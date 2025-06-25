@@ -1,0 +1,20 @@
+[project]
+name = "jellyfin-ollama-chat"
+version = "0.1.0"
+description = "Django + Langchain + Ollama GPU queue for Jellyfin integration"
+authors = [{ name = "SGloop", email = "dev@custard.solutions" }]
+dependencies = [
+    "Django>=5.0",
+    "langchain>=0.1.0",
+    "psycopg[binary]>=3.1",
+    "django-environ",
+    "httpx",
+    "django-q2",
+    "uvicorn",
+    "gunicorn"
+]
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
