@@ -1,6 +1,20 @@
 FROM python:3.12-slim
+
+# Install PostgreSQL client and curl for health checks
+RUN apt-get update && \
+    apt-get install -y postgresql-client curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
+
+# Copy only what's needed for layer caching
 COPY pyproject.toml ./
-COPY . .
+COPY src/ ./src/
+COPY docker/worker/entrypoint.sh ./docker/worker/entrypoint.sh
+
+# Install Python dependencies (PEP 621 + hatch)
 RUN pip install --upgrade pip && pip install --no-cache-dir .
+
+# Set entrypoint
 ENTRYPOINT ["./docker/worker/entrypoint.sh"]

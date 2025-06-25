@@ -1,7 +1,23 @@
 FROM python:3.12-slim
+
+# Install PostgreSQL tools and curl for health checks
+RUN apt-get update && \
+    apt-get install -y postgresql-client curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
+
+# Copy pyproject first for Docker cache optimization
 COPY pyproject.toml ./
-COPY . .
+
+# Then copy actual source code and web entrypoint
+COPY src/ ./src/
+COPY docker/web/entrypoint.sh ./docker/web/entrypoint.sh
+
+# Install dependencies using Hatch (PEP 621 layout)
 RUN pip install --upgrade pip && pip install --no-cache-dir .
+
 EXPOSE 8000
+
 ENTRYPOINT ["./docker/web/entrypoint.sh"]
