@@ -47,43 +47,45 @@ This will:
 
 ## 🧱 Project Layout
 
+```
 Jellyfin.Ollama.Chat/
 ├── .env                     # Active environment config (copied from .env.example)
-├── .env.example            # Sample configuration (PostgreSQL, Ollama, etc.)
-├── .gitignore              # Excludes volumes, Python cache, .env, etc.
-├── build.ps1               # PowerShell build & launch script
-├── build.sh                # Bash equivalent of build.ps1
-├── docker-compose.dev.yml # Full dev stack: Django, Ollama, Qdrant, etc.
-├── manage.py               # Django launcher (DJANGO_SETTINGS_MODULE points to webserver.settings)
-├── pyproject.toml          # Project config (PEP 621, hatchling)
-├── README.md               # Dev-friendly instructions and architecture overview
+├── .env.example             # Sample env values (Postgres, Ollama, etc.)
+├── .gitignore               # Ignores Python cache, Docker volumes, secrets
+├── build.ps1                # PowerShell: builds + runs the dev stack
+├── build.sh                 # Bash equivalent of build.ps1
+├── docker-compose.dev.yml  # Dev environment definition
+├── manage.py                # Django launcher (uses webserver.settings)
+├── pyproject.toml           # PEP 621 + hatch config
+├── README.md                # This file
 
-├── docker/                         # All container-related logic
+├── docker/
 │   ├── ingestor/
-│   │   ├── Dockerfile.dev         # Builds the ingestor container from src/ingestor
-│   │   └── entrypoint.sh          # Waits for Qdrant, Ollama, then runs LangChain ingestion
+│   │   ├── Dockerfile.dev       # Ingestor container (LangChain + vector upload)
+│   │   └── entrypoint.sh        # Waits for Qdrant/Ollama, then runs ingest
 │   ├── vectordb/
-│   │   ├── Dockerfile             # Extends qdrant/qdrant, adds custom healthcheck.sh
-│   │   └── healthcheck.sh         # Robust check for Qdrant readiness
+│   │   ├── Dockerfile           # Extends qdrant/qdrant to include a healthcheck script
+│   │   └── healthcheck.sh       # Robust startup check for Qdrant
 │   ├── web/
-│   │   ├── Dockerfile.dev         # Django app container (builds from pyproject + src/)
-│   │   └── entrypoint.sh          # Waits for PostgreSQL, runs migrations, starts dev server
+│   │   ├── Dockerfile.dev       # Django container
+│   │   └── entrypoint.sh        # Waits for DB, runs migrate + runserver
 │   └── worker/
-│       ├── Dockerfile.dev         # LangChain query container
-│       └── entrypoint.sh          # Waits for Ollama, Qdrant, PostgreSQL, then runs LangChain
+│       ├── Dockerfile.dev       # RAG query worker (LangChain + Ollama)
+│       └── entrypoint.sh        # Waits for dependencies, then runs LangChain
 
-├── src/                            # All source code lives here
+├── src/
 │   ├── ingestor/
-│   │   └── main.py                # Embeds Jellyfin data into Qdrant using LangChain
+│   │   └── main.py              # Embeds Jellyfin metadata into Qdrant
 │   ├── webserver/
-│   │   ├── __init__.py           # Marks this as a Python module
-│   │   ├── asgi.py               # ASGI entrypoint
-│   │   ├── settings.py           # Django config (updated to use 'webserver' module path)
-│   │   ├── urls.py               # Routing
-│   │   └── wsgi.py               # WSGI entrypoint
+│   │   ├── __init__.py
+│   │   ├── asgi.py
+│   │   ├── settings.py          # Django settings (DJANGO_SETTINGS_MODULE=webserver.settings)
+│   │   ├── urls.py
+│   │   └── wsgi.py
 │   └── worker/
-│       └── main.py              # LangChain RAG query execution using Ollama
+│       └── main.py              # RAG query handler using LangChain + Ollama
 
+```
 
 ---
 
