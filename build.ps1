@@ -2,6 +2,7 @@
 Jellyfin.Ollama.Chat Build Script
 • Loads .env
 • Validates docker + compose
+• Determines python3/python fallback
 • Builds and launches containers
 #>
 
@@ -21,6 +22,18 @@ if (-not (Test-Path $ComposeFile)) {
     Write-Host "❌ Compose file '$ComposeFile' not found." -ForegroundColor Red
     exit 1
 }
+
+# Resolve python3 or python
+$python = Get-Command python3 -ErrorAction SilentlyContinue
+if (-not $python) {
+    $python = Get-Command python -ErrorAction SilentlyContinue
+}
+if (-not $python) {
+    Write-Host "❌ No python3 or python found in PATH." -ForegroundColor Red
+    exit 1
+}
+$env:PYTHON_EXECUTABLE = $python.Source
+Write-Host "🐍 Using Python: $env:PYTHON_EXECUTABLE" -ForegroundColor Green
 
 # Load .env if present
 if (Test-Path ".env") {

@@ -1,4 +1,4 @@
-from langchain_community.vectorstores import Qdrant
+from langchain_qdrant import Qdrant
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
 import os

@@ -1,9 +1,7 @@
 <#
 One-click Jellychat bootstrap (Windows)
 • Deletes any existing .venv
-• Finds highest Python 3.x:
-    – py launcher if present
-    – else C:\Python###\python.exe fallbacks
+• Requires Python 3.13+ via py launcher
 • Creates .venv and installs in editable mode
 • No global env persistence — fully repo-isolated
 #>
@@ -13,26 +11,21 @@ $ErrorActionPreference = "Stop"
 
 function Find-Python {
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        $ver = (& py -0p) |
-               Where-Object { $_ -match '-3\.(\d+)-64' } |
-               Sort-Object { [int]$Matches[1] } -Descending |
-               Select-Object -First 1
-        if ($ver) {
-            return "py $($ver -replace ' .*','' -replace '-64$','')"
+        try {
+            $ver = & py -3.13 --version
+            if ($LASTEXITCODE -eq 0 -and $ver -match "3\.13") {
+                return "py -3.13"
+            }
+        } catch {
+            # Continue to throw below
         }
     }
-    $candidates = @(
-        'C:\Python312\python.exe',
-        'C:\Python311\python.exe',
-        'C:\Python310\python.exe'
-    )
-    foreach ($p in $candidates) {
-        if (Test-Path $p) { return $p }
-    }
-    throw "No suitable Python 3.x interpreter found."
+
+    throw "❌ Python 3.13 not found via py launcher. Please ensure it's installed and available via 'py -3.13'."
 }
 
 $python = Find-Python
+$env:PYTHON_EXECUTABLE = $python
 $env:PIP_NO_NETWORK_SSL_VERIFY = '1'
 
 Write-Host "🐍 Using interpreter: $python"
@@ -44,10 +37,11 @@ if (Test-Path ".venv") {
 }
 
 # ✅ Create new virtual environment
-& $python -m venv .venv
+$parts = $python.Split(" ")
+& $parts[0] $parts[1..($parts.Length - 1)] -m venv .venv
 
 # 🔁 Activate and install in editable mode
 & .\.venv\Scripts\Activate.ps1
-pip install -e .
+pip install -e .[dev]
 
 Write-Host "`n✅ Jellychat .venv ready and activated."

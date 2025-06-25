@@ -3,7 +3,7 @@ import json
 import asyncio
 import redis.asyncio as redis
 from langchain.chains import RetrievalQA
-from langchain_community.vectorstores import Qdrant
+from langchain_qdrant import Qdrant
 from langchain_ollama import Ollama
 
 # Init Redis

@@ -1,10 +1,13 @@
 import os
 from pprint import pprint
 from src.rag.formatter import render_media_text_block
-from langchain.embeddings import OllamaEmbeddings
-from langchain_community.vectorstores import Qdrant
+
+from langchain_ollama import OllamaEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
 from uuid import uuid4
 
+# 1. Render via Jinja2
 sample_entry = {
     "title": "The Matrix",
     "year": 1999,
@@ -16,14 +19,10 @@ sample_entry = {
     "media_type": "Movie",
     "language": "English"
 }
-
-# Step 1: Render via Jinja2
 text_block = render_media_text_block(sample_entry)
-print("📝 Rendered text:\n")
-print(text_block)
-print("\n" + "="*60)
+print("📝 Rendered text:\n", text_block)
 
-# Step 2: Embed via Ollama
+# 2. Embed via Ollama
 embedder = OllamaEmbeddings(
     model=os.getenv("OLLAMA_MODEL", "mistral"),
     base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
@@ -31,12 +30,16 @@ embedder = OllamaEmbeddings(
 vector = embedder.embed_documents([text_block])
 print(f"\n🔢 Vector length: {len(vector[0])}")
 
-# Step 3: Store in Qdrant
+# 3. Store in Qdrant
 doc_id = str(uuid4())
-qdrant = Qdrant(
+qdrant_client = QdrantClient(url=os.getenv("VECTORDB_URL", "http://vectordb:6333"))
+collection_name = os.getenv("VECTORDB_COLLECTION", "jellyfin_rag")
+
+# Use `from_documents` helper to create/reuse a collection, auto-creating as needed
+qdrant_store = QdrantVectorStore.from_documents(
+    texts=[text_block],
+    embeddings=embedder,
     url=os.getenv("VECTORDB_URL", "http://vectordb:6333"),
-    collection_name=os.getenv("VECTORDB_COLLECTION", "jellyfin_rag"),
-    prefer_grpc=False
+    collection_name=collection_name
 )
-qdrant.add_texts(texts=[text_block], metadatas=None, ids=[doc_id], embeddings=vector)
-print(f"\n✅ Stored in Qdrant with ID: {doc_id}")
+print(f"\n✅ Stored in Qdrant in collection '{collection_name}'")

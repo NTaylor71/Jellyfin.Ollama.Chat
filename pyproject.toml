@@ -3,25 +3,25 @@ name = "jellyfin-ollama-chat"
 version = "0.1.0"
 description = "Jellyfin LLM integration with FastAPI, LangChain, Redis, and Ollama"
 authors = [{ name = "SGloop", email = "dev@custard.solutions" }]
+requires-python = ">=3.13"
+
 dependencies = [
     "fastapi>=0.110.0",
     "pydantic>=2.0",
-    "langchain>=0.1.0",
+    "langchain>=0.3.26",
+    "langchain-ollama>=0.3.3",
+    "langchain-qdrant",
     "httpx",
     "redis>=5.0.0",
-    "uvicorn"m
-    "langchain-ollama",
-    "langchain-community",  # for Qdrant wrapper
-    "pydantic",             # already added for FastAPI
+    "uvicorn",
+    "jinja2"
 ]
-
-requires-python = ">=3.12"
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "httpx",
-    "redis",
+    "redis"
 ]
 
 [tool.pytest.ini_options]
@@ -32,3 +32,6 @@ addopts = "-q --tb=short"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
