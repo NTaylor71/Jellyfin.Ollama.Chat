@@ -1,0 +1,25 @@
+{{ title }} ({{ year }}) is a {% if genres %}{{ genres | join(', ') }}{% else %}{{ media_type.lower() }}{% endif %} {{ media_type.lower() }}.
+
+{% if overview %}
+Summary:
+{{ overview }}
+{% endif %}
+
+{% if genres %}
+Genres: {{ genres | join(', ') }}
+{% endif %}
+
+{% if tagline %}
+Tagline: "{{ tagline }}"
+{% endif %}
+
+{% if actors %}
+Cast: {{ actors | join(', ') }}
+{% endif %}
+
+{% if certificate %}
+Certificate: {{ certificate }}
+{% endif %}
+
+Media Type: {{ media_type }}
+Language: {{ language }}

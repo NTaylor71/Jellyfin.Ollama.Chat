@@ -1,141 +1,91 @@
-# Jellyfin.Ollama.Chat
+Jellyfin.Ollama.Chat - Developer Guide
+======================================
 
-Local-first AI chatbot for your Jellyfin library.  
-Powered by Django, LangChain, Ollama, and Qdrant.
+🧠 What This Project Does
+--------------------------
+1. Accepts Jellyfin metadata via POST /api/ingest
+2. Converts each item to a richly formatted semantic block using Jinja2
+3. Embeds using Ollama + LangChain
+4. Stores in Qdrant for semantic vector search
+5. Accepts chat queries via POST /chat, queues them in Redis
+6. Asynchronously processes jobs via worker, returning result via GET /chat/result/{job_id}
 
----
 
-## 🚀 Quick Start (for Developers)
+💻 Developer Tips
+------------------
 
-### 1. Clone the Repo
+• Run full test suite:
 
-    git clone https://github.com/YOUR_ORG/Jellyfin.Ollama.Chat.git
-    cd Jellyfin.Ollama.Chat
+    pytest
 
-### 2. Setup `.env`
+• Run individual tests manually:
 
-    cp .env.example .env
+    python tests/test_chat.py
+    python tests/test_ingest_and_query.py
 
-Edit the `.env` file if needed (e.g. change database password or Ollama model).
+• Use the CLI dev tool:
 
----
+    python scripts/dev.py cli
 
-### 3. Build and Launch
+• Other CLI actions:
 
-**Windows (PowerShell):**
+    python scripts/dev.py test-chat
+    python scripts/dev.py test-ingest-query
 
-    ./build.ps1
+• Manually ingest a batch via API:
 
-**Linux/macOS (Bash):**
+    curl -X POST http://localhost:8000/api/ingest \
+      -H "Content-Type: application/json" \
+      -d '{"replace": true, "entries": [ ... ]}'
 
-    ./build.sh
+• Submit a chat query manually:
 
-This will:
-- Build Docker containers for Django, LangChain worker, ingestor, PostgreSQL, Ollama, and Qdrant
-- Launch everything in dev mode
+    curl -X POST http://localhost:8000/chat \
+      -H "Content-Type: application/json" \
+      -d '{"query": "sci-fi movies about simulation"}'
 
----
+• Poll for result:
 
-## 🧪 Services
+    curl http://localhost:8000/chat/result/<job_id>
 
-    Django (API/admin):   http://localhost:8000
-    Qdrant UI:            http://localhost:6333
-    Ollama (LLM):         http://localhost:12434
-    Postgres:             localhost:5432
+• Run just the worker manually:
 
----
+    docker compose -f docker-compose.dev.yml run --rm worker
 
-## 🧱 Project Layout
 
-```
-Jellyfin.Ollama.Chat/
-├── .env                     # Active environment config (copied from .env.example)
-├── .env.example             # Sample env values (Postgres, Ollama, etc.)
-├── .gitignore               # Ignores Python cache, Docker volumes, secrets
-├── build.ps1                # PowerShell: builds + runs the dev stack
-├── build.sh                 # Bash equivalent of build.ps1
-├── docker-compose.dev.yml  # Dev environment definition
-├── manage.py                # Django launcher (uses webserver.settings)
-├── pyproject.toml           # PEP 621 + hatch config
-├── README.md                # This file
+🛠 Troubleshooting
+-------------------
 
-├── docker/
-│   ├── ingestor/
-│   │   ├── Dockerfile.dev       # Ingestor container (LangChain + vector upload)
-│   │   └── entrypoint.sh        # Waits for Qdrant/Ollama, then runs ingest
-│   ├── vectordb/
-│   │   ├── Dockerfile           # Extends qdrant/qdrant to include a healthcheck script
-│   │   └── healthcheck.sh       # Robust startup check for Qdrant
-│   ├── web/
-│   │   ├── Dockerfile.dev       # Django container
-│   │   └── entrypoint.sh        # Waits for DB, runs migrate + runserver
-│   └── worker/
-│       ├── Dockerfile.dev       # RAG query worker (LangChain + Ollama)
-│       └── entrypoint.sh        # Waits for dependencies, then runs LangChain
+• Qdrant is unhealthy:
+    Wait for startup, or inspect: docker logs jellychat_vectordb
 
-├── src/
-│   ├── ingestor/
-│   │   └── main.py              # Embeds Jellyfin metadata into Qdrant
-│   ├── webserver/
-│   │   ├── __init__.py
-│   │   ├── asgi.py
-│   │   ├── settings.py          # Django settings (DJANGO_SETTINGS_MODULE=webserver.settings)
-│   │   ├── urls.py
-│   │   └── wsgi.py
-│   └── worker/
-│       └── main.py              # RAG query handler using LangChain + Ollama
+• Ollama not responding:
+    Ensure the model is downloaded and GPU/CPU is available
 
-```
+• Redis not processing jobs:
+    Confirm Redis and worker are both running, and polling from chat:queue
 
----
+• No result after sending a job:
+    Use: python scripts/dev.py test-chat to simulate a known-working roundtrip
 
-## 🧠 What This Project Does
+• Reset persistent data (Qdrant, Ollama models, etc.):
 
-1. Ingests your Jellyfin media metadata into a vector DB (Qdrant)
-2. Embeds it using Ollama + LangChain
-3. Supports querying your media collection via natural language
-4. Runs 100% locally with GPU acceleration (if supported)
+    docker compose -f docker-compose.dev.yml down -v
 
----
 
-## 💻 Developer Tips
+✅ Requirements
+----------------
 
-- Run just the ingest step:
+• Docker + Docker Compose
+• GPU optional (Ollama will fall back to CPU if not available)
+• Python 3.12+ only required for running dev_setup.ps1, tests/, and CLI tools
 
-      docker compose run --rm ingestor
 
-- Run just the query worker:
-
-      docker compose run --rm worker
-
-- Inspect the database:
-
-      docker exec -it jellychat_db psql -U chatdb
-
----
-
-## 🛠 Troubleshooting
-
-- Qdrant is unhealthy:
-      wait a few seconds or inspect the healthcheck log
-- Django crash: `ModuleNotFoundError`
-      → make sure DJANGO_SETTINGS_MODULE is set to `"webserver.settings"`
-- Database errors:
-      → ensure POSTGRES_DB in `.env` is `chatdb`
-- Reset persistent state:
-      docker compose down -v
-
----
-
-## ✅ Requirements
-
-- Docker + Docker Compose
-- GPU optional (Ollama will fall back to CPU)
-- Python 3.12+ required only if developing outside Docker
-
----
-
-## 🫶 Contributing
+🫶 Contributing
+----------------
 
 Pull requests welcome!  
-Please include clear commit messages and test your changes locally.
+Please include clear commit messages and test your changes locally via:
+
+    pytest
+    python scripts/dev.py test-ingest-query
