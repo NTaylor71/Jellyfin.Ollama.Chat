@@ -38,7 +38,7 @@ collection_name = os.getenv("VECTORDB_COLLECTION", "jellyfin_rag")
 # Use `from_documents` helper to create/reuse a collection, auto-creating as needed
 qdrant_store = QdrantVectorStore.from_documents(
     texts=[text_block],
-    embeddings=embedder,
+    embedding=embedder,
     url=os.getenv("VECTORDB_URL", "http://vectordb:6333"),
     collection_name=collection_name
 )

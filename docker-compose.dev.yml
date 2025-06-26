@@ -15,14 +15,16 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - ./docker/wait_for_services.sh:/wait_for_services.sh:ro
     depends_on:
-      redis:
-        condition: service_started
-      ollama:
-        condition: service_healthy
+      - redis
+      - ollama
+      - vectordb
+    environment:
+      - ENV=docker
     env_file:
       - .env
-    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    entrypoint: ["/bin/bash", "/app/docker/api/entrypoint.sh"]
 
   worker:
     build:
@@ -30,14 +32,16 @@ services:
       dockerfile: docker/worker/Dockerfile.dev
     container_name: jellychat_worker
     depends_on:
-      redis:
-        condition: service_started
-      ollama:
-        condition: service_healthy
-      vectordb:
-        condition: service_healthy
+      - redis
+      - ollama
+      - vectordb
     volumes:
       - .:/app
+      - ./docker/wait_for_services.sh:/wait_for_services.sh:ro
+    environment:
+      - ENV=docker
+      - VECTORDB_URL=http://vectordb:6333
+      - OLLAMA_BASE_URL=http://jellychat_ollama:11434
     env_file:
       - .env
     command: ["./docker/worker/entrypoint.sh"]
@@ -69,7 +73,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 120
-      
+
   vectordb:
     build:
       context: .
@@ -81,12 +85,11 @@ services:
       - qdrant_data:/qdrant/storage
     healthcheck:
       test: ["CMD", "/healthcheck.sh"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 2s
+      timeout: 2s
+      retries: 30
     depends_on:
-      ollama:
-        condition: service_healthy
+      - ollama
 
   ingestor:
     build:
@@ -94,14 +97,16 @@ services:
       dockerfile: docker/ingestor/Dockerfile.dev
     container_name: jellychat_ingestor
     depends_on:
-      redis:
-        condition: service_started
-      vectordb:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
+      - redis
+      - ollama
+      - vectordb
     volumes:
       - .:/app
+      - ./docker/wait_for_services.sh:/wait_for_services.sh:ro
+    environment:
+      - ENV=docker
+      - VECTORDB_URL=http://vectordb:6333
+      - OLLAMA_BASE_URL=http://jellychat_ollama:11434
     env_file:
       - .env
     command: ["./docker/ingestor/entrypoint.sh"]

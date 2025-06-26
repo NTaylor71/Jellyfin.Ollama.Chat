@@ -4,8 +4,8 @@ import asyncio
 import redis.asyncio as redis
 import httpx
 from uuid import uuid4
+from src.config import r
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 QUEUE = "chat:queue"
 RESULT_PREFIX = "chat:result:"
@@ -25,7 +25,9 @@ sample_entry = {
 
 async def ingest_sample():
     print("📥 Ingesting sample...")
-    async with httpx.AsyncClient() as client:
+
+    # TODO : timeout=None : remove once Redis queue is a thing
+    async with httpx.AsyncClient(timeout=None) as client:
         resp = await client.post(f"{API_URL}/api/ingest", json={
             "replace": True,
             "entries": [sample_entry]
@@ -37,7 +39,6 @@ async def query_sample():
     job_id = str(uuid4())
     payload = {"job_id": job_id, "user_id": "test", "query": "movies about simulated reality"}
 
-    r = redis.from_url(REDIS_URL)
     await r.rpush(QUEUE, json.dumps(payload))
 
     print(f"🧠 Sent query job: {job_id}")

@@ -13,7 +13,7 @@ dependencies = [
     "langchain-qdrant",
     "httpx",
     "redis>=5.0.0",
-    "uvicorn",
+    "uvicorn[standard]",
     "jinja2"
 ]
 

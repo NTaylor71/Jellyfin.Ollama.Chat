@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "🌐 Ingestor Environment:"
+echo "🌐 API Environment:"
 echo "VECTORDB_URL: $VECTORDB_URL"
 echo "OLLAMA_BASE_URL: $OLLAMA_BASE_URL"
+echo "REDIS_HOST: $REDIS_HOST"
 
 source /wait_for_services.sh
 
 wait_for_service "Qdrant vector DB" "$VECTORDB_URL/collections"
 wait_for_service "Ollama" "$OLLAMA_BASE_URL/api/tags"
+wait_for_service "Redis" "$REDIS_HOST:6379/ping"
 
-echo "📥 Starting ingestion script..."
-exec python /app/src/ingestor/main.py
+echo "🚀 Starting API server..."
+exec uvicorn src.api.main:app --host 0.0.0.0 --port 8000
