@@ -11,13 +11,13 @@ services:
       timeout: 2s
       retries: 30
 
-  ollama:
+  ollama_embed:
     image: ollama/ollama
-    container_name: ollama
+    container_name: ollama_embed
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     environment:
       - ENV=docker
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_MODEL=${OLLAMA_EMBED_MODEL}
       - NVIDIA_VISIBLE_DEVICES=all
     env_file:
       - .env
@@ -29,9 +29,41 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      - ./docker/ollama/entrypoint.sh:/entrypoint.sh:ro
-      - ./docker/ollama/healthcheck.sh:/healthcheck.sh:ro
-      - ollama-models:/root/.ollama
+      - ./docker/ollama_embed/entrypoint.sh:/entrypoint.sh:ro
+      - ./docker/ollama_embed/healthcheck.sh:/healthcheck.sh:ro
+      - ollama-embed-models:/root/.ollama
+    ports:
+      - "12435:11434"
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 120
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ollama_chat:
+    image: ollama/ollama
+    container_name: ollama_chat
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    environment:
+      - ENV=docker
+      - OLLAMA_MODEL=${OLLAMA_CHAT_MODEL}
+      - NVIDIA_VISIBLE_DEVICES=all
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./docker/ollama_chat/entrypoint.sh:/entrypoint.sh:ro
+      - ./docker/ollama_chat/healthcheck.sh:/healthcheck.sh:ro
+      - ollama-chat-models:/root/.ollama
     ports:
       - "12434:11434"
     healthcheck:
@@ -60,9 +92,9 @@ services:
     environment:
       - ENV=docker
       - VECTORDB_URL=http://faiss_service:6333
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBED_BASE_URL=http://ollama_embed:11434
     depends_on:
-      ollama:
+      ollama_embed:
         condition: service_healthy
 
   api:
@@ -81,33 +113,12 @@ services:
     environment:
       - ENV=docker
       - VECTORDB_URL=http://faiss_service:6333
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBED_BASE_URL=http://ollama_embed:11434
+      - OLLAMA_CHAT_BASE_URL=http://ollama_chat:11434
       - REDIS_HOST=redis
     env_file:
       - .env
     entrypoint: ["/bin/bash", "/app/docker/api/entrypoint.sh"]
-
-  redis_queue_worker:
-    build:
-      context: .
-      dockerfile: docker/redis_queue_worker/Dockerfile
-    container_name: redis_queue_worker
-    depends_on:
-      faiss_service:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    volumes:
-      - .:/app
-      - ./docker/wait_for_services.sh:/wait_for_services.sh:ro
-    environment:
-      - ENV=docker
-      - VECTORDB_URL=http://faiss_service:6333
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - REDIS_HOST=redis
-    env_file:
-      - .env
-    entrypoint: ["./docker/redis_queue_worker/entrypoint.sh"]
 
   gpu_queue_worker:
     build:
@@ -117,7 +128,9 @@ services:
     depends_on:
       faiss_service:
         condition: service_healthy
-      ollama:
+      ollama_embed:
+        condition: service_healthy
+      ollama_chat:
         condition: service_healthy
     volumes:
       - .:/app
@@ -125,7 +138,8 @@ services:
     environment:
       - ENV=docker
       - VECTORDB_URL=http://faiss_service:6333
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBED_BASE_URL=http://ollama_embed:11434
+      - OLLAMA_CHAT_BASE_URL=http://ollama_chat:11434
       - REDIS_HOST=redis
     env_file:
       - .env
@@ -139,17 +153,20 @@ services:
     depends_on:
       faiss_service:
         condition: service_healthy
+      ollama_embed:
+        condition: service_healthy
     volumes:
       - .:/app
       - ./docker/wait_for_services.sh:/wait_for_services.sh:ro
     environment:
       - ENV=docker
       - VECTORDB_URL=http://faiss_service:6333
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBED_BASE_URL=http://ollama_embed:11434
       - REDIS_HOST=redis
     env_file:
       - .env
     entrypoint: ["./docker/faiss_ingestor/entrypoint.sh"]
 
 volumes:
-  ollama-models:
+  ollama-embed-models:
+  ollama-chat-models:

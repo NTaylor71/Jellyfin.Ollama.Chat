@@ -5,11 +5,11 @@ import redis.asyncio as redis
 import httpx
 from src.config import REDIS_URL
 from src.config import (
-    GPU_QUEUE,
-    GPU_RESULT_PREFIX,
-    GPU_ERROR_PREFIX,
-    OLLAMA_BASE_URL,
-    OLLAMA_MODEL
+    REDIS_QUEUE,
+    RESULT_PREFIX,
+    ERROR_PREFIX,
+    OLLAMA_EMBED_BASE_URL,
+    OLLAMA_EMBED_MODEL
 )
 
 async def gpu_worker_loop():
@@ -20,7 +20,7 @@ async def gpu_worker_loop():
     try:
         while True:
             try:
-                job = await r.blpop(GPU_QUEUE, timeout=5)
+                job = await r.blpop(REDIS_QUEUE, timeout=5)
                 if job:
                     _, job_data = job
                     job_obj = json.loads(job_data.decode())
@@ -32,10 +32,10 @@ async def gpu_worker_loop():
                     embedding = await get_embedding_from_ollama(prompt)
 
                     if embedding:
-                        await r.set(f"{GPU_RESULT_PREFIX}{job_id}", json.dumps(embedding), ex=60)
+                        await r.set(f"{RESULT_PREFIX}{job_id}", json.dumps(embedding), ex=60)
                         print(f"✅ GPU embedding job {job_id} completed.")
                     else:
-                        await r.set(f"{GPU_ERROR_PREFIX}{job_id}", "Embedding generation failed.", ex=60)
+                        await r.set(f"{ERROR_PREFIX}{job_id}", "Embedding generation failed.", ex=60)
                         print(f"❌ GPU embedding job {job_id} failed.")
 
                 await asyncio.sleep(0.1)
@@ -49,10 +49,10 @@ async def gpu_worker_loop():
         print("🛑 Redis connection closed.")
 
 async def get_embedding_from_ollama(prompt: str) -> list:
-    """Send embedding request to Ollama and return the embedding vector."""
+    """Send embedding request to Ollama Embed service and return the embedding vector."""
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(f"{OLLAMA_BASE_URL}/api/embeddings", json={"model": OLLAMA_MODEL, "prompt": prompt})
+            response = await client.post(f"{OLLAMA_EMBED_BASE_URL}/api/embeddings", json={"model": OLLAMA_EMBED_MODEL, "prompt": prompt})
             response.raise_for_status()
             embedding = response.json().get("embedding", [])
             return embedding

@@ -1,5 +1,3 @@
-# /src/gpu_queue_worker/main.py
-
 import asyncio
 from src.gpu_queue_worker.gpu_worker import gpu_worker_loop
 

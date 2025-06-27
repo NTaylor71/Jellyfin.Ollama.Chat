@@ -13,14 +13,14 @@ dependencies = [
     "uvicorn[standard]",
     "jinja2",
     "faiss-cpu",
-    "pathspec"
+    "pathspec",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "httpx",
-    "redis"
+    "redis",
 ]
 
 [tool.pytest.ini_options]

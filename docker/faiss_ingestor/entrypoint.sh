@@ -3,12 +3,12 @@ set -e
 
 echo "🌐 FAISS Ingestor Environment:"
 echo "VECTORDB_URL: $VECTORDB_URL"
-echo "OLLAMA_BASE_URL: $OLLAMA_BASE_URL"
+echo "OLLAMA_EMBED_BASE_URL: $OLLAMA_EMBED_BASE_URL"
 
 source /wait_for_services.sh
 
 wait_for_service "FAISS vector DB" "$VECTORDB_URL/health"
-wait_for_service "Ollama" "$OLLAMA_BASE_URL/api/tags"
+wait_for_service "Ollama Embed" "$OLLAMA_EMBED_BASE_URL/api/tags"
 
 echo "📥 Starting ingestion script..."
 exec python /app/src/faiss_ingestor/main.py

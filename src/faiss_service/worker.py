@@ -1,14 +1,16 @@
-import os
 import json
 import asyncio
 import redis.asyncio as redis
 import httpx
-from src.config import r
+from src.config import (
+    r,
+    REDIS_QUEUE,
+    GPU_RESULT_PREFIX,
+    GPU_ERROR_PREFIX,
+    OLLAMA_CHAT_BASE_URL
+)
 
-QUEUE_NAME = os.getenv("REDIS_QUEUE", "chat:queue")
-RESULT_PREFIX = "chat:result:"
-ERROR_PREFIX = "chat:error:"
-API_URL = os.getenv("API_URL", "http://jellychat_ollama:11434/api/chat")
+API_URL = f"{OLLAMA_CHAT_BASE_URL}/api/chat"
 
 
 async def wait_for_service(name: str, url: str, check_key: str = "status", success_value: str = "ok", max_attempts: int = 30, delay: float = 2.0):
@@ -48,21 +50,21 @@ async def handle_job(job: dict) -> None:
             response.raise_for_status()
             answer = response.json().get("response", "").strip()
 
-        await r.set(f"{RESULT_PREFIX}{job_id}", answer)
+        await r.set(f"{GPU_RESULT_PREFIX}{job_id}", answer)
         print(f"✅ Job complete: {job_id}")
 
     except Exception as e:
-        await r.set(f"{ERROR_PREFIX}{job_id}", str(e))
+        await r.set(f"{GPU_ERROR_PREFIX}{job_id}", str(e))
         print(f"❌ Job failed: {job_id} | Error: {str(e)}")
 
 
 async def worker_loop() -> None:
-    await wait_for_service("Ollama", os.getenv("OLLAMA_BASE_URL", "http://ollama:11434") + "/api/tags", check_key="status_code")
+    await wait_for_service("Ollama Chat", f"{OLLAMA_CHAT_BASE_URL}/api/tags", check_key="status_code")
 
-    print(f"🚀 Worker listening on queue: {QUEUE_NAME}")
+    print(f"🚀 Worker listening on queue: {REDIS_QUEUE}")
     while True:
         try:
-            job_json = await r.blpop(QUEUE_NAME, timeout=0)
+            job_json = await r.blpop(REDIS_QUEUE, timeout=0)
             if job_json:
                 _, job_data = job_json
                 job = json.loads(job_data)

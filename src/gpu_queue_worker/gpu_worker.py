@@ -1,102 +1,99 @@
-# /src/gpu_queue_worker/gpu_worker.py
-
 import asyncio
 import json
 import httpx
-from src.config import OLLAMA_BASE_URL, r
-from src.config import GPU_QUEUE, GPU_RESULT_PREFIX, GPU_ERROR_PREFIX
+from src.config import (
+    OLLAMA_EMBED_BASE_URL,
+    OLLAMA_CHAT_BASE_URL,
+    r,
+    REDIS_QUEUE,
+    RESULT_PREFIX,
+    ERROR_PREFIX,
+    OLLAMA_EMBED_MODEL,
+    OLLAMA_CHAT_MODEL
+)
+from src.ollama_service.embedding_client import get_ollama_embedding
+from src.ollama_service.chat_client import get_ollama_chat_response
 
-
-VECTOR_DIM = 4096
-
-import httpx
-import asyncio
-
-async def check_ollama_model_ready(max_retries=10, delay=5):
-    """
-    Check if Ollama model is ready. Will retry up to `max_retries` times with `delay` seconds between retries.
-    """
+async def check_ollama_model_ready(base_url, max_retries=10, delay=5):
     retries = 0
     while retries < max_retries:
         async with httpx.AsyncClient(timeout=30) as client:
             try:
-                # Attempt to get the model's status
-                response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+                response = await client.get(f"{base_url}/api/tags")
                 if response.status_code == 200:
-                    print("✅ Ollama model is ready.")
+                    print(f"✅ Ollama model at {base_url} is ready.")
                     return True
                 else:
-                    print(f"❌ Ollama returned an unexpected status: {response.status_code}")
+                    print(f"❌ Ollama at {base_url} returned an unexpected status: {response.status_code}")
             except httpx.RequestError as e:
-                print(f"⚠️ Error checking Ollama status: {e}")
+                print(f"⚠️ Error checking Ollama status at {base_url}: {e}")
 
         retries += 1
-        print(f"⏳ Retrying in {delay} seconds... (Attempt {retries}/{max_retries})")
+        print(f"⏳ Retrying {base_url} in {delay} seconds... (Attempt {retries}/{max_retries})")
         await asyncio.sleep(delay)
 
-    print("❌ Ollama model is not ready after maximum retries.")
+    print(f"❌ Ollama model at {base_url} is not ready after maximum retries.")
     return False
 
 
 async def gpu_worker_loop():
-    """Asynchronous GPU queue worker loop."""
-    print("🚀 GPU Queue Worker is ready. Listening for GPU jobs...")
+    """Asynchronous Redis queue worker loop for multi-purpose tasks."""
+    print("🚀 Redis Queue Worker is ready. Listening for jobs...")
 
     try:
         while True:
-            # Wait for the Ollama model to be ready before processing any job
-            model_ready = await check_ollama_model_ready(max_retries=5, delay=10)
-            if not model_ready:
-                print("❌ Exiting loop: Model not ready after retries.")
-                continue  # You can break here if you want to exit the loop, or keep trying indefinitely
-
             try:
-                job = await r.blpop(GPU_QUEUE, timeout=5)
+                job = await r.blpop(REDIS_QUEUE, timeout=5)
                 if job:
                     _, job_data = job
                     job_obj = json.loads(job_data.decode())
                     job_id = job_obj.get("job_id")
+                    task_type = job_obj.get("task_type", "embedding")
                     prompt = job_obj.get("prompt", "")
 
-                    print(f"🔧 Processing GPU job: {job_id}")
+                    print(f"🔧 Processing job: {job_id} | Type: {task_type}")
 
-                    try:
-                        embedding = await get_ollama_embedding(prompt)
+                    if task_type == "embedding":
+                        model_ready = await check_ollama_model_ready(OLLAMA_EMBED_BASE_URL, max_retries=5, delay=10)
+                        if not model_ready:
+                            await r.set(f"{ERROR_PREFIX}{job_id}", "Embedding model not ready.")
+                            print(f"❌ Embedding model not ready for job {job_id}.")
+                            continue
 
+                        embedding = await get_ollama_embedding(prompt, model=OLLAMA_EMBED_MODEL)
                         if embedding:
-                            await r.set(f"{GPU_RESULT_PREFIX}{job_id}", json.dumps(embedding))
-                            print(f"✅ GPU job {job_id} completed successfully.")
+                            await r.set(f"{RESULT_PREFIX}{job_id}", json.dumps(embedding))
+                            print(f"✅ Embedding job {job_id} completed successfully.")
                         else:
-                            await r.set(f"{GPU_ERROR_PREFIX}{job_id}", "Embedding failed or dimension mismatch.")
-                            print(f"❌ GPU job {job_id} failed due to embedding issue.")
+                            await r.set(f"{ERROR_PREFIX}{job_id}", "Embedding failed or returned empty.")
+                            print(f"❌ Embedding job {job_id} failed.")
 
-                    except Exception as e:
-                        await r.set(f"{GPU_ERROR_PREFIX}{job_id}", str(e))
-                        print(f"❌ GPU job {job_id} failed: {e}")
+                    elif task_type == "chat":
+                        model_ready = await check_ollama_model_ready(OLLAMA_CHAT_BASE_URL, max_retries=5, delay=10)
+                        if not model_ready:
+                            await r.set(f"{ERROR_PREFIX}{job_id}", "Chat model not ready.")
+                            print(f"❌ Chat model not ready for job {job_id}.")
+                            continue
+
+                        messages = job_obj.get("messages", [{"role": "user", "content": prompt}])
+                        response = await get_ollama_chat_response(messages, model=OLLAMA_CHAT_MODEL)
+                        if response:
+                            await r.set(f"{RESULT_PREFIX}{job_id}", json.dumps({"response": response}))
+                            print(f"✅ Chat job {job_id} completed successfully.")
+                        else:
+                            await r.set(f"{ERROR_PREFIX}{job_id}", "Chat response was empty.")
+                            print(f"❌ Chat job {job_id} failed: Empty response.")
+
+                    else:
+                        await r.set(f"{ERROR_PREFIX}{job_id}", f"Unknown task type: {task_type}")
+                        print(f"❌ Unknown task type for job {job_id}: {task_type}")
 
                 await asyncio.sleep(0.1)
 
             except Exception as e:
-                print(f"⚠️ GPU Worker loop error: {e}")
+                print(f"⚠️ Worker loop error: {e}")
                 await asyncio.sleep(2)
 
     finally:
         await r.close()
-        print("🛑 Redis connection closed in GPU worker.")
-
-
-async def get_ollama_embedding(text: str) -> list:
-    """Query Ollama to generate embedding for the provided text."""
-    url = f"{OLLAMA_BASE_URL}/api/embeddings"
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(url, json={"model": "mistral", "prompt": text})
-            response.raise_for_status()
-            embedding = response.json().get("embedding", [])
-            if len(embedding) != VECTOR_DIM:
-                print(f"⚠️ Embedding dimension mismatch. Expected {VECTOR_DIM}, got {len(embedding)}.")
-                return []
-            return embedding
-        except Exception as e:
-            print(f"❌ Ollama embedding request failed: {e}")
-            return []
+        print("🛑 Redis connection closed in worker.")

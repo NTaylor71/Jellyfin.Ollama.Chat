@@ -1,3 +1,4 @@
+
 # FAISS RAG System - Developer Guide
 
 ## 🎉 Welcome
@@ -46,8 +47,7 @@ cp .env.example .env
 ```
 
 - Edit `.env` if needed (model names, Redis URLs, etc.).
-
-  - Editing is only needed in professional deployments, its fine in your LAN at home as is.
+  - Editing is only needed in professional deployments, it is fine in your LAN at home as is.
 
 ### 3. Build Local Python Environment
 
@@ -131,17 +131,17 @@ The `ENV` variable in `.env` tells the system whether to run in Docker or local 
 
 The system will **auto-detect** and adjust Redis hosts, ports, and URLs accordingly.
 
-- No need to change this if just running at home within your LAN
+- No need to change this if just running at home within your LAN.
 
 ENV=local
 
-- Just means python that you run on your host machine (PC) can access the internal docker network that you build via docker
+- Just means Python that you run on your host machine (PC) can access the internal Docker network that you build via Docker.
 
 ENV=docker
 
-- As used by 'docker build', all urls use the internal docker environment for urls
+- Used by 'docker build', all URLs use the internal Docker environment for URLs.
 
-In practice, you can ignore this concept and everything env var 'just works'
+In practice, you can ignore this concept and everything env var 'just works'.
 
 ---
 
@@ -162,7 +162,7 @@ This system is:
 
 ---
 
-## 🗕️ Understanding FAISS (Facebook AI Similarity Search)
+## 🗅️ Understanding FAISS (Facebook AI Similarity Search)
 
 **What is FAISS?**
 
@@ -253,9 +253,7 @@ If the index file is missing and rebuilding is not allowed, the system will fail
 ### Submit a Chat Query
 
 ```bash
-curl -X POST http://localhost:8000/chat \
- -H "Content-Type: application/json" \
- -d '{"query": "sci-fi movies about simulation"}'
+curl -X POST http://localhost:8000/chat  -H "Content-Type: application/json"  -d '{"query": "sci-fi movies about simulation"}'
 ```
 
 ### Check Chat Result
@@ -275,26 +273,22 @@ python tests/test_faiss_ingestor.py
 ## 🛠️ Troubleshooting
 
 - **FAISS healthcheck failing?**
-
   - Run: `docker logs <faiss_service_container>`
 
 - **Redis queue stuck?**
-
   - Run: `python scripts/dev.py test-chat` to simulate a working query.
 
 - **No response after job submission?**
-
   - Confirm the worker is running and Redis is reachable.
 
 - **Reset system:**
-
 ```bash
 docker compose -f docker-compose.dev.yml down -v
 ```
 
 ---
 
-## 🫱🏼‍💻 We Welcome Contributions
+## 🧁️ We Welcome Contributions
 
 Pull requests are welcome at all levels.
 
@@ -309,4 +303,3 @@ python scripts/dev.py test-ingest-query
 ```
 
 If you are unsure about contributing, reach out — this project is proudly beginner and intermediate friendly.
-

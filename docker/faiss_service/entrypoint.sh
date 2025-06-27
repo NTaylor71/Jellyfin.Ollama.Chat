@@ -6,19 +6,19 @@ SLEEP_INTERVAL=2
 
 echo "🌐 FAISS Service Environment:"
 echo "VECTORDB_URL: $VECTORDB_URL"
-echo "OLLAMA_BASE_URL: $OLLAMA_BASE_URL"
+echo "OLLAMA_EMBED_BASE_URL: $OLLAMA_EMBED_BASE_URL"
 
-# --- Wait for Ollama ---
-echo "⏳ Waiting for Ollama at $OLLAMA_BASE_URL/api/tags..."
+# --- Wait for Ollama Embed ---
+echo "⏳ Waiting for Ollama Embed at $OLLAMA_EMBED_BASE_URL/api/tags..."
 for i in $(seq 1 $MAX_ATTEMPTS); do
-    if curl -sSf "$OLLAMA_BASE_URL/api/tags" > /dev/null; then
-        echo "✅ Ollama is ready."
+    if curl -sSf "$OLLAMA_EMBED_BASE_URL/api/tags" > /dev/null; then
+        echo "✅ Ollama Embed is ready."
         break
     fi
-    echo "⏳ Attempt $i/$MAX_ATTEMPTS - Ollama not ready yet."
+    echo "⏳ Attempt $i/$MAX_ATTEMPTS - Ollama Embed not ready yet."
     sleep $SLEEP_INTERVAL
     if [ $i -eq $MAX_ATTEMPTS ]; then
-        echo "❌ Ollama did not become ready in time."
+        echo "❌ Ollama Embed did not become ready in time."
         exit 1
     fi
 done

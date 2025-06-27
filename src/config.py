@@ -1,5 +1,3 @@
-# /src/config.py
-
 import os
 import redis.asyncio as redis
 from dotenv import load_dotenv
@@ -13,27 +11,28 @@ IS_DOCKER = os.getenv("ENV") == "docker"
 # Redis
 REDIS_HOST = "redis" if IS_DOCKER else os.getenv("REDIS_HOST", "localhost")
 REDIS_URL = f"redis://{REDIS_HOST}:6379"
-REDIS_QUEUE = os.getenv("REDIS_QUEUE", "chat:queue")
+
+# 🚨 Single Redis Queue for All Jobs
+REDIS_QUEUE = os.getenv("REDIS_QUEUE", "chat:queue")  # Unified queue name
 RESULT_PREFIX = os.getenv("RESULT_PREFIX", "chat:result:")
 ERROR_PREFIX = os.getenv("ERROR_PREFIX", "chat:error:")
-INGEST_QUEUE = os.getenv("INGEST_QUEUE", "chat:ingest")
 
-# Ollama
-OLLAMA_BASE_URL = "http://ollama:11434" if IS_DOCKER else os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
+# Ollama Embedding Service
+OLLAMA_EMBED_BASE_URL = "http://ollama_embed:11434" if IS_DOCKER else os.getenv("OLLAMA_EMBED_BASE_URL", "http://localhost:12435")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+
+# Ollama Chat Service
+OLLAMA_CHAT_BASE_URL = "http://ollama_chat:11434" if IS_DOCKER else os.getenv("OLLAMA_CHAT_BASE_URL", "http://localhost:12434")
+OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2:3b")
 
 # FAISS Service
 VECTORDB_URL = "http://faiss_service:6333" if IS_DOCKER else os.getenv("VECTORDB_URL", "http://localhost:6333")
+FAISS_VECTOR_DIM = 4096  # Dimension for FAISS vectors
 
 # API URL for CLI or external services
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-# GPU Redis Queue
-GPU_QUEUE = os.getenv("GPU_QUEUE", "chat:gpu:queue")
-GPU_RESULT_PREFIX = os.getenv("GPU_RESULT_PREFIX", "gpu:result:")
-GPU_ERROR_PREFIX = os.getenv("GPU_ERROR_PREFIX", "gpu:error:")
-
-# Timeouts
+# ⏲️ Timeouts
 TIMEOUT_SEC = int(os.getenv("TIMEOUT_SEC", 60))  # General timeout
 
 # Redis Client

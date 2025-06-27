@@ -1,20 +1,20 @@
 FROM python:3.13-slim
 
-# Install required tools (curl for health checks)
+# Install curl with minimal footprint
 RUN apt-get update && \
-    apt-get install -y curl && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy metadata first for layer caching
+# Copy only pyproject.toml first for layer caching
 COPY pyproject.toml ./
+COPY src src
 
-# Copy source code (PEP 621 + /src layout)
-COPY src/ ./src/
-
-# Install project dependencies using Hatchling and pyproject.toml
-RUN pip install --upgrade pip && pip install --no-cache-dir .
+# Install Python dependencies using pip cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir .
 
 # Run the GPU worker entrypoint
 ENTRYPOINT ["./docker/gpu_queue_worker/entrypoint.sh"]

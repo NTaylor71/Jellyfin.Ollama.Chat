@@ -1,8 +1,8 @@
 # /src/data/sample_entries.py
 
 from uuid import uuid4
+from src.config import FAISS_VECTOR_DIM
 
-FAISS_VECTOR_DIM = 4096
 
 SAMPLE_VECTORS = [
     {

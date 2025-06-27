@@ -1,11 +1,9 @@
 import asyncio
 import json
-import random
-from src.config import r
+from uuid import uuid4
 import httpx
-
-VECTORDB_URL = "http://faiss_service:6333"
-FAISS_VECTOR_DIM = 4096  # Must match faiss_index.py
+from src.config import r, VECTORDB_URL, REDIS_QUEUE, RESULT_PREFIX, ERROR_PREFIX
+from src.data.sample_entries import get_sample_entries
 
 async def start_ingestion():
     print("📥 FAISS Ingestor is listening for ingestion jobs...")
@@ -33,27 +31,65 @@ async def start_ingestion():
             print(f"❌ Ingestion failed: {e}")
             await asyncio.sleep(2)
 
+
 async def send_to_faiss(vectors):
+    """Send the generated vectors to FAISS."""
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(f"{VECTORDB_URL}/add", json={"vectors": vectors})
         response.raise_for_status()
 
-def generate_fake_vectors(count=5, dim=FAISS_VECTOR_DIM):
-    """
-    Generate a list of fake vectors for ingestion.
 
-    Args:
-        count (int): Number of vectors to generate.
-        dim (int): Dimensionality of each vector.
+async def generate_movie_vectors():
+    """Generate embedding jobs for movies and collect their embedding results from the Redis queue."""
+    sample_entries = get_sample_entries()
+    movie_data = []
 
-    Returns:
-        list: A list of vector items with id, vector, and metadata.
-    """
-    return [
-        {
-            "id": f"item_{i}",
-            "vector": [random.random() for _ in range(dim)],
-            "metadata": {"title": f"Fake Item {i}"}
+    for entry in sample_entries:
+        formatted_text = (
+            f"{entry['title']} ({entry['year']}) - {entry['genres']} - {entry['overview']}"
+        )
+
+        job_id = str(uuid4())
+        gpu_job = {
+            "job_id": job_id,
+            "task_type": "embedding",
+            "prompt": formatted_text
         }
-        for i in range(count)
-    ]
+
+        # Push embedding job to Redis queue
+        await r.rpush(REDIS_QUEUE, json.dumps(gpu_job))
+        print(f"📤 Submitted embedding job {job_id} to Redis queue.")
+
+        # Wait for the embedding result
+        for _ in range(60):  # Up to 60 seconds wait
+            embedding_result = await r.get(f"{RESULT_PREFIX}{job_id}")
+            error_result = await r.get(f"{ERROR_PREFIX}{job_id}")
+
+            if embedding_result:
+                vector = json.loads(embedding_result)
+                movie_data.append({
+                    "id": str(uuid4()),
+                    "vector": vector,
+                    "metadata": entry
+                })
+                print(f"✅ Received embedding result for job {job_id}")
+                break
+
+            if error_result:
+                error_message = error_result.decode()
+                print(f"❌ Job {job_id} failed: {error_message}")
+                break
+
+            await asyncio.sleep(1)
+
+        else:
+            print(f"❌ Job {job_id} timed out.")
+
+    return movie_data
+
+
+async def start_real_ingestion():
+    """Start ingestion with real movie vectors using Redis queue."""
+    vectors = await generate_movie_vectors()
+    await send_to_faiss(vectors)
+    print(f"✅ Ingested {len(vectors)} real movie vectors.")

@@ -3,13 +3,8 @@ import json
 import asyncio
 import redis.asyncio as redis
 from uuid import uuid4
-from src.faiss_ingestor.ingestion_worker import generate_fake_vectors, FAISS_VECTOR_DIM
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-SEARCH_QUEUE = "chat:queue"
-RESULT_PREFIX = "chat:result:"
-ERROR_PREFIX = "chat:error:"
-TIMEOUT_SEC = 60
+from src.data.sample_entries import get_sample_vectors
+from src.config import FAISS_VECTOR_DIM, REDIS_URL, REDIS_QUEUE, RESULT_PREFIX, ERROR_PREFIX, TIMEOUT_SEC  # Correct import
 
 sample_query = "List famous sci-fi movies with virtual reality."
 
@@ -17,15 +12,17 @@ async def submit_ingestion_job():
     r = redis.from_url(REDIS_URL)
     job_id = str(uuid4())
 
-    vectors = generate_fake_vectors(count=5, dim=FAISS_VECTOR_DIM)
+    # Get real sample vectors from the data
+    vectors = get_sample_vectors()
 
+    # Prepare job payload for ingestion
     job_payload = {
         "job_id": job_id,
         "vectors": vectors
     }
 
     print(f"📦 Submitting ingestion job to Redis queue: {job_id}")
-    await r.rpush("chat:ingest", json.dumps(job_payload))
+    await r.rpush(REDIS_QUEUE, json.dumps(job_payload))  # Use REDIS_QUEUE from config
     print(f"⏳ Waiting for ingestion to process the job... (up to 5s)")
 
     await asyncio.sleep(5)
@@ -44,7 +41,7 @@ async def submit_and_listen():
     }
 
     print(f"📤 Submitting search job to Redis queue: {job_id}")
-    await r.rpush(SEARCH_QUEUE, json.dumps(job_payload))
+    await r.rpush(REDIS_QUEUE, json.dumps(job_payload))  # Use REDIS_QUEUE from config
 
     print(f"⏳ Waiting for Redis Queue Worker to process job... (up to {TIMEOUT_SEC}s)")
     for i in range(TIMEOUT_SEC):
