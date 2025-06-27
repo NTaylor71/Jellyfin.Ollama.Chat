@@ -5,7 +5,9 @@ import json
 from src.config import REDIS_QUEUE, RESULT_PREFIX, ERROR_PREFIX
 from src.redis_queue_worker.worker import process_job
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_URL = f"redis://{REDIS_HOST}:6379"
+
 
 async def worker_loop():
     r = redis.from_url(REDIS_URL)

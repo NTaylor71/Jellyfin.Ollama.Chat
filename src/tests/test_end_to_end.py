@@ -1,32 +1,21 @@
-import os
 import json
 import asyncio
 import httpx
 import redis.asyncio as redis
 from uuid import uuid4
+from src.config import REDIS_URL, REDIS_QUEUE, RESULT_PREFIX, ERROR_PREFIX, TIMEOUT_SEC, FAISS_URL
+from src.data.sample_entries import get_sample_entries
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-QUEUE_NAME = "chat:queue"
-RESULT_PREFIX = "chat:result:"
-ERROR_PREFIX = "chat:error:"
-TIMEOUT_SEC = 60
-FAISS_URL = "http://localhost:6333"
-
-sample_vectors = [
-    {
-        "id": str(uuid4()),
-        "vector": [0.1 * i for i in range(4096)],
-        "metadata": {"title": "The Matrix", "year": 1999}
-    },
-    {
-        "id": str(uuid4()),
-        "vector": [0.2 * i for i in range(4096)],
-        "metadata": {"title": "Pulp Fiction", "year": 1994}
-    }
-]
+sample_vectors = get_sample_entries()
 
 async def ingest_sample():
     print("📥 Ingesting sample vectors into FAISS Service...")
+
+    # Ensure each vector has a 'document' field
+    for vector in sample_vectors:
+        metadata = vector.get("metadata", {})
+        vector["document"] = f"{metadata.get('title', 'Unknown')} ({metadata.get('year', 'Unknown')})"
+
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(f"{FAISS_URL}/add", json={"vectors": sample_vectors})
         assert response.status_code == 200, f"Ingest failed: {response.text}"
@@ -40,12 +29,12 @@ async def query_sample():
     payload = {
         "job_id": job_id,
         "user_id": "e2e_test",
-        "query": "Test query vector submission",
+        "query": "List famous sci-fi movies with virtual reality.",
         "query_vector": query_vector
     }
 
     print(f"📤 Submitting query job to Redis: {job_id}")
-    await r.rpush(QUEUE_NAME, json.dumps(payload))
+    await r.rpush(REDIS_QUEUE, json.dumps(payload))
 
     print(f"⏳ Waiting for result... (up to {TIMEOUT_SEC}s)")
     for i in range(TIMEOUT_SEC):

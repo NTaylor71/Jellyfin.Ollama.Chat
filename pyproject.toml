@@ -12,7 +12,8 @@ dependencies = [
     "redis>=5.0.0",
     "uvicorn[standard]",
     "jinja2",
-    "faiss-cpu"
+    "faiss-cpu",
+    "pathspec"
 ]
 
 [project.optional-dependencies]

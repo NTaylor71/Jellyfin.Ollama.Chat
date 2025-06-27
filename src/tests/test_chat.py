@@ -3,12 +3,7 @@ import json
 import asyncio
 import redis.asyncio as redis
 from uuid import uuid4
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-QUEUE_NAME = "chat:queue"
-RESULT_PREFIX = "chat:result:"
-ERROR_PREFIX = "chat:error:"
-TIMEOUT_SEC = 30
+from src.config import REDIS_URL, REDIS_QUEUE, RESULT_PREFIX, ERROR_PREFIX, TIMEOUT_SEC
 
 query = "What are some 90s dystopian sci-fi movies?"
 job_id = str(uuid4())
@@ -22,7 +17,7 @@ payload = {
 async def test_roundtrip():
     r = redis.from_url(REDIS_URL)
     print(f"📤 Submitting job: {job_id}")
-    await r.rpush(QUEUE_NAME, json.dumps(payload))
+    await r.rpush(REDIS_QUEUE, json.dumps(payload))
 
     print(f"⏳ Waiting for result... (up to {TIMEOUT_SEC}s)")
     for i in range(TIMEOUT_SEC):

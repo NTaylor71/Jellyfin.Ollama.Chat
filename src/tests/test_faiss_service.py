@@ -1,22 +1,12 @@
 import asyncio
 import httpx
+from src.data.sample_entries import get_sample_vectors  # Use unified sample data
 
 FAISS_URL = "http://localhost:6333"
 
-sample_vectors = [
-    {
-        "id": "vec-1",
-        "vector": [0.1 * i for i in range(4096)],
-        "metadata": {"title": "The Matrix", "year": 1999}
-    },
-    {
-        "id": "vec-2",
-        "vector": [0.2 * i for i in range(4096)],
-        "metadata": {"title": "Pulp Fiction", "year": 1994}
-    }
-]
-
 async def test_faiss_service():
+    sample_vectors = get_sample_vectors()  # Always pull from the unified source
+
     async with httpx.AsyncClient(timeout=30) as client:
         # Test Add
         print("📤 Adding sample vectors...")

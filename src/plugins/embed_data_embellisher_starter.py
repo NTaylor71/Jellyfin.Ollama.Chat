@@ -1,4 +1,6 @@
-from src.api.plugin_registry import register_plugin, EMBED_DATA_EMBELLISHER
+# /src/plugins/embed_data_embellisher_starter.py
+
+from src.api.plugin_registry import register_plugin
 
 def embellish_embedding_document(document: dict) -> dict:
     """Example: Automatically tag English-language content if missing."""
@@ -6,5 +8,9 @@ def embellish_embedding_document(document: dict) -> dict:
         document["language"] = "English"
     return document
 
-# Register the plugin with weight 100
-register_plugin(EMBED_DATA_EMBELLISHER, embellish_embedding_document, weight=100)
+# Register the plugin
+register_plugin({
+    "type": "embed_data_embellisher",
+    "function": embellish_embedding_document,
+    "weight": 100
+})

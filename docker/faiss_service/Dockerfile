@@ -2,9 +2,9 @@
 
 FROM python:3.13-slim
 
-# Install curl for health checks
+# Install curl and ping for health checks and connectivity testing
 RUN apt-get update && \
-    apt-get install -y curl && \
+    apt-get install -y curl iputils-ping && \
     rm -rf /var/lib/apt/lists/*
 
 # Set working directory

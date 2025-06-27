@@ -16,6 +16,7 @@ REDIS_URL = f"redis://{REDIS_HOST}:6379"
 REDIS_QUEUE = os.getenv("REDIS_QUEUE", "chat:queue")
 RESULT_PREFIX = os.getenv("RESULT_PREFIX", "chat:result:")
 ERROR_PREFIX = os.getenv("ERROR_PREFIX", "chat:error:")
+INGEST_QUEUE = os.getenv("INGEST_QUEUE", "chat:ingest")
 
 # Ollama
 OLLAMA_BASE_URL = "http://ollama:11434" if IS_DOCKER else os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -26,6 +27,14 @@ VECTORDB_URL = "http://faiss_service:6333" if IS_DOCKER else os.getenv("VECTORDB
 
 # API URL for CLI or external services
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+
+# GPU Redis Queue
+GPU_QUEUE = os.getenv("GPU_QUEUE", "chat:gpu:queue")
+GPU_RESULT_PREFIX = os.getenv("GPU_RESULT_PREFIX", "gpu:result:")
+GPU_ERROR_PREFIX = os.getenv("GPU_ERROR_PREFIX", "gpu:error:")
+
+# Timeouts
+TIMEOUT_SEC = int(os.getenv("TIMEOUT_SEC", 60))  # General timeout
 
 # Redis Client
 r = redis.from_url(REDIS_URL)
