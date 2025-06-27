@@ -1,5 +1,5 @@
 <#
-One-click Jellychat bootstrap (Windows)
+One-click FAISS RAG bootstrap (Windows)
 • Deletes any existing .venv
 • Requires Python 3.13+ via py launcher
 • Creates .venv and installs in editable mode
@@ -44,4 +44,4 @@ $parts = $python.Split(" ")
 & .\.venv\Scripts\Activate.ps1
 pip install -e .[dev]
 
-Write-Host "`n✅ Jellychat .venv ready and activated."
+Write-Host "`n✅ FAISS RAG .venv ready and activated."

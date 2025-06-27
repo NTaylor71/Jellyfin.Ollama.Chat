@@ -12,7 +12,7 @@ TIMEOUT = 60  # seconds
 
 r = redis.from_url(REDIS_URL)
 
-async def send_query(query):
+async def send_query(query: str):
     job_id = str(uuid4())
     job = {"job_id": job_id, "user_id": "cli", "query": query}
     await r.rpush(QUEUE, json.dumps(job))
@@ -33,7 +33,7 @@ async def send_query(query):
     print(f"\n⚠️ Timeout: No response after {TIMEOUT}s.\n")
 
 async def main():
-    print("💬 Jellychat CLI (Ctrl+C to quit)")
+    print("💬 FAISS RAG CLI (Ctrl+C to quit)")
     while True:
         try:
             query = input("You: ").strip()

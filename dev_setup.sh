@@ -1,46 +1,40 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# -------------------------------
-# Jellychat Dev Bootstrap (Unix)
-# -------------------------------
-# • Deletes .venv if present
+# One-click FAISS RAG bootstrap (Linux/macOS)
+# • Deletes any existing .venv
 # • Requires Python 3.13+
-# • Creates fresh virtual env
-# • Installs editable mode package
-# -------------------------------
+# • Creates .venv and installs in editable mode
+# • No global env persistence — fully repo-isolated
 
-set -euo pipefail
+set -e
 
-echo "🧠 Jellychat dev setup (Linux/macOS)"
+echo "🔧 FAISS RAG: Starting local dev setup..."
 
-# Step 1: Locate Python 3.13+
-PYTHON=""
-if command -v python3.13 >/dev/null 2>&1; then
-    PYTHON="python3.13"
-elif command -v python3 >/dev/null 2>&1 && [[ $(python3 -c 'import sys; print(sys.version_info.major * 10 + sys.version_info.minor)') -ge 313 ]]; then
-    PYTHON="python3"
-elif command -v python >/dev/null 2>&1 && [[ $(python -c 'import sys; print(sys.version_info.major * 10 + sys.version_info.minor)') -ge 313 ]]; then
-    PYTHON="python"
-else
-    echo "❌ Python 3.13+ is required but not found."
+# Validate Python 3.13+
+if ! command -v python3.13 &> /dev/null
+then
+    echo "❌ Python 3.13 not found in PATH."
     exit 1
 fi
 
-echo "🐍 Using interpreter: $PYTHON"
+PYTHON_EXECUTABLE="python3.13"
+export PYTHON_EXECUTABLE=$PYTHON_EXECUTABLE
+export PIP_NO_NETWORK_SSL_VERIFY=1
 
-# Step 2: Delete existing .venv
-if [[ -d .venv ]]; then
+echo "🐍 Using interpreter: $PYTHON_EXECUTABLE"
+
+# ❌ Remove existing virtual environment
+if [ -d ".venv" ]; then
     echo "🧼 Removing existing .venv..."
     rm -rf .venv
 fi
 
-# Step 3: Create venv
-"$PYTHON" -m venv .venv
+# ✅ Create new virtual environment
+$PYTHON_EXECUTABLE -m venv .venv
 
-# Step 4: Activate and install
+# 🔁 Activate and install in editable mode
 source .venv/bin/activate
-pip install --upgrade pip
 pip install -e .[dev]
 
 echo ""
-echo "✅ Jellychat .venv ready and activated."
+echo "✅ FAISS RAG .venv ready and activated."

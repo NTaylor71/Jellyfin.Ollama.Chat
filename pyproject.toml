@@ -1,20 +1,18 @@
 [project]
-name = "jellyfin-ollama-chat"
+name = "faiss-rag-system"
 version = "0.1.0"
-description = "Jellyfin LLM integration with FastAPI, LangChain, Redis, and Ollama"
+description = "FAISS RAG system with Redis, Ollama, FastAPI, and hot-reloadable plugins"
 authors = [{ name = "SGloop", email = "dev@custard.solutions" }]
 requires-python = ">=3.13"
 
 dependencies = [
     "fastapi>=0.110.0",
     "pydantic>=2.0",
-    "langchain>=0.3.26",
-    "langchain-ollama>=0.3.3",
-    "langchain-qdrant",
     "httpx",
     "redis>=5.0.0",
     "uvicorn[standard]",
-    "jinja2"
+    "jinja2",
+    "faiss-cpu"
 ]
 
 [project.optional-dependencies]

@@ -9,13 +9,13 @@ def run(func):
         print("\n👋 Cancelled.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Jellychat Dev CLI")
+    parser = argparse.ArgumentParser(description="FAISS RAG Dev CLI")
     sub = parser.add_subparsers(dest="cmd")
 
     sub.add_parser("cli", help="Run interactive chat client")
     sub.add_parser("test-chat", help="Test a roundtrip query only")
     sub.add_parser("test-ingest-query", help="Full ingest and query test")
-    
+
     args = parser.parse_args()
 
     if args.cmd == "cli":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
         run(test_roundtrip)
 
     elif args.cmd == "test-ingest-query":
-        from tests.test_ingest_and_query import ingest_sample, query_sample
+        from tests.test_end_to_end import ingest_sample, query_sample
         run(ingest_sample)
         run(query_sample)
 

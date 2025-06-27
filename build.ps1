@@ -1,5 +1,5 @@
 <#
-Jellyfin.Ollama.Chat Build Script
+FAISS RAG Build Script
 • Loads .env
 • Validates docker + compose
 • Determines python3/python fallback
@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 $ComposeFile = "docker-compose.dev.yml"
 
-Write-Host "🔧 Jellychat: Starting build..." -ForegroundColor Cyan
+Write-Host "🔧 FAISS RAG: Starting build..." -ForegroundColor Cyan
 
 # Validate Docker
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
