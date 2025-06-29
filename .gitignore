@@ -3,3 +3,7 @@
 .idea
 *__pycache__*
 chat_rag_project.md
+embedding_cache.pkl
+enrich_failed.log
+faiss.index
+jellyfin_movies.json

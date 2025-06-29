@@ -43,5 +43,6 @@ $parts = $python.Split(" ")
 # 🔁 Activate and install in editable mode
 & .\.venv\Scripts\Activate.ps1
 pip install -e .[dev]
+python -m nltk.downloader wordnet omw-1.4
 
 Write-Host "`n✅ FAISS RAG .venv ready and activated."

@@ -22,7 +22,7 @@ OLLAMA_EMBED_BASE_URL = "http://ollama_embed:11434" if IS_DOCKER else os.getenv(
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 # Ollama Chat Service
-OLLAMA_CHAT_BASE_URL = "http://ollama_chat:11434" if IS_DOCKER else os.getenv("OLLAMA_CHAT_BASE_URL", "http://localhost:12434")
+OLLAMA_CHAT_BASE_URL = "http://ollama_chat:11434" if IS_DOCKER else os.getenv("OLLAMA_CHAT_BASE_URL", "http://localhost:11c434")
 OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2:3b")
 
 # FAISS Service

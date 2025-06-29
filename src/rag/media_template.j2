@@ -1,25 +1,26 @@
-{{ title }} ({{ year }}) is a {% if genres %}{{ genres | join(', ') }}{% else %}{{ media_type.lower() }}{% endif %} {{ media_type.lower }}.
+🎬 {{ title }} ({{ year }})
+📀 Type: {{ media_type }}
+{% if genres -%}
+🗂️ Genres: {{ genres | join(', ') }}
 
-{% if overview %}
-Summary:
-{{ overview }}
 {% endif %}
+{% if overview -%}
+📝 Summary: {{ overview }}
 
-{% if genres %}
-Genres: {{ genres | join(', ') }}
 {% endif %}
+{% if tagline -%}
+💬 Tagline: "{{ tagline }}"
 
-{% if tagline %}
-Tagline: "{{ tagline }}"
 {% endif %}
+{% if actors -%}
+👥 Cast: {{ actors | join(', ') }}
 
-{% if actors %}
-Cast: {{ actors | join(', ') }}
 {% endif %}
+{% if certificate -%}
+🔞 Certificate: {{ certificate }}
 
-{% if certificate %}
-Certificate: {{ certificate }}
 {% endif %}
+{% if language -%}
+🗣️ Language: {{ language }}
 
-Media Type: {{ media_type }}
-Language: {{ language }}
+{% endif %}

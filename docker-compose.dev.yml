@@ -18,16 +18,11 @@ services:
     environment:
       - ENV=docker
       - OLLAMA_MODEL=${OLLAMA_EMBED_MODEL}
-      - NVIDIA_VISIBLE_DEVICES=all
+      - OLLAMA_KEEP_ALIVE=5m
+      - NVIDIA_VISIBLE_DEVICES=""
+      - CUDA_VISIBLE_DEVICES=""
     env_file:
       - .env
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     volumes:
       - ./docker/ollama_embed/entrypoint.sh:/entrypoint.sh:ro
       - ./docker/ollama_embed/healthcheck.sh:/healthcheck.sh:ro
@@ -50,16 +45,10 @@ services:
     environment:
       - ENV=docker
       - OLLAMA_MODEL=${OLLAMA_CHAT_MODEL}
+      - OLLAMA_KEEP_ALIVE=5m
       - NVIDIA_VISIBLE_DEVICES=all
     env_file:
       - .env
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     volumes:
       - ./docker/ollama_chat/entrypoint.sh:/entrypoint.sh:ro
       - ./docker/ollama_chat/healthcheck.sh:/healthcheck.sh:ro

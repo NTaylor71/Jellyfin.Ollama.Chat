@@ -14,6 +14,10 @@ dependencies = [
     "jinja2",
     "faiss-cpu",
     "pathspec",
+    "colorama",
+    "requests",
+    "rapidfuzz",
+    "nltk>=3.8",
 ]
 
 [project.optional-dependencies]
