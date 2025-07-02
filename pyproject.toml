@@ -3,7 +3,7 @@ name = "faiss-rag-system"
 version = "0.1.0"
 description = "FAISS RAG system with Redis, Ollama, FastAPI, and hot-reloadable plugins"
 authors = [{ name = "SGloop", email = "dev@custard.solutions" }]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 
 dependencies = [
     "fastapi>=0.110.0",
@@ -18,6 +18,8 @@ dependencies = [
     "requests",
     "rapidfuzz",
     "nltk>=3.8",
+    "ollama",
+    "gensim>=4.3,<5"
 ]
 
 [project.optional-dependencies]

@@ -22,8 +22,13 @@ OLLAMA_EMBED_BASE_URL = "http://ollama_embed:11434" if IS_DOCKER else os.getenv(
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 # Ollama Chat Service
-OLLAMA_CHAT_BASE_URL = "http://ollama_chat:11434" if IS_DOCKER else os.getenv("OLLAMA_CHAT_BASE_URL", "http://localhost:11c434")
+OLLAMA_CHAT_BASE_URL = "http://ollama_chat:11434" if IS_DOCKER else os.getenv("OLLAMA_CHAT_BASE_URL", "http://localhost:114434")
 OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2:3b")
+
+ENRICH_CHAT_BASE_URL = "http://ollama_chat:11434" if IS_DOCKER else os.getenv("ENRICH_CHAT_BASE_URL", "http://localhost:114434")
+ENRICH_CHAT_MODEL = os.getenv("ENRICH_CHAT_MODEL", "phi3:3.8b")
+
+KEYWORD_SIMILARITY_THRESHOLD=0.58
 
 # FAISS Service
 VECTORDB_URL = "http://faiss_service:6333" if IS_DOCKER else os.getenv("VECTORDB_URL", "http://localhost:6333")

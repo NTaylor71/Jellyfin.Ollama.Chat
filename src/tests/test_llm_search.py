@@ -21,6 +21,9 @@ from src.config import (
     OLLAMA_EMBED_BASE_URL,
     OLLAMA_CHAT_MODEL,
     OLLAMA_CHAT_BASE_URL,
+    ENRICH_CHAT_BASE_URL,
+    ENRICH_CHAT_MODEL,
+    KEYWORD_SIMILARITY_THRESHOLD,
 )
 
 import nltk
@@ -43,6 +46,8 @@ ENRICHED_TEXT_FIELDS = [
     "reviews",
     "historical_context",
 ]
+
+STOPWORDS = {"film", "movie", "cinema", "story", "narrative", "documentary", "drama"}
 
 CACHE_FILE = Path("embedding_cache.pkl")
 FAISS_INDEX_FILE = Path("faiss.index")
@@ -73,7 +78,10 @@ def top_keyword_field_matches(
 
 def normalize_keyword(kw: str) -> str:
     text = re.sub(r"[^\w\s]", "", kw.lower())
-    return " ".join(lemmatizer.lemmatize(word) for word in text.split())
+    words = [lemmatizer.lemmatize(w) for w in text.split()]
+    if any(w in STOPWORDS for w in words):
+        return ""
+    return " ".join(words)
 
 
 def format_duration(seconds: float) -> str:
@@ -178,7 +186,7 @@ def load_faiss_index(entries: List[dict]) -> faiss.IndexFlatIP:
 def matched_keywords_by_field_vector(
         entry: dict,
         keyword_vectors: dict[str, list[float]],
-        similarity_threshold: float = 0.65) -> dict[str, list[str]]:
+        similarity_threshold: float = KEYWORD_SIMILARITY_THRESHOLD) -> dict[str, list[str]]:
     results = {}
     field_vectors = entry.get("vector_fields", {})
 
@@ -203,8 +211,9 @@ def matched_keywords_by_field_vector(
 
 
 async def expand_keywords_with_llm(keywords: list[str]) -> dict[str, list[str]]:
-    client = AsyncClient(host=OLLAMA_CHAT_BASE_URL)
-    prompt = f"""
+    client = AsyncClient(host=ENRICH_CHAT_BASE_URL)
+
+    base_prompt = f"""
 Given the list of keywords below, return expanded terms or close synonyms.
 
 Respond ONLY with JSON like:
@@ -213,17 +222,41 @@ Respond ONLY with JSON like:
 List:
 {json.dumps(keywords)}
 """
-    try:
-        response = await client.chat(
-            model=OLLAMA_CHAT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.5},
-        )
-        raw = response["message"]["content"].strip("`\n ")
-        return json.loads(raw).get("expanded", {})
-    except Exception as e:
-        print(f"{Fore.RED}⚠️ Keyword synonym expansion failed: {e}{Style.RESET_ALL}")
-        return {}
+
+    for attempt in range(1, 4):
+        try:
+            temperature = 0.5 if attempt == 1 else 0.3
+            prompt = base_prompt if attempt == 1 else (
+                "⚠️ You previously failed to return valid JSON. Do not explain. Try again.\n\n" + base_prompt
+            )
+
+            response = await client.chat(
+                model=ENRICH_CHAT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                options={"temperature": temperature},
+            )
+
+            raw = response["message"]["content"].strip()
+            print(f"{Fore.LIGHTBLACK_EX}📝 Raw synonym response (attempt {attempt}):\n{raw[:300]}{Style.RESET_ALL}")
+
+            # Strip markdown/code blocks or LLM preambles
+            if raw.startswith("<think>"):
+                raw = re.sub(r"(?s)^<think>.*?\n", "", raw).strip()
+            if raw.startswith("```") or raw.startswith("{"):
+                raw = raw.strip("` \n")
+
+            parsed = json.loads(raw)
+            expanded = parsed.get("expanded")
+            if not isinstance(expanded, dict):
+                raise ValueError("Missing or invalid 'expanded' object")
+            return expanded
+
+        except Exception as e:
+            print(f"{Fore.RED}⚠️ Synonym expansion attempt {attempt} failed: {e}{Style.RESET_ALL}")
+            continue
+
+    # Final fallback if all attempts fail
+    return {kw: [] for kw in keywords}
 
 
 async def enrich_prompt(query: str, mode: str, debug: bool) -> tuple[str, list[str], list[float], dict[str, list[float]]]:
@@ -236,16 +269,19 @@ async def enrich_prompt(query: str, mode: str, debug: bool) -> tuple[str, list[s
     paragraph = result["query_paragraph"]
     base_keywords = result["keywords"]
 
-    synonym_map = await expand_keywords_with_llm(base_keywords)
-    enriched_keywords = list(set(base_keywords + [syn for syns in synonym_map.values() for syn in syns]))
+    #synonym_map = await expand_keywords_with_llm(base_keywords)
+    #enriched_keywords = list(set(base_keywords + [syn for syns in synonym_map.values() for syn in syns]))
+    enriched_keywords = base_keywords
 
     if debug:
-        print(f"{Fore.CYAN}🧠 Keyword Expansion:\n{json.dumps(synonym_map, indent=2)}{Style.RESET_ALL}")
+        #print(f"{Fore.CYAN}🧠 Keyword Expansion:\n{json.dumps(synonym_map, indent=2)}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}🧠 Keyword Expansion:\n{json.dumps(enriched_keywords, indent=2)}{Style.RESET_ALL}")
 
     embedder = CPUEmbedderPlugin(model=OLLAMA_EMBED_MODEL, host=OLLAMA_EMBED_BASE_URL)
 
     # ✅ Normalize keywords before embedding
     normalized_keywords = [normalize_keyword(kw) for kw in enriched_keywords]
+    normalized_keywords = [kw for kw in normalized_keywords if kw]  # drop empties
     keyword_vecs = await embedder.embed_texts(normalized_keywords)
     keyword_vectors = dict(zip(enriched_keywords, keyword_vecs))  # preserve original names for display
 

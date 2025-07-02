@@ -3,7 +3,14 @@ import json
 from ollama import AsyncClient
 from colorama import Fore, Style
 
-from src.config import OLLAMA_CHAT_MODEL, OLLAMA_CHAT_BASE_URL, OLLAMA_EMBED_MODEL, OLLAMA_EMBED_BASE_URL
+from src.config import (
+    OLLAMA_CHAT_MODEL,
+    OLLAMA_CHAT_BASE_URL,
+    OLLAMA_EMBED_MODEL,
+    OLLAMA_EMBED_BASE_URL,
+    ENRICH_CHAT_BASE_URL,
+    ENRICH_CHAT_MODEL,
+)
 from src.plugins.embedding.cpu_embedder_plugin import CPUEmbedderPlugin
 
 
