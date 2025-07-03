@@ -154,6 +154,10 @@ class BasePlugin(ABC):
             "last_health_check": time.time()
         }
     
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Alias for health_check() method for compatibility."""
+        return await self.health_check()
+    
     async def _get_resource_usage(self) -> Dict[str, Any]:
         """Get current resource usage for this plugin."""
         try:
@@ -383,7 +387,7 @@ class EmbedDataEmbellisherPlugin(BasePlugin):
         pass
     
     async def execute(self, data: Any, context: PluginExecutionContext) -> PluginExecutionResult:
-        """Execute embed data embellishment."""
+        """Execute embed data embellishment with proper data merging."""
         try:
             if not isinstance(data, dict):
                 return PluginExecutionResult(
@@ -391,12 +395,53 @@ class EmbedDataEmbellisherPlugin(BasePlugin):
                     error_message="Embed data embellisher expects dict input"
                 )
             
-            enhanced_data = await self.embellish_embed_data(data, context)
+            # Get plugin-specific enhancements
+            plugin_enhancements = await self.embellish_embed_data(data, context)
+            
+            # Create standardized enhanced data structure
+            enhanced_data = data.copy()  # Preserve original data
+            
+            # Initialize plugin tracking structures if not present
+            if 'plugin_enhancements' not in enhanced_data:
+                enhanced_data['plugin_enhancements'] = {}
+            
+            if 'enhancement_metadata' not in enhanced_data:
+                enhanced_data['enhancement_metadata'] = {
+                    'processing_plugins': [],
+                    'processing_timestamps': {},
+                    'plugin_versions': {}
+                }
+            
+            # Add this plugin's data with namespacing
+            plugin_name = self.metadata.name
+            enhanced_data['plugin_enhancements'][plugin_name] = plugin_enhancements
+            
+            # Update tracking metadata
+            if plugin_name not in enhanced_data['enhancement_metadata']['processing_plugins']:
+                enhanced_data['enhancement_metadata']['processing_plugins'].append(plugin_name)
+            
+            enhanced_data['enhancement_metadata']['processing_timestamps'][plugin_name] = asyncio.get_event_loop().time()
+            enhanced_data['enhancement_metadata']['plugin_versions'][plugin_name] = self.metadata.version
+            
+            # Merge top-level fields from plugin (for backward compatibility)
+            for key, value in plugin_enhancements.items():
+                if key not in ['plugin_enhancements', 'enhancement_metadata']:
+                    # Don't overwrite existing keys, use plugin-specific naming
+                    if key in enhanced_data and key not in data:
+                        # This key was added by a previous plugin, namespace it
+                        enhanced_data[f"{plugin_name}_{key}"] = value
+                    else:
+                        enhanced_data[key] = value
             
             return PluginExecutionResult(
                 success=True,
                 data=enhanced_data,
-                metadata={"original_data_keys": list(data.keys()), "enhanced_data_keys": list(enhanced_data.keys())}
+                metadata={
+                    "plugin_name": plugin_name,
+                    "original_data_keys": list(data.keys()), 
+                    "plugin_enhancement_keys": list(plugin_enhancements.keys()),
+                    "final_data_keys": list(enhanced_data.keys())
+                }
             )
             
         except Exception as e:

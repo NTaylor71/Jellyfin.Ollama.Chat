@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Type, Any, Set
 from dataclasses import dataclass
 from collections import defaultdict
 
-from ..plugins.base import (
+from src.plugins.base import (
     BasePlugin, PluginType, PluginMetadata, ExecutionPriority, 
     PluginExecutionContext, PluginExecutionResult
 )
@@ -62,26 +62,31 @@ class PluginRegistry:
     
     async def _discover_plugins(self) -> None:
         """Discover plugin files and register plugin classes."""
+        logger.info(f"Starting plugin discovery in directories: {self.plugin_directories}")
         for plugin_dir in self.plugin_directories:
             plugin_path = Path(plugin_dir)
             if not plugin_path.exists():
                 logger.warning(f"Plugin directory does not exist: {plugin_dir}")
                 continue
                 
-            logger.info(f"Discovering plugins in {plugin_dir}")
+            logger.debug(f"Discovering plugins in {plugin_dir}")
             await self._scan_directory(plugin_path)
     
     async def _scan_directory(self, directory: Path) -> None:
         """Recursively scan directory for plugin files."""
+        logger.debug(f"Scanning directory: {directory}")
         for item in directory.iterdir():
             if item.is_file() and item.suffix == '.py' and not item.name.startswith('__'):
+                logger.debug(f"Found Python file: {item}")
                 await self._load_plugin_file(item)
             elif item.is_dir() and not item.name.startswith('__'):
+                logger.debug(f"Scanning subdirectory: {item}")
                 await self._scan_directory(item)
     
     async def _load_plugin_file(self, file_path: Path) -> None:
         """Load a plugin file and register any plugin classes found."""
         try:
+            logger.info(f"Loading plugin file: {file_path}")
             # Convert file path to module name
             # Make file_path absolute if it isn't already
             if not file_path.is_absolute():
@@ -96,12 +101,14 @@ class PluginRegistry:
             
             # Convert to module name
             module_name = str(relative_path).replace(os.sep, '.').replace('.py', '')
+            logger.info(f"Module name: {module_name}")
             
             # Skip if already loaded
             if module_name in self._loaded_modules:
                 return
             
             # Import the module
+            logger.debug(f"Importing module: {module_name}")
             if module_name in sys.modules:
                 module = importlib.reload(sys.modules[module_name])
             else:
@@ -124,11 +131,30 @@ class PluginRegistry:
         plugin_classes = []
         
         for name, obj in inspect.getmembers(module):
-            if (inspect.isclass(obj) and 
-                issubclass(obj, BasePlugin) and 
-                obj != BasePlugin and
-                not inspect.isabstract(obj)):
-                plugin_classes.append(obj)
+            if inspect.isclass(obj):
+                # Check if this class has BasePlugin in its inheritance chain
+                try:
+                    is_plugin_subclass = False
+                    # Check direct inheritance
+                    if issubclass(obj, BasePlugin):
+                        is_plugin_subclass = True
+                    else:
+                        # Check inheritance chain by comparing class names and module paths
+                        for base in obj.__mro__:
+                            if (hasattr(base, '__name__') and 
+                                base.__name__ == 'BasePlugin' and 
+                                hasattr(base, '__module__') and 
+                                'plugins.base' in base.__module__):
+                                is_plugin_subclass = True
+                                break
+                    
+                    if is_plugin_subclass:
+                        # Skip if it's BasePlugin itself or an abstract class
+                        if obj.__name__ != 'BasePlugin' and not inspect.isabstract(obj):
+                            plugin_classes.append(obj)
+                        
+                except Exception as e:
+                    logger.debug(f"Error checking {name}: {e}")
         
         return plugin_classes
     
