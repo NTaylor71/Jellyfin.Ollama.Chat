@@ -41,7 +41,7 @@ class PluginRegistry:
     """Central registry for managing plugins with hot-reload capabilities."""
     
     def __init__(self, plugin_directories: Optional[List[str]] = None):
-        self.plugin_directories = plugin_directories or ["src/plugins"]
+        self.plugin_directories = plugin_directories if plugin_directories is not None else ["src/plugins"]
         self._plugins: Dict[str, RegisteredPlugin] = {}
         self._plugins_by_type: Dict[PluginType, List[str]] = defaultdict(list)
         self._initialization_lock = asyncio.Lock()

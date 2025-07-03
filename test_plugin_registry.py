@@ -24,15 +24,36 @@ class TestPlugin(BasePlugin):
     
     def __init__(self, name: str = "TestPlugin", plugin_type: PluginType = PluginType.QUERY_EMBELLISHER):
         super().__init__()
-        self.metadata = PluginMetadata(
+        self._plugin_metadata = PluginMetadata(
             name=name,
             version="1.0.0",
             description="Test plugin",
+            author="Test Author",
             plugin_type=plugin_type,
             execution_priority=ExecutionPriority.NORMAL
         )
+        self._plugin_resource_requirements = PluginResourceRequirements(
+            min_cpu_cores=1.0,
+            preferred_cpu_cores=2.0,
+            min_memory_mb=100.0
+        )
         self.initialized = False
         self.cleanup_called = False
+    
+    @property
+    def metadata(self) -> PluginMetadata:
+        """Plugin metadata for registration."""
+        return self._plugin_metadata
+    
+    @property
+    def resource_requirements(self) -> PluginResourceRequirements:
+        """Resource requirements for this plugin."""
+        return self._plugin_resource_requirements
+        
+    async def initialize(self, config: Dict[str, Any]) -> bool:
+        """Initialize the plugin with configuration."""
+        self.initialized = True
+        return True
         
     async def execute(self, data: Any, context: PluginExecutionContext) -> PluginExecutionResult:
         """Test execution that adds a prefix."""
@@ -44,10 +65,6 @@ class TestPlugin(BasePlugin):
             )
         return PluginExecutionResult(success=True, data=data)
     
-    async def initialize_with_config(self, config_manager: Optional[PluginConfigManager] = None) -> bool:
-        self.initialized = True
-        return True
-    
     async def cleanup(self) -> None:
         self.cleanup_called = True
 
@@ -57,7 +74,7 @@ class HighPriorityPlugin(TestPlugin):
     
     def __init__(self):
         super().__init__("HighPriorityPlugin")
-        self.metadata.execution_priority = ExecutionPriority.HIGH
+        self._plugin_metadata.execution_priority = ExecutionPriority.HIGH
 
 
 class LowPriorityPlugin(TestPlugin):
@@ -65,7 +82,7 @@ class LowPriorityPlugin(TestPlugin):
     
     def __init__(self):
         super().__init__("LowPriorityPlugin")
-        self.metadata.execution_priority = ExecutionPriority.LOW
+        self._plugin_metadata.execution_priority = ExecutionPriority.LOW
 
 
 class FailingPlugin(TestPlugin):
@@ -83,7 +100,7 @@ class ResourceHungryPlugin(TestPlugin):
     
     def __init__(self):
         super().__init__("ResourceHungryPlugin")
-        self.resource_requirements = PluginResourceRequirements(
+        self._plugin_resource_requirements = PluginResourceRequirements(
             min_cpu_cores=100,  # Impossibly high
             min_memory_mb=1000000,  # 1TB
             requires_gpu=True
@@ -146,7 +163,7 @@ class TestPluginRegistry:
     @pytest.mark.asyncio
     async def test_registry_initialization(self, registry):
         """Test basic registry initialization."""
-        assert registry.plugin_directories == []
+        assert registry.plugin_directories == []  # Empty because we passed []
         assert len(registry._plugins) == 0
         assert len(registry._plugins_by_type) == 0
     
@@ -155,7 +172,6 @@ class TestPluginRegistry:
         """Test manual plugin registration."""
         with patch('src.api.plugin_registry.get_resource_limits', return_value=mock_resource_limits):
             # Register plugin manually
-            plugin = TestPlugin()
             await registry._register_plugin_class(TestPlugin, "/fake/path", "test_module")
             
             # Check registration
@@ -235,7 +251,7 @@ class TestPluginRegistry:
             await registry._initialize_plugin("TestPlugin", mock_resource_limits)
             
             # Execute plugins
-            context = PluginExecutionContext(user_id="test_user", query="test query")
+            context = PluginExecutionContext(user_id="test_user", metadata={"query": "test query"})
             results = await registry.execute_plugins(PluginType.QUERY_EMBELLISHER, "test_data", context)
             
             assert len(results) == 1
@@ -267,7 +283,7 @@ class TestPluginRegistry:
             await registry._initialize_plugin("SecondPlugin", mock_resource_limits)
             
             # Execute plugins - data should be modified by each plugin
-            context = PluginExecutionContext(user_id="test_user", query="test query")
+            context = PluginExecutionContext(user_id="test_user", metadata={"query": "test query"})
             results = await registry.execute_plugins(PluginType.QUERY_EMBELLISHER, "original", context)
             
             assert len(results) == 2
@@ -285,7 +301,7 @@ class TestPluginRegistry:
             await registry._initialize_plugin("FailingPlugin", mock_resource_limits)
             
             # Execute plugin
-            context = PluginExecutionContext(user_id="test_user", query="test query")
+            context = PluginExecutionContext(user_id="test_user", metadata={"query": "test query"})
             results = await registry.execute_plugins(PluginType.QUERY_EMBELLISHER, "test_data", context)
             
             assert len(results) == 1
