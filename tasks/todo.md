@@ -112,10 +112,33 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
   - ✅ Real FAISS operations with numpy integration
   - ✅ Error handling and graceful degradation
 
-- [ ] **Add plugin configuration system**
-  - Plugin-specific config files
-  - Environment variable support
-  - Runtime configuration updates
+- [x] **Add plugin configuration system** ✅ (IMPLEMENTATION COMPLETE, TESTING PENDING)
+  - ✅ Plugin-specific config files (YAML/JSON support)
+  - ✅ Environment variable support with type conversion
+  - ✅ Runtime configuration updates via API
+  - ✅ Configuration validation with Pydantic
+  - ✅ Hierarchical config: defaults → file → environment → runtime
+  - ✅ Integration with BasePlugin class and plugin registry
+  - ✅ Updated AdaptiveQueryExpanderPlugin to use new config system
+  - ✅ Created comprehensive test suite (test_plugin_config.py)
+  - [ ] **RUN AND VALIDATE TESTS** - test_plugin_config.py needs execution
+  
+  **Files Created**:
+  - `src/plugins/config.py` - Core configuration system (400+ lines)
+  - `config/plugins/AdaptiveQueryExpanderPlugin.yml` - Example config file
+  - `test_plugin_config.py` - Configuration system tests (READY TO RUN)
+  
+  **Features Implemented**:
+  - ✅ BasePluginConfig class with common fields (enabled, debug, timeout, retries)
+  - ✅ PluginConfigManager for individual plugin configuration
+  - ✅ GlobalPluginConfigManager for system-wide plugin config management
+  - ✅ Environment variable support with PLUGIN_{NAME}_{SETTING} pattern
+  - ✅ Configuration source tracking (default/file/environment/runtime)
+  - ✅ Sensitive value masking for security
+  - ✅ Configuration validation and error handling
+  - ✅ Integration with plugin registry initialization
+  
+  **NEXT TASK**: Execute test_plugin_config.py to validate the configuration system
 
 ### Phase 4.4: Testing & Monitoring
 - [ ] **Create comprehensive plugin tests**
@@ -528,7 +551,7 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
 - [x] Comprehensive plugin integration testing (7/7 tests passing)
 - [x] Modify chat route for plugin execution (src/api/routes/chat.py)
 - [x] Add plugin health checks with Prometheus integration (src/api/plugin_metrics.py)
-- [x] **STAGE 4.3 FIRST PLUGIN COMPLETED**: Adaptive Query Expander Plugin Implementation
+- [x] **STAGE 4.3 PLUGIN SYSTEM COMPLETED**: All sample plugins and configuration system
   - ✅ Production-ready AdaptiveQueryExpanderPlugin with NLTK/WordNet integration
   - ✅ Hardware-adaptive processing (Low/Medium/High/Ollama Enhanced strategies)
   - ✅ Ollama LLM integration with retry logic and error correction
@@ -536,12 +559,23 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
   - ✅ Docker network configuration for host Ollama access
   - ✅ Comprehensive test suite (test_query_expander.py) with API integration
   - ✅ Plugin metrics and health monitoring working end-to-end
+- [x] **STAGE 4.3 CONFIGURATION SYSTEM IMPLEMENTED**: Plugin Configuration Management
+  - ✅ Complete configuration system with file, environment, and runtime support
+  - ✅ Pydantic validation and type conversion
+  - ✅ Configuration source tracking and sensitive value masking
+  - ✅ Integration with BasePlugin class and plugin registry
+  - ✅ Updated plugins to use new configuration system
+  - [ ] **TESTING REQUIRED**: Run test_plugin_config.py to validate implementation
 
-### Stage 4 Progress
-**Phase 4.3**: 2/4 plugins completed (Adaptive Query Expander ✅, Advanced Embed Data Enhancer ✅)
-**Phase 4.4**: 3/3 monitoring tasks completed ✅
-**Phase 4.5**: Security hardening completed ✅ (6/6 critical fixes applied)
-**Remaining**: FAISS CRUD plugin, plugin configuration system, additional tests
+### Stage 4 Progress (NEARLY COMPLETE - TESTING REQUIRED)
+**Phase 4.1**: Plugin Foundation ✅ (6/6 tasks completed)
+**Phase 4.2**: API Integration ✅ (4/4 tasks completed) 
+**Phase 4.3**: Sample Plugins (3.5/4 tasks completed - Config system implementation done, testing pending)
+**Phase 4.4**: Testing & Monitoring (Ready for next phase)
+**Phase 4.5**: Security hardening ✅ (6/6 critical fixes applied)
+
+**CURRENT STATUS**: Plugin configuration system implemented but not yet tested
+**NEXT STEP**: Run test_plugin_config.py to validate the configuration system
 
 ### Notes
 - **Stage 4 Achievement**: Production-grade plugin system with hot-reload, metrics, comprehensive testing, and security hardening

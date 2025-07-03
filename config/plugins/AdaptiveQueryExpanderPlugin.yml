@@ -1,0 +1,25 @@
+# Configuration for Adaptive Query Expander Plugin
+enabled: true
+debug: false
+timeout_seconds: 30.0
+max_retries: 3
+
+# Plugin-specific configuration
+expansion_strategies:
+  - "synonyms"
+  - "related_terms"
+  - "context_expansion"
+
+max_expansion_terms: 10
+enable_ollama: true
+ollama_model: "llama2"
+fallback_strategy: "synonyms_only"
+
+# Hardware adaptation settings
+min_processing_strategy: "low"
+preferred_processing_strategy: "high"
+enable_parallel_processing: true
+
+# Retry settings for LLM calls
+llm_retry_attempts: 3
+llm_timeout_seconds: 10.0

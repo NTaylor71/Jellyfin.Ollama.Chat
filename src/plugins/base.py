@@ -7,7 +7,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List, Union, Callable
+from typing import Dict, Any, Optional, List, Union, Callable, Type
 from enum import Enum
 import time
 from pydantic import BaseModel, Field
@@ -116,6 +116,8 @@ class BasePlugin(ABC):
         self._initialization_error: Optional[str] = None
         self._performance_metrics: Dict[str, Any] = {}
         self._logger = logging.getLogger(f"plugin.{self.__class__.__name__}")
+        self._config_manager: Optional[Any] = None  # Will be set during initialization
+        self._current_config: Optional[Any] = None
     
     @property
     @abstractmethod
@@ -129,9 +131,50 @@ class BasePlugin(ABC):
         """Resource requirements for this plugin."""
         pass
     
+    @property
+    def config_class(self) -> Optional[Type]:
+        """Configuration class for this plugin. Override in subclasses."""
+        return None
+    
+    def get_config(self) -> Optional[Any]:
+        """Get current plugin configuration."""
+        return self._current_config
+    
+    def update_config(self, updates: Dict[str, Any]) -> bool:
+        """Update plugin configuration at runtime."""
+        if self._config_manager:
+            return self._config_manager.update_config(updates)
+        return False
+    
+    async def initialize_with_config(self, config_manager: Optional[Any] = None) -> bool:
+        """Initialize the plugin with configuration manager."""
+        try:
+            # Set up configuration if config class is provided
+            if self.config_class and config_manager:
+                self._config_manager = config_manager
+                self._current_config = config_manager.get_config()
+                self._logger.info(f"Loaded configuration for plugin {self.metadata.name}")
+            
+            # Call plugin-specific initialization
+            legacy_config = self._current_config.model_dump() if self._current_config else {}
+            success = await self.initialize(legacy_config)
+            
+            if success:
+                self._is_initialized = True
+                self._initialization_error = None
+            else:
+                self._initialization_error = "Plugin initialization returned False"
+            
+            return success
+            
+        except Exception as e:
+            self._logger.error(f"Failed to initialize plugin {self.metadata.name}: {e}")
+            self._initialization_error = str(e)
+            return False
+    
     @abstractmethod
     async def initialize(self, config: Dict[str, Any]) -> bool:
-        """Initialize the plugin with configuration."""
+        """Initialize the plugin with configuration. Override in subclasses."""
         pass
     
     @abstractmethod
@@ -145,7 +188,7 @@ class BasePlugin(ABC):
     
     async def health_check(self) -> Dict[str, Any]:
         """Check plugin health status."""
-        return {
+        health_info = {
             "status": "healthy" if self._is_initialized else "unhealthy",
             "initialized": self._is_initialized,
             "error": self._initialization_error,
@@ -153,6 +196,19 @@ class BasePlugin(ABC):
             "resource_usage": await self._get_resource_usage(),
             "last_health_check": time.time()
         }
+        
+        # Add configuration information
+        if self._config_manager:
+            health_info["config"] = {
+                "has_config": True,
+                "config_summary": self._config_manager.get_config_summary()
+            }
+        else:
+            health_info["config"] = {
+                "has_config": False
+            }
+        
+        return health_info
     
     async def get_health_status(self) -> Dict[str, Any]:
         """Alias for health_check() method for compatibility."""

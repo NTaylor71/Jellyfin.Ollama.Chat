@@ -78,8 +78,69 @@ from ..base import (
     QueryEmbellisherPlugin, PluginMetadata, PluginResourceRequirements, 
     PluginExecutionContext, PluginExecutionResult, PluginType, ExecutionPriority
 )
+from ..config import BasePluginConfig
 from ...shared.config import get_settings
 from ...shared.hardware_config import get_resource_limits, get_hardware_profile
+from typing import Type
+from pydantic import Field
+
+
+class AdaptiveQueryExpanderConfig(BasePluginConfig):
+    """Configuration for Adaptive Query Expander Plugin."""
+    
+    # Expansion settings
+    expansion_strategies: List[str] = Field(
+        default=["synonyms", "related_terms", "context_expansion"],
+        description="List of expansion strategies to use"
+    )
+    max_expansion_terms: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum number of terms to add during expansion"
+    )
+    
+    # LLM settings
+    enable_ollama: bool = Field(
+        default=True,
+        description="Enable Ollama LLM for advanced expansions"
+    )
+    ollama_model: str = Field(
+        default="llama2",
+        description="Ollama model to use for expansions"
+    )
+    llm_retry_attempts: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of retry attempts for LLM calls"
+    )
+    llm_timeout_seconds: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+        description="Timeout for LLM API calls"
+    )
+    
+    # Fallback settings
+    fallback_strategy: str = Field(
+        default="synonyms_only",
+        description="Strategy to use when advanced methods fail"
+    )
+    
+    # Hardware adaptation
+    min_processing_strategy: str = Field(
+        default="low",
+        description="Minimum processing strategy (low/medium/high)"
+    )
+    preferred_processing_strategy: str = Field(
+        default="high",
+        description="Preferred processing strategy when resources allow"
+    )
+    enable_parallel_processing: bool = Field(
+        default=True,
+        description="Enable parallel processing when resources allow"
+    )
 
 
 @dataclass
@@ -136,10 +197,25 @@ class AdaptiveQueryExpanderPlugin(QueryEmbellisherPlugin):
             can_use_distributed_resources=True
         )
     
+    @property
+    def config_class(self) -> Type[BasePluginConfig]:
+        """Return the configuration class for this plugin."""
+        return AdaptiveQueryExpanderConfig
+    
     async def initialize(self, config: Dict[str, Any]) -> bool:
         """Initialize the plugin with expansion dictionaries and Ollama client."""
         try:
             self._logger.info("Initializing Adaptive Query Expander...")
+            
+            # Get plugin configuration
+            plugin_config = self.get_config()
+            if plugin_config:
+                self._logger.info(f"Using plugin configuration: enabled={plugin_config.enabled}, max_terms={plugin_config.max_expansion_terms}")
+                
+                # Check if plugin is enabled
+                if not plugin_config.enabled:
+                    self._logger.info("Plugin is disabled in configuration")
+                    return False
             
             # Get settings
             self._settings = get_settings()
@@ -147,8 +223,11 @@ class AdaptiveQueryExpanderPlugin(QueryEmbellisherPlugin):
             # Initialize hardware profile
             await self._initialize_hardware_registry()
             
-            # Initialize Ollama client
-            await self._initialize_ollama_client()
+            # Initialize Ollama client (if enabled in config)
+            if not plugin_config or plugin_config.enable_ollama:
+                await self._initialize_ollama_client()
+            else:
+                self._logger.info("Ollama integration disabled in configuration")
             
             # Load expansion dictionaries (minimal, as backup)
             await self._load_expansion_dictionaries()

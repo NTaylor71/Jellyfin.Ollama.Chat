@@ -18,6 +18,7 @@ from src.plugins.base import (
     BasePlugin, PluginType, PluginMetadata, ExecutionPriority, 
     PluginExecutionContext, PluginExecutionResult
 )
+from src.plugins.config import GlobalPluginConfigManager, get_global_config_manager
 from ..shared.hardware_config import get_resource_limits
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class PluginRegistry:
         self._initialization_lock = asyncio.Lock()
         self._reload_lock = asyncio.Lock()
         self._loaded_modules: Set[str] = set()
+        self._config_manager = get_global_config_manager()
         
     async def initialize(self) -> None:
         """Initialize the plugin registry and discover plugins."""
@@ -248,9 +250,16 @@ class PluginRegistry:
                 registered_plugin.initialization_error = error_msg
                 return
             
-            # Initialize the plugin
-            config = await self._get_plugin_config(plugin_name)
-            success = await instance.initialize(config)
+            # Set up configuration manager if plugin has config class
+            plugin_config_manager = None
+            if instance.config_class:
+                plugin_config_manager = self._config_manager.register_plugin(
+                    plugin_name, instance.config_class
+                )
+                logger.info(f"Registered configuration for plugin {plugin_name}")
+            
+            # Initialize the plugin with configuration
+            success = await instance.initialize_with_config(plugin_config_manager)
             
             if success:
                 registered_plugin.instance = instance
