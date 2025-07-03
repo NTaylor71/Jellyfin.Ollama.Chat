@@ -26,7 +26,8 @@ api = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "prometheus-fastapi-instrumentator>=6.1.0",
-    "slowapi>=0.1.9"
+    "slowapi>=0.1.9",
+    "watchdog"
 ]
 
 # FAISS service - only vector search deps
@@ -63,9 +64,14 @@ monitoring = [
     "opentelemetry-instrumentation-fastapi>=0.42b0"
 ]
 
+# Plugin system - hot-reload and plugin management
+plugins = [
+    "watchdog>=3.0.0"
+]
+
 # Local development - everything for local work
 local = [
-    "production-rag-system[api,faiss,worker,ollama,dev,monitoring]"
+    "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins]"
 ]
 
 [tool.setuptools.packages.find]
