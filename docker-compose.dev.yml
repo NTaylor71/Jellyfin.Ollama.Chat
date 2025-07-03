@@ -73,6 +73,7 @@ services:
       - LOG_LEVEL=DEBUG
       - ENABLE_CORS=true
       - ENABLE_API_DOCS=true
+      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
     networks:
       - rag-network
     depends_on:
@@ -104,6 +105,7 @@ services:
       - ENV=docker
       - REDIS_HOST=redis
       - LOG_LEVEL=DEBUG
+      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
     networks:
       - rag-network
     depends_on:

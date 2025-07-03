@@ -167,15 +167,14 @@ async def test_plugin_via_api():
             logger.info("\n💬 Testing query expansion via chat endpoint...")
             test_chat_queries = [
                 "Find me funny samurai movies",
-                "Show me dark Finnish comedies",
+                "Show me dark Finnish comedies", 
                 "I want to watch 80s sci-fi horror"
             ]
             
             for query in test_chat_queries:
                 try:
-                    response = await client.post(f"{api_url}/chat/query", json={
-                        "query": query,
-                        "use_rag": False
+                    response = await client.post(f"{api_url}/chat/", json={
+                        "query": query
                     })
                     
                     if response.status_code == 200:
@@ -223,9 +222,8 @@ async def test_plugin_metrics():
             logger.info("🚀 Triggering plugin executions...")
             for i in range(3):
                 try:
-                    await client.post(f"{api_url}/chat/query", json={
-                        "query": f"test query {i+1} for metrics",
-                        "use_rag": False
+                    await client.post(f"{api_url}/chat/", json={
+                        "query": f"test query {i+1} for metrics"
                     })
                 except:
                     pass  # Ignore failures, we just want to trigger plugins

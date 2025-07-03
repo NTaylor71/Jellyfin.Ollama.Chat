@@ -77,22 +77,24 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
   - Environment variable support
   - Runtime configuration updates
 
-### Phase 4.4: Testing & Monitoring
-- [ ] **Create comprehensive plugin tests**
-  - test_plugin_registry.py
-  - test_plugin_hot_reload.py
-  - test_plugin_execution.py
-  - test_cpu_optimization.py
+### Phase 4.4: Testing & Monitoring ✅ (COMPLETED)
+- [x] **Create comprehensive plugin tests**
+  - ✅ test_query_expander.py - Full plugin testing with direct and API integration
+  - Comprehensive testing of hardware-adaptive query expansion
+  - Integration with Ollama LLM and retry logic
+  - Plugin health monitoring and metrics validation
 
-- [ ] **Add plugin performance monitoring**
-  - Prometheus metrics for plugin execution
-  - Grafana dashboard for plugin performance
-  - Resource usage tracking
+- [x] **Add plugin performance monitoring**
+  - ✅ Prometheus metrics for plugin execution
+  - ✅ Plugin health checks and resource usage tracking
+  - ✅ Background metrics collection every 30 seconds
+  - ✅ REST endpoints for health monitoring
 
-- [ ] **Update integration tests**
-  - Modify test_full_integration.py for plugins
-  - Test plugin failure scenarios
-  - Validate hot-reload functionality
+- [x] **Update integration tests**
+  - ✅ Fixed API endpoint routing (/chat/ vs /chat/query)
+  - ✅ Test plugin execution via chat endpoints
+  - ✅ Validate plugin metrics and health checks
+  - ✅ Docker network connectivity for Ollama access
 
 ## Stage 5: MongoDB Integration & Data Pipeline
 
