@@ -1,5 +1,5 @@
 """
-Simple FastAPI application for RAG system.
+Simple FastAPI application for RAG system with Prometheus metrics.
 """
 
 import logging
@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 from src.api.routes import health, chat
@@ -23,15 +24,15 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting RAG API service")
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"API URL: {settings.API_URL}")
-    
+
     yield
-    
+
     logger.info("🛑 Shutting down RAG API service")
 
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
-    
+
     # Create FastAPI app
     app = FastAPI(
         title="Production RAG System API",
@@ -41,7 +42,21 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
         lifespan=lifespan
     )
-    
+
+    # Add Prometheus metrics
+    if getattr(settings, 'ENABLE_METRICS', True):  # Default to enabled
+        instrumentator = Instrumentator(
+            should_group_status_codes=False,
+            should_ignore_untemplated=True,
+            should_instrument_requests_inprogress=True,
+            excluded_handlers=["/metrics"],
+        )
+
+        instrumentator.instrument(app).expose(app)
+        logger.info("✅ Prometheus metrics enabled at /metrics")
+    else:
+        logger.info("⚠️ Prometheus metrics disabled")
+
     # Add CORS middleware
     if settings.ENABLE_CORS:
         app.add_middleware(
@@ -51,11 +66,11 @@ def create_app() -> FastAPI:
             allow_methods=settings.CORS_METHODS,
             allow_headers=settings.CORS_HEADERS,
         )
-    
+
     # Include routers
     app.include_router(health.router, prefix="/health", tags=["Health"])
     app.include_router(chat.router, prefix="/chat", tags=["Chat"])
-    
+
     # Root endpoint
     @app.get("/")
     async def root():
@@ -64,10 +79,11 @@ def create_app() -> FastAPI:
             "version": "2.0.0",
             "environment": settings.ENV,
             "docs": "/docs" if settings.ENABLE_API_DOCS else None,
+            "metrics": "/metrics",
             "health": "/health",
             "status": "running"
         }
-    
+
     return app
 
 
@@ -77,17 +93,17 @@ app = create_app()
 
 def main():
     """Main entry point for the API service."""
-    
+
     # Setup basic logging
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     logger.info("🎯 Starting Production RAG API")
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"Debug mode: {settings.is_localhost}")
-    
+
     # Run the server
     uvicorn.run(
         "src.api.main:app",
