@@ -2,6 +2,7 @@
 Simple FastAPI application for RAG system with Prometheus metrics.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -14,10 +15,27 @@ from src.shared.config import get_settings
 from src.api.routes import health, chat, plugins
 from src.api.plugin_registry import plugin_registry
 from src.api.plugin_watcher import plugin_watcher
+from src.api.plugin_metrics import get_plugin_metrics
 
 # Get settings
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+
+async def update_plugin_metrics_periodically():
+    """Background task to update plugin metrics for Prometheus."""
+    metrics_collector = get_plugin_metrics()
+    
+    while True:
+        try:
+            await metrics_collector.update_plugin_health_metrics(plugin_registry)
+            await asyncio.sleep(30)  # Update every 30 seconds
+        except asyncio.CancelledError:
+            logger.info("📊 Plugin metrics update task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error updating plugin metrics: {e}")
+            await asyncio.sleep(30)  # Continue after error
 
 
 @asynccontextmanager
@@ -28,6 +46,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"API URL: {settings.API_URL}")
     
     # Initialize plugin system
+    metrics_task = None
     try:
         logger.info("🔌 Initializing plugin system...")
         await plugin_registry.initialize()
@@ -42,6 +61,11 @@ async def lifespan(app: FastAPI):
         plugin_status = await plugin_registry.get_plugin_status()
         logger.info(f"✅ Plugin system initialized: {plugin_status['enabled_plugins']}/{plugin_status['total_plugins']} plugins active")
         
+        # Start plugin metrics collection if Prometheus is enabled
+        if getattr(settings, 'ENABLE_METRICS', True):
+            metrics_task = asyncio.create_task(update_plugin_metrics_periodically())
+            logger.info("📊 Plugin metrics collection started")
+        
     except Exception as e:
         logger.error(f"❌ Failed to initialize plugin system: {e}")
         logger.warning("🔄 Continuing without plugin system...")
@@ -51,6 +75,14 @@ async def lifespan(app: FastAPI):
     # Cleanup plugin system
     logger.info("🛑 Shutting down RAG API service")
     try:
+        # Cancel metrics task
+        if metrics_task and not metrics_task.done():
+            metrics_task.cancel()
+            try:
+                await metrics_task
+            except asyncio.CancelledError:
+                pass
+        
         if plugin_watcher.is_watching:
             await plugin_watcher.stop_watching()
             logger.info("👁️ Plugin watcher stopped")

@@ -149,8 +149,38 @@ class BasePlugin(ABC):
             "status": "healthy" if self._is_initialized else "unhealthy",
             "initialized": self._is_initialized,
             "error": self._initialization_error,
-            "metrics": self._performance_metrics
+            "metrics": self._performance_metrics,
+            "resource_usage": await self._get_resource_usage(),
+            "last_health_check": time.time()
         }
+    
+    async def _get_resource_usage(self) -> Dict[str, Any]:
+        """Get current resource usage for this plugin."""
+        try:
+            import psutil
+            import os
+            
+            # Get process info
+            process = psutil.Process(os.getpid())
+            memory_info = process.memory_info()
+            
+            return {
+                "memory_used_mb": round(memory_info.rss / 1024 / 1024, 2),
+                "cpu_percent": process.cpu_percent(),
+                "num_threads": process.num_threads(),
+                "open_files": len(process.open_files()),
+                "resource_requirements": self.resource_requirements.to_dict()
+            }
+        except Exception as e:
+            self._logger.warning(f"Could not get resource usage: {e}")
+            return {
+                "memory_used_mb": 0,
+                "cpu_percent": 0,
+                "num_threads": 0,
+                "open_files": 0,
+                "resource_requirements": self.resource_requirements.to_dict(),
+                "error": str(e)
+            }
     
     def _update_performance_metrics(self, execution_time_ms: float, success: bool) -> None:
         """Update internal performance metrics."""
@@ -173,6 +203,23 @@ class BasePlugin(ABC):
             self._performance_metrics["total_execution_time_ms"] / 
             self._performance_metrics["executions"]
         )
+        
+        # Record metrics to Prometheus (if available)
+        try:
+            # Import here to avoid circular dependency
+            from ..api.plugin_metrics import get_plugin_metrics
+            metrics_collector = get_plugin_metrics()
+            metrics_collector.record_plugin_execution(
+                plugin_name=self.metadata.name,
+                plugin_type=self.metadata.plugin_type.value,
+                execution_time_ms=execution_time_ms,
+                success=success
+            )
+        except ImportError:
+            # Prometheus metrics not available (e.g., in worker service)
+            pass
+        except Exception as e:
+            self._logger.warning(f"Failed to record Prometheus metrics: {e}")
     
     async def _check_resource_availability(self, context: PluginExecutionContext) -> bool:
         """Check if required resources are available."""

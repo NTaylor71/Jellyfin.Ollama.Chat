@@ -2,6 +2,7 @@
 Chat endpoints for RAG system.
 """
 
+import logging
 import time
 import uuid
 from typing import Optional, List, Dict, Any
@@ -10,6 +11,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from src.shared.config import get_settings
+from src.api.plugin_registry import get_plugin_registry
+from src.plugins.base import PluginType, PluginExecutionContext
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -62,14 +67,14 @@ async def submit_chat_query(request: ChatRequest):
     # Generate unique job ID
     job_id = str(uuid.uuid4())
     
-    # For now, we'll simulate processing with a simple response
-    # Later this will queue the job in Redis
+    # Execute query embellisher plugins
+    enhanced_query = await _execute_query_embellisher_plugins(request.query, request.context)
     
-    # Create initial job record
+    # Create initial job record with enhanced query
     job_result = ChatResult(
         job_id=job_id,
         status="processing",
-        query=request.query,
+        query=enhanced_query,
         timestamp=time.time()
     )
     
@@ -77,12 +82,12 @@ async def submit_chat_query(request: ChatRequest):
     _job_storage[job_id] = job_result
     
     # Simulate processing (replace with actual queue later)
-    await _simulate_processing(job_id, request)
+    await _simulate_processing(job_id, request, enhanced_query)
     
     return ChatResponse(
         job_id=job_id,
         status="accepted",
-        query=request.query,
+        query=enhanced_query,
         timestamp=time.time(),
         estimated_time=5.0  # 5 seconds estimated
     )
@@ -136,7 +141,46 @@ async def list_recent_jobs(limit: int = 10):
     }
 
 
-async def _simulate_processing(job_id: str, request: ChatRequest):
+async def _execute_query_embellisher_plugins(query: str, context: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Execute query embellisher plugins to enhance the user's query.
+    
+    Returns the enhanced query or original query if no plugins are available.
+    """
+    try:
+        plugin_registry = await get_plugin_registry()
+        
+        # Create execution context
+        execution_context = PluginExecutionContext(
+            request_id=str(uuid.uuid4()),
+            metadata={
+                "user_context": context or {},
+                "timestamp": time.time(),
+                "query_type": "chat"
+            }
+        )
+        
+        # Execute query embellisher plugins
+        results = await plugin_registry.execute_plugins(
+            PluginType.QUERY_EMBELLISHER,
+            query,
+            execution_context
+        )
+        
+        # Use the enhanced query from the last successful plugin
+        enhanced_query = query
+        for result in results:
+            if result.success and result.data:
+                enhanced_query = result.data
+        
+        return enhanced_query
+        
+    except Exception as e:
+        logger.error(f"Error executing query embellisher plugins: {e}")
+        return query
+
+
+async def _simulate_processing(job_id: str, request: ChatRequest, enhanced_query: str):
     """
     Simulate chat processing (temporary implementation).
     
@@ -151,7 +195,7 @@ async def _simulate_processing(job_id: str, request: ChatRequest):
     mock_results = [
         {
             "title": "Sample Movie 1",
-            "summary": f"This is a sample movie result for query: {request.query}",
+            "summary": f"This is a sample movie result for query: {enhanced_query}",
             "relevance_score": 0.95,
             "metadata": {
                 "genre": "Drama",
@@ -161,7 +205,7 @@ async def _simulate_processing(job_id: str, request: ChatRequest):
         },
         {
             "title": "Sample Movie 2", 
-            "summary": f"Another relevant movie for: {request.query}",
+            "summary": f"Another relevant movie for: {enhanced_query}",
             "relevance_score": 0.87,
             "metadata": {
                 "genre": "Action",
@@ -175,13 +219,14 @@ async def _simulate_processing(job_id: str, request: ChatRequest):
     job = _job_storage[job_id]
     job.status = "completed"
     job.results = mock_results[:request.max_results] if request.max_results else mock_results
-    job.response = f"Found {len(job.results)} relevant movies for your query: '{request.query}'"
+    job.response = f"Found {len(job.results)} relevant movies for your query: '{enhanced_query}'"
     job.processing_time = 0.1
     job.metadata = {
         "total_results": len(mock_results),
         "processing_method": "mock",
         "filters_applied": [],
-        "query_enhanced": False
+        "query_enhanced": enhanced_query != request.query,
+        "original_query": request.query
     }
 
 

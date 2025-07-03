@@ -4,6 +4,7 @@ Provides API endpoints for managing and monitoring plugins.
 """
 
 import logging
+import time
 from typing import Dict, List, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -228,6 +229,114 @@ async def force_reload_watcher():
     except Exception as e:
         logger.error(f"Error force reloading plugins: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to force reload: {str(e)}")
+
+
+@router.get("/health")
+async def get_plugin_health_overview():
+    """Get health overview of all plugins with performance metrics."""
+    try:
+        status = await plugin_registry.get_plugin_status()
+        
+        # Calculate aggregate metrics
+        total_plugins = status["total_plugins"]
+        healthy_plugins = 0
+        total_executions = 0
+        total_failures = 0
+        avg_response_time = 0
+        aggregate_resource_usage = {
+            "total_memory_used_mb": 0,
+            "total_cpu_usage_percent": 0,
+            "plugins_using_gpu": 0
+        }
+        
+        plugin_health_details = []
+        
+        for name, details in status["plugin_details"].items():
+            health_info = details.get("health", {})
+            metrics = health_info.get("metrics", {})
+            resource_usage = health_info.get("resource_usage", {})
+            
+            # Count healthy plugins
+            if health_info.get("status") == "healthy":
+                healthy_plugins += 1
+            
+            # Aggregate performance metrics
+            executions = metrics.get("executions", 0)
+            failures = metrics.get("failed_executions", 0)
+            total_executions += executions
+            total_failures += failures
+            
+            # Aggregate resource usage
+            plugin_memory = resource_usage.get("memory_used_mb", 0)
+            plugin_cpu = resource_usage.get("cpu_percent", 0)
+            aggregate_resource_usage["total_memory_used_mb"] += plugin_memory
+            aggregate_resource_usage["total_cpu_usage_percent"] += plugin_cpu
+            
+            # Check if plugin uses GPU
+            requirements = resource_usage.get("resource_requirements", {})
+            if requirements.get("requires_gpu", False):
+                aggregate_resource_usage["plugins_using_gpu"] += 1
+            
+            # Calculate plugin-specific metrics
+            success_rate = 0
+            if executions > 0:
+                success_rate = ((executions - failures) / executions) * 100
+            
+            plugin_health_details.append({
+                "name": name,
+                "status": health_info.get("status", "unknown"),
+                "initialized": details.get("initialized", False),
+                "success_rate_percent": round(success_rate, 2),
+                "total_executions": executions,
+                "avg_execution_time_ms": round(metrics.get("avg_execution_time_ms", 0), 2),
+                "last_error": details.get("initialization_error"),
+                "resource_usage": {
+                    "memory_used_mb": plugin_memory,
+                    "cpu_percent": plugin_cpu,
+                    "num_threads": resource_usage.get("num_threads", 0),
+                    "requires_gpu": requirements.get("requires_gpu", False)
+                },
+                "last_health_check": health_info.get("last_health_check", 0)
+            })
+        
+        # Calculate overall metrics
+        if total_executions > 0:
+            overall_success_rate = ((total_executions - total_failures) / total_executions) * 100
+        else:
+            overall_success_rate = 100
+            
+        # Calculate average response time across all plugins
+        total_response_time = 0
+        plugins_with_metrics = 0
+        for detail in plugin_health_details:
+            if detail["avg_execution_time_ms"] > 0:
+                total_response_time += detail["avg_execution_time_ms"]
+                plugins_with_metrics += 1
+        
+        if plugins_with_metrics > 0:
+            avg_response_time = total_response_time / plugins_with_metrics
+        
+        return {
+            "overall_health": {
+                "status": "healthy" if healthy_plugins == total_plugins else "degraded",
+                "healthy_plugins": healthy_plugins,
+                "total_plugins": total_plugins,
+                "health_percentage": round((healthy_plugins / total_plugins) * 100, 2) if total_plugins > 0 else 0
+            },
+            "performance_metrics": {
+                "total_executions": total_executions,
+                "total_failures": total_failures,
+                "overall_success_rate_percent": round(overall_success_rate, 2),
+                "avg_response_time_ms": round(avg_response_time, 2)
+            },
+            "resource_usage": aggregate_resource_usage,
+            "plugin_health_details": plugin_health_details,
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting plugin health overview: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get plugin health overview: {str(e)}")
 
 
 @router.get("/types")
