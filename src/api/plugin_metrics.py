@@ -25,6 +25,33 @@ plugin_execution_duration_seconds = Histogram(
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 )
 
+# Enhanced plugin performance metrics
+plugin_execution_phases = Histogram(
+    'plugin_execution_phases_duration_seconds',
+    'Plugin execution phase duration in seconds',
+    ['plugin_name', 'plugin_type', 'phase'],
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
+)
+
+plugin_data_processing_bytes = Histogram(
+    'plugin_data_processing_bytes',
+    'Amount of data processed by plugin in bytes',
+    ['plugin_name', 'plugin_type'],
+    buckets=[100, 1000, 10000, 100000, 1000000, 10000000, 100000000]
+)
+
+plugin_concurrency_level = Gauge(
+    'plugin_concurrency_level',
+    'Current concurrency level for plugin execution',
+    ['plugin_name', 'plugin_type']
+)
+
+plugin_queue_size = Gauge(
+    'plugin_queue_size',
+    'Number of pending plugin executions',
+    ['plugin_name', 'plugin_type']
+)
+
 # Plugin health metrics
 plugin_health_status = Gauge(
     'plugin_health_status',
@@ -93,8 +120,10 @@ class PluginMetricsCollector:
         self._collection_interval = 30  # seconds
         
     def record_plugin_execution(self, plugin_name: str, plugin_type: str, 
-                              execution_time_ms: float, success: bool) -> None:
-        """Record a plugin execution event."""
+                              execution_time_ms: float, success: bool,
+                              data_processed_bytes: int = 0, 
+                              phase_timings: dict = None) -> None:
+        """Record a plugin execution event with enhanced metrics."""
         status = "success" if success else "failure"
         
         # Update counters
@@ -110,7 +139,39 @@ class PluginMetricsCollector:
             plugin_type=plugin_type
         ).observe(execution_time_ms / 1000.0)  # Convert ms to seconds
         
+        # Record data processing metrics
+        if data_processed_bytes > 0:
+            plugin_data_processing_bytes.labels(
+                plugin_name=plugin_name,
+                plugin_type=plugin_type
+            ).observe(data_processed_bytes)
+        
+        # Record phase timings if provided
+        if phase_timings:
+            for phase, duration_ms in phase_timings.items():
+                plugin_execution_phases.labels(
+                    plugin_name=plugin_name,
+                    plugin_type=plugin_type,
+                    phase=phase
+                ).observe(duration_ms / 1000.0)
+        
         logger.debug(f"Recorded plugin execution: {plugin_name} ({status}, {execution_time_ms}ms)")
+    
+    def update_plugin_concurrency(self, plugin_name: str, plugin_type: str, 
+                                 concurrency_level: int) -> None:
+        """Update plugin concurrency level."""
+        plugin_concurrency_level.labels(
+            plugin_name=plugin_name,
+            plugin_type=plugin_type
+        ).set(concurrency_level)
+    
+    def update_plugin_queue_size(self, plugin_name: str, plugin_type: str, 
+                                queue_size: int) -> None:
+        """Update plugin queue size."""
+        plugin_queue_size.labels(
+            plugin_name=plugin_name,
+            plugin_type=plugin_type
+        ).set(queue_size)
     
     async def update_plugin_health_metrics(self, plugin_registry) -> None:
         """Update plugin health and resource metrics."""
@@ -227,6 +288,17 @@ class PluginMetricsCollector:
             ).set(0)
             
             plugin_thread_count.labels(
+                plugin_name=plugin_name,
+                plugin_type=plugin_type
+            ).set(0)
+            
+            # Reset enhanced performance metrics
+            plugin_concurrency_level.labels(
+                plugin_name=plugin_name,
+                plugin_type=plugin_type
+            ).set(0)
+            
+            plugin_queue_size.labels(
                 plugin_name=plugin_name,
                 plugin_type=plugin_type
             ).set(0)

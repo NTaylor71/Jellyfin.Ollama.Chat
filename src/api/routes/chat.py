@@ -8,7 +8,7 @@ import uuid
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from src.shared.config import get_settings
 from src.api.plugin_registry import get_plugin_registry

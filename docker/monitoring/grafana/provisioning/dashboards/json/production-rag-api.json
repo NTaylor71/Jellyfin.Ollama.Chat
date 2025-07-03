@@ -1,5 +1,4 @@
 {
-  "dashboard": {
     "id": null,
     "title": "Production RAG System API Monitoring",
     "description": "Comprehensive monitoring for Production RAG System FastAPI with detailed instrumentation",
@@ -331,8 +330,7 @@
         }
       }
     ],
-    "refresh": "5s",
-    "schemaVersion": 27,
-    "version": 1
-  }
+  "refresh": "5s",
+  "schemaVersion": 27,
+  "version": 1
 }
