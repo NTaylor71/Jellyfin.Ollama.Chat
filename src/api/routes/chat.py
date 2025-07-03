@@ -21,11 +21,50 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    """Chat request model."""
+    """Chat request model with security validation."""
     query: str = Field(..., min_length=1, max_length=5000, description="User query")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context")
     max_results: Optional[int] = Field(default=5, ge=1, le=20, description="Maximum number of results")
     include_metadata: Optional[bool] = Field(default=True, description="Include result metadata")
+    
+    @validator("query")
+    def validate_query_security(cls, v):
+        """Security validation for query content."""
+        if not v or not v.strip():
+            raise ValueError("Query cannot be empty")
+            
+        # Basic content filtering for security
+        dangerous_patterns = [
+            r'<script',
+            r'javascript:',
+            r'eval\s*\(',
+            r'exec\s*\(',
+            r'__import__',
+            r'subprocess',
+            r'os\.',
+            r'sys\.',
+        ]
+        
+        import re
+        for pattern in dangerous_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                raise ValueError("Query contains potentially unsafe content")
+        
+        return v.strip()
+    
+    @validator("context")
+    def validate_context_security(cls, v):
+        """Security validation for context data."""
+        if v is None:
+            return v
+            
+        # Limit context size to prevent memory exhaustion
+        import json
+        context_str = json.dumps(v)
+        if len(context_str) > 10000:  # 10KB limit
+            raise ValueError("Context data too large")
+            
+        return v
 
 
 class ChatResponse(BaseModel):

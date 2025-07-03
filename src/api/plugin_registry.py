@@ -72,6 +72,36 @@ class PluginRegistry:
             logger.debug(f"Discovering plugins in {plugin_dir}")
             await self._scan_directory(plugin_path)
     
+    def _is_safe_module_name(self, module_name: str) -> bool:
+        """Security: Validate that module name is safe to import."""
+        import re
+        
+        # Only allow modules within src.plugins namespace
+        if not module_name.startswith('src.plugins.'):
+            return False
+            
+        # Prevent path traversal and dangerous module names
+        dangerous_patterns = [
+            r'\.\.',  # Path traversal
+            r'__',    # Dunder methods/modules  
+            r'sys',   # System modules
+            r'os',    # OS modules
+            r'subprocess',  # Process execution
+            r'eval',  # Code evaluation
+            r'exec',  # Code execution
+            r'import', # Import manipulation
+        ]
+        
+        for pattern in dangerous_patterns:
+            if re.search(pattern, module_name, re.IGNORECASE):
+                return False
+                
+        # Only allow alphanumeric, dots, and underscores
+        if not re.match(r'^[a-zA-Z0-9._]+$', module_name):
+            return False
+            
+        return True
+
     async def _scan_directory(self, directory: Path) -> None:
         """Recursively scan directory for plugin files."""
         logger.debug(f"Scanning directory: {directory}")
@@ -99,8 +129,14 @@ class PluginRegistry:
                 logger.error(f"Plugin file {file_path} is not within project directory")
                 return
             
-            # Convert to module name
+            # Convert to module name with security validation
             module_name = str(relative_path).replace(os.sep, '.').replace('.py', '')
+            
+            # Security: Validate module name to prevent arbitrary imports
+            if not self._is_safe_module_name(module_name):
+                logger.error(f"Unsafe module name rejected: {module_name}")
+                return
+                
             logger.info(f"Module name: {module_name}")
             
             # Skip if already loaded

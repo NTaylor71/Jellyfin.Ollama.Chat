@@ -268,11 +268,11 @@ class Settings(BaseSettings):
     # SECURITY
     # ==========================================================================
     
-    # API security
+    # API security - Enhanced for production
     API_KEY_ENABLED: bool = Field(default=False)
     API_KEY: Optional[str] = Field(default=None)
     JWT_SECRET_KEY: Optional[str] = Field(default=None)
-    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ALGORITHM: str = Field(default="RS256")  # Changed to RS256 for better security
     JWT_EXPIRE_MINUTES: int = Field(default=60)
     
     @validator("JWT_SECRET_KEY")
