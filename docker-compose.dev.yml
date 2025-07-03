@@ -1,0 +1,158 @@
+# =============================================================================
+# Production RAG System - Development Environment (Updated for Redis)
+# =============================================================================
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  faiss-data:
+    driver: local
+  logs-data:
+    driver: local
+
+services:
+  # ===========================================================================
+  # REDIS QUEUE SYSTEM
+  # ===========================================================================
+
+  redis:
+    build:
+      context: .
+      dockerfile: docker/redis/Dockerfile
+    container_name: rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/etc/redis/redis.conf:ro
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # RAG SYSTEM SERVICES
+  # ===========================================================================
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: rag-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LOG_LEVEL=DEBUG
+      - ENABLE_CORS=true
+      - ENABLE_API_DOCS=true
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: rag-worker
+    restart: unless-stopped
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - LOG_LEVEL=DEBUG
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from src.redis_worker.queue_manager import RedisQueueManager; RedisQueueManager().redis_client.ping()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # FUTURE SERVICES (Placeholder)
+  # ===========================================================================
+
+  faiss-service:
+    build:
+      context: .
+      dockerfile: docker/faiss/Dockerfile
+    container_name: rag-faiss-service
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - faiss-data:/app/data
+      - ./src:/app/src:ro
+      - ./logs:/app/logs
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - VECTORDB_URL=http://faiss-service:6333
+      - LOG_LEVEL=DEBUG
+      - FAISS_INDEX_PATH=/app/data/faiss_index
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - faiss  # Only start with --profile faiss
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
