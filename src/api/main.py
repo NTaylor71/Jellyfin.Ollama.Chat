@@ -11,7 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
-from src.api.routes import health, chat
+from src.api.routes import health, chat, plugins
+from src.api.plugin_registry import plugin_registry
+from src.api.plugin_watcher import plugin_watcher
 
 # Get settings
 settings = get_settings()
@@ -24,10 +26,39 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting RAG API service")
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"API URL: {settings.API_URL}")
+    
+    # Initialize plugin system
+    try:
+        logger.info("🔌 Initializing plugin system...")
+        await plugin_registry.initialize()
+        
+        # Start plugin file watcher for hot-reload
+        if getattr(settings, 'ENABLE_PLUGIN_HOT_RELOAD', True):
+            await plugin_watcher.start_watching()
+            logger.info("👁️ Plugin hot-reload watcher started")
+        else:
+            logger.info("⚠️ Plugin hot-reload disabled")
+            
+        plugin_status = await plugin_registry.get_plugin_status()
+        logger.info(f"✅ Plugin system initialized: {plugin_status['enabled_plugins']}/{plugin_status['total_plugins']} plugins active")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize plugin system: {e}")
+        logger.warning("🔄 Continuing without plugin system...")
 
     yield
 
+    # Cleanup plugin system
     logger.info("🛑 Shutting down RAG API service")
+    try:
+        if plugin_watcher.is_watching:
+            await plugin_watcher.stop_watching()
+            logger.info("👁️ Plugin watcher stopped")
+        
+        await plugin_registry.cleanup()
+        logger.info("🔌 Plugin system cleaned up")
+    except Exception as e:
+        logger.error(f"❌ Error during plugin cleanup: {e}")
 
 
 def create_app() -> FastAPI:
@@ -70,6 +101,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health.router, prefix="/health", tags=["Health"])
     app.include_router(chat.router, prefix="/chat", tags=["Chat"])
+    app.include_router(plugins.router, prefix="/plugins", tags=["Plugins"])
 
     # Root endpoint
     @app.get("/")

@@ -130,7 +130,7 @@ class HardwareConfigModel(BaseModel):
     local_cpu_cores: int = Field(..., ge=1, le=128, description="Local CPU cores")
     local_cpu_threads: int = Field(..., ge=1, le=256, description="Local CPU threads")
     local_memory_gb: float = Field(..., ge=0.5, le=1024, description="Local RAM in GB")
-    local_storage_type: str = Field("hdd", regex="^(hdd|ssd|nvme)$", description="Local storage type")
+    local_storage_type: str = Field("hdd", pattern="^(hdd|ssd|nvme)$", description="Local storage type")
     
     cpu_endpoints: List[ResourceEndpointModel] = Field(default_factory=list, description="CPU endpoints")
     gpu_endpoints: List[ResourceEndpointModel] = Field(default_factory=list, description="GPU endpoints")
@@ -301,25 +301,30 @@ class HardwareConfigManager:
             
             # Auto-detect if no config file or loading failed
             self._current_profile = HardwareDetector.auto_detect()
-            await self.save_config(self._current_profile)
+            # Save without acquiring lock again (we already have it)
+            await self._save_config_unlocked(self._current_profile)
             return self._current_profile
+    
+    async def _save_config_unlocked(self, profile: HardwareProfile) -> None:
+        """Save hardware configuration to file without acquiring lock."""
+        try:
+            # Validate before saving
+            validated = HardwareConfigModel(**profile.to_dict())
+            
+            with open(self.config_path, 'w') as f:
+                json.dump(validated.dict(), f, indent=2)
+            
+            self._current_profile = profile
+            logger.info(f"Saved hardware config to {self.config_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save hardware config: {e}")
+            raise
     
     async def save_config(self, profile: HardwareProfile) -> None:
         """Save hardware configuration to file."""
         async with self._lock:
-            try:
-                # Validate before saving
-                validated = HardwareConfigModel(**profile.to_dict())
-                
-                with open(self.config_path, 'w') as f:
-                    json.dump(validated.dict(), f, indent=2)
-                
-                self._current_profile = profile
-                logger.info(f"Saved hardware config to {self.config_path}")
-                
-            except Exception as e:
-                logger.error(f"Failed to save hardware config: {e}")
-                raise
+            await self._save_config_unlocked(profile)
     
     async def update_config(self, **kwargs) -> HardwareProfile:
         """Update specific hardware configuration values."""

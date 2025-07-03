@@ -96,7 +96,7 @@ class PluginExecutionResult:
 class PluginMetadata(BaseModel):
     """Metadata for plugin registration."""
     name: str = Field(..., min_length=1, max_length=100)
-    version: str = Field(..., regex=r'^\d+\.\d+\.\d+$')
+    version: str = Field(..., pattern=r'^\d+\.\d+\.\d+$')
     description: str = Field(..., min_length=1, max_length=500)
     author: str = Field(..., min_length=1, max_length=100)
     plugin_type: PluginType
@@ -280,6 +280,10 @@ class QueryEmbellisherPlugin(BasePlugin):
             plugin_type=PluginType.QUERY_EMBELLISHER
         )
     
+    @property
+    def resource_requirements(self) -> PluginResourceRequirements:
+        return PluginResourceRequirements()
+    
     @abstractmethod
     async def embellish_query(self, query: str, context: PluginExecutionContext) -> str:
         """Embellish the input query and return enhanced version."""
@@ -322,6 +326,10 @@ class EmbedDataEmbellisherPlugin(BasePlugin):
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER
         )
     
+    @property
+    def resource_requirements(self) -> PluginResourceRequirements:
+        return PluginResourceRequirements()
+    
     @abstractmethod
     async def embellish_embed_data(self, data: Dict[str, Any], context: PluginExecutionContext) -> Dict[str, Any]:
         """Embellish data before embedding."""
@@ -363,6 +371,10 @@ class FAISSCRUDPlugin(BasePlugin):
             author="System",
             plugin_type=PluginType.FAISS_CRUD
         )
+    
+    @property
+    def resource_requirements(self) -> PluginResourceRequirements:
+        return PluginResourceRequirements()
     
     @abstractmethod
     async def handle_faiss_operation(self, operation: str, data: Dict[str, Any], context: PluginExecutionContext) -> Any:

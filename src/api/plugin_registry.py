@@ -83,7 +83,18 @@ class PluginRegistry:
         """Load a plugin file and register any plugin classes found."""
         try:
             # Convert file path to module name
-            relative_path = file_path.relative_to(Path.cwd())
+            # Make file_path absolute if it isn't already
+            if not file_path.is_absolute():
+                file_path = Path.cwd() / file_path
+            
+            # Get relative path from current working directory
+            try:
+                relative_path = file_path.relative_to(Path.cwd())
+            except ValueError:
+                logger.error(f"Plugin file {file_path} is not within project directory")
+                return
+            
+            # Convert to module name
             module_name = str(relative_path).replace(os.sep, '.').replace('.py', '')
             
             # Skip if already loaded
