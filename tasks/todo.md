@@ -431,113 +431,329 @@ DEFERRED FOR LATER - Will return to this after comprehensive testing phase
   - ✅ `test_fuzzy_matcher.py` - 23/23 tests passing with edge case coverage
   - ✅ Performance testing and error handling validation
 
-### Phase 6.2: Field-Specific Weighting System ✅ (COMPLETED)
-- [x] **Implement weighted field search** (`src/search/field_weights.py`) ✅
-  - ✅ Title field with 3.0x weight and 5.0x exact match boost
-  - ✅ Genre field with 2.5x weight and 4.0x exact match boost
-  - ✅ Cast/director fields with 2.0x weight and 3.5x exact match boost
-  - ✅ Configurable weights via admin interface
+### Phase 6.2: Advanced Language Intelligence & Hybrid Search System (REPLACES OLD 6.2, 6.3, and Stage 7)
 
-- [x] **Create positional scoring** (`src/search/positional_scorer.py`) ✅
-  - ✅ First word match bonus (2x weight)
-  - ✅ Title start match bonus (3x weight)
-  - ✅ Phrase order preservation (1.5x weight)
-  - ✅ Beginning vs middle vs end positioning
+**RATIONALE FOR REPLACEMENT:**
+The previous implementation (field_weights.py, positional_scorer.py, match_quality.py) was:
+- Brittle with hard-coded movie-specific fields
+- Using arbitrary scoring weights (3.0x, 2.5x, etc.)
+- Not leveraging modern NLP capabilities
+- Not media-agnostic
+- Not using MongoDB's powerful text search features
+- Not symmetric (different code for ingestion vs queries)
 
-- [x] **Implement match quality scoring** (`src/search/match_quality.py`) ✅
-  - ✅ Exact match: 1.0 score
-  - ✅ Stemmed match: 0.8 score
-  - ✅ Fuzzy match: 0.6 score based on edit distance
-  - ✅ Synonym match: 0.7 score
-  - ✅ Partial match: 0.4 score
+This new system combines the best of:
+- data/synonyms_generator.py (proven Gensim > WordNet for synonyms)
+- data/old_search.py (field-specific embeddings, LLM enrichment)
+- Modern NLP tools (ConceptNet, FrameNet, spaCy, AllenNLP)
+- MongoDB text search and array operations
+- Symmetric plugin architecture (same code for content and queries)
 
-**Files Created:**
-- `src/search/field_weights.py` - Comprehensive field weighting system (244 lines)
-- `src/search/positional_scorer.py` - Positional scoring with phrase order detection (288 lines)
-- `src/search/match_quality.py` - Match quality scoring with edit distance and similarity (356 lines)
-- `test_field_weights.py` - Comprehensive test suite (25+ test cases, 305 lines)
-- `test_positional_scorer.py` - Positional scoring test suite (comprehensive coverage)
-- `test_match_quality.py` - Quality scoring test suite (comprehensive coverage)
-- `test_search_integration.py` - Integration tests combining all systems (289 lines)
+#### Phase 6.2.1: Linguistic Plugin Infrastructure
 
-**Key Features Implemented:**
-- ✅ Field-specific weighting with configurable boosts for different match types
-- ✅ Positional scoring with word position bonuses and phrase order preservation
-- ✅ Match quality assessment with edit distance, similarity ratios, and confidence scores
-- ✅ Complete integration framework for combining all scoring systems
-- ✅ Comprehensive test coverage with edge cases and performance testing
-- ✅ Support for all Jellyfin movie field types (strings, lists, objects, enhanced fields)
+- [ ] **Create base linguistic plugin classes** (`src/plugins/linguistic/base.py`)
+  - LinguisticPlugin base class for all language analysis
+  - DualUsePlugin for symmetric ingestion/query processing
+  - Media-agnostic text extraction (works for movies, books, music, etc.)
 
-**Testing Status:**
-- ✅ `test_field_weights.py` - 25+ test cases covering configuration, search, ranking, edge cases
-- ✅ `test_positional_scorer.py` - Positional scoring and phrase order detection tests
-- ✅ `test_match_quality.py` - Quality assessment and similarity calculation tests
-- ✅ `test_search_integration.py` - End-to-end integration testing with real search scenarios
+- [ ] **Implement ConceptNetExpansionPlugin** (`src/plugins/linguistic/conceptnet.py`)
+  - Extract concepts using POS tagging and NER
+  - Expand concepts via ConceptNet API (IsA, RelatedTo, PartOf, HasA, UsedFor, etc.)
+  - Build weighted concept graphs with relationships
+  - Cache expansions for performance
+  - Example: "robot" → ["android", "cyborg", "AI", "machine", "automaton"]
 
-**Performance:**
-- ✅ Sub-second response times for complex queries with multiple terms
-- ✅ Efficient ranking algorithms for large result sets
-- ✅ Memory-efficient processing for large movie datasets
-- ✅ Configurable scoring parameters for performance tuning
+- [ ] **Implement TemporalExpressionPlugin** (`src/plugins/linguistic/temporal.py`)
+  - Parse time expressions: "late 80s", "last decade", "summer of 2020"
+  - Use dateparser/SUTime for normalization
+  - Handle relative ("last year") and absolute ("1995") dates
+  - Support ranges and approximations
+  - Example: "movies from the 90s" → {start: 1990, end: 1999}
 
-### Phase 6.3: Movie-Specific Search Enhancements
-- [ ] **Create movie query analyzer** (`src/search/movie_query_analyzer.py`)
-  - Detect query intent: "action movies with Tom Cruise"
-  - Extract entities: genres, actors, directors, years
-  - Parse complex queries: "sci-fi movies from 2020s with good ratings"
-  - Handle movie-specific terminology and slang
+- [ ] **Implement SemanticRoleLabelerPlugin** (`src/plugins/linguistic/semantic_roles.py`)
+  - Extract WHO did WHAT to WHOM using AllenNLP/spaCy
+  - FrameNet integration for semantic frames (e.g., "Creating", "Behind_the_scenes")
+  - VerbNet for verb classifications
+  - PropBank for predicate-argument structures
+  - Example: "Spielberg directed Jaws" → {predicate: "directed", agent: "Spielberg", theme: "Jaws"}
 
-- [ ] **Implement genre classification** (`src/search/genre_classifier.py`)
-  - Multi-label genre classification
-  - Genre hierarchy and relationships
-  - Subgenre detection (psychological thriller vs action thriller)
-  - Genre consistency scoring across fields
+- [ ] **Implement DependencyParserPlugin** (`src/plugins/linguistic/dependency.py`)
+  - Universal Dependencies parsing with spaCy
+  - Extract noun phrases, verb phrases, modifiers
+  - Build grammatical relationship graphs
+  - Identify compound concepts
+  - Example: "action-packed thriller" → {head: "thriller", modifier: "action-packed"}
 
-- [ ] **Create cast/crew matching** (`src/search/cast_matcher.py`)
-  - Actor name normalization and aliases
-  - Character name to actor mapping
-  - Director and producer matching
-  - Collaborative relationship detection
+- [ ] **Implement EntityRecognitionPlugin** (`src/plugins/linguistic/entities.py`)
+  - Advanced NER (PERSON, ORG, WORK_OF_ART, DATE, GPE, etc.)
+  - Entity linking and disambiguation
+  - Coreference resolution
+  - Entity relationship extraction
+  - Example: "Tom Cruise in the Mission Impossible franchise" → {person: "Tom Cruise", work: "Mission Impossible", relation: "acts_in"}
 
-## Stage 7: Hybrid Search System
+#### Phase 6.2.2: Embedding & Similarity Plugins
 
-### Phase 7.1: Semantic Search Integration
-- [ ] **FAISS vector operations** (`src/search/vector_search.py`)
-  - Multiple embedding strategies (plot, title, cast, full-text)
-  - Hybrid FAISS indices for different search types
-  - Semantic similarity with configurable thresholds
-  - Vector search optimization for movie data
+- [ ] **Adapt GensimSynonymPlugin** (from data/synonyms_generator.py)
+  - Use proven word2vec/GloVe embeddings (glove-wiki-gigaword-300)
+  - Integrate LLM-enhanced synonyms via Ollama
+  - Weight synonyms by cosine similarity
+  - Filter stopwords and single characters
+  - Support WordNet fallback
 
-- [ ] **Create semantic cache system** (`src/search/semantic_cache.py`)
-  - FAISS-based cache for query embeddings
-  - Configurable similarity threshold for cache hits
-  - MongoDB-backed persistent cache storage
-  - Cache warming strategies for common queries
+- [ ] **Implement MultiFieldEmbeddingPlugin** (inspired by data/old_search.py)
+  - Generate field-specific embeddings (title, overview, cast, etc.)
+  - Support weighted field combinations
+  - Enable keyword-to-field similarity matching
+  - Work with enhanced_fields from LLM plugins
 
-- [ ] **Implement embedding strategies** (`src/search/embedder.py`)
-  - Plot embeddings for thematic search
-  - Title embeddings for quick matching
-  - Cast embeddings for people-based search
-  - Combined embeddings for holistic search
+- [ ] **Implement SentenceTransformerPlugin**
+  - Dense embeddings for semantic search (all-MiniLM-L6-v2 or similar)
+  - Multi-lingual support
+  - Domain-adaptable
+  - GPU acceleration when available
 
-### Phase 7.2: Hybrid Scoring System
-- [ ] **Create unified search orchestrator** (`src/search/hybrid_search.py`)
-  - Parse and analyze query intent
-  - Execute literal search with field weighting
-  - Execute semantic search with FAISS
-  - Combine and re-rank results with configurable weights
+#### Phase 6.2.3: MongoDB Schema Evolution
 
-- [ ] **Implement result fusion** (`src/search/result_fusion.py`)
-  - RRF (Reciprocal Rank Fusion) for combining rankings
-  - Weighted score combination
-  - Diversity-aware ranking to avoid duplicate types
-  - Confidence scoring for result quality
+- [ ] **Design linguistic storage schema**
+  ```javascript
+  {
+    "_id": ObjectId,
+    "type": "media",  // Generic: movie, book, song, etc.
+    "original": { /* Source data from Jellyfin/etc */ },
+    
+    // Linguistic Analysis (plugin-generated)
+    "linguistic": {
+      // From ConceptNetPlugin
+      "concepts": {
+        "primary": ["robot", "artificial_intelligence"],
+        "expanded": {
+          "robot": ["android", "cyborg", "machine", "automaton"],
+          "artificial_intelligence": ["ai", "machine_learning", "neural_network"]
+        },
+        "graph": {
+          "nodes": ["robot", "android", "cyborg", "ai", "machine"],
+          "edges": [
+            {source: "robot", target: "machine", relation: "IsA", weight: 0.9},
+            {source: "android", target: "robot", relation: "TypeOf", weight: 0.85}
+          ]
+        }
+      },
+      
+      // From SemanticRolePlugin
+      "semantic_roles": [
+        {
+          predicate: "directed",
+          agent: "Steven Spielberg",
+          theme: "Jurassic Park",
+          frame: "Behind_the_scenes",
+          verbnet_class: "29.8"
+        }
+      ],
+      
+      // From TemporalPlugin
+      "temporal": {
+        "expressions": ["1990s", "summer of 1993"],
+        "normalized": [
+          {text: "1990s", start: 1990, end: 1999, precision: "decade"},
+          {text: "summer of 1993", start: "1993-06-01", end: "1993-08-31", precision: "season"}
+        ]
+      },
+      
+      // From EntityPlugin
+      "entities": {
+        "people": [
+          {text: "Tom Cruise", type: "PERSON", roles: ["actor", "producer"]}
+        ],
+        "organizations": [
+          {text: "Paramount Pictures", type: "ORG", role: "studio"}
+        ],
+        "works": [
+          {text: "Mission Impossible", type: "WORK_OF_ART", relation: "franchise"}
+        ],
+        "locations": [
+          {text: "Los Angeles", type: "GPE", context: "filming_location"}
+        ]
+      },
+      
+      // From DependencyPlugin
+      "structure": {
+        "noun_phrases": ["action-packed thriller", "stunning visual effects"],
+        "verb_phrases": ["directed by", "starring in", "produced by"],
+        "modifier_chains": {
+          "thriller": ["action-packed", "high-octane"],
+          "effects": ["visual", "stunning", "groundbreaking"]
+        }
+      }
+    },
+    
+    // Search Features (pre-computed)
+    "search": {
+      // From synonym plugins
+      "synonyms": {
+        "movie": ["film", "picture", "flick", "cinema", "motion_picture"],
+        "thriller": ["suspense", "mystery", "nail-biter", "page-turner"]
+      },
+      
+      // From embedding plugins  
+      "embeddings": {
+        "full": [...],        // 384-dim sentence embedding
+        "title": [...],       // Field-specific embeddings
+        "overview": [...], 
+        "cast": [...],
+        "concepts": [...]     // Concept graph embedding
+      },
+      
+      // Unified search text for MongoDB $text index
+      "text": "title title title overview cast genres ...", // Weighted repetition
+      
+      // Pre-computed features for filtering/boosting
+      "features": {
+        "decade": 1990,
+        "has_sequels": true,
+        "primary_genre": "action",
+        "mood_vector": [...]
+      }
+    }
+  }
+  ```
 
-- [ ] **Create contextual boosting** (`src/search/contextual_booster.py`)
-  - Cross-field consistency bonuses
-  - Year proximity scoring
-  - Genre coherence bonuses
-  - User preference learning (future)
+- [ ] **Create MongoDB indices**
+  - Text index on search.text
+  - Array indices on concepts, entities, semantic roles
+  - 2dsphere index for embedding similarity (future)
+  - Compound indices for common query patterns
+
+#### Phase 6.2.4: Symmetric Query Processing
+
+- [ ] **Implement QueryLinguisticAnalyzer** (`src/search/query_analyzer.py`)
+  - Run same linguistic plugins on queries as ingestion
+  - Extract query intent, entities, temporal references
+  - Build concept graphs for queries
+  - Generate query embeddings
+  - Example: "90s sci-fi with robots" → concepts: ["1990s", "science_fiction", "robot"], temporal: [1990-1999]
+
+- [ ] **Implement MongoQueryBuilder** (`src/search/mongo_builder.py`)
+  - Convert linguistic analysis to MongoDB queries
+  - Support multiple query strategies:
+    ```javascript
+    // Strategy 1: Text search with expanded terms
+    {$text: {$search: "robot android cyborg \"science fiction\" 1990s"}}
+    
+    // Strategy 2: Concept graph matching
+    {"linguistic.concepts.graph.nodes": {$in: ["robot", "android", "cyborg", "ai"]}}
+    
+    // Strategy 3: Semantic role matching
+    {"linguistic.semantic_roles": {$elemMatch: {agent: "James Cameron", predicate: "directed"}}}
+    
+    // Strategy 4: Temporal matching
+    {"linguistic.temporal.normalized": {
+      $elemMatch: {start: {$lte: 1999}, end: {$gte: 1990}}
+    }}
+    
+    // Combined with $or for best results
+    ```
+
+- [ ] **Implement HybridSearchOrchestrator** (`src/search/orchestrator.py`)
+  - Execute MongoDB text search
+  - Execute FAISS vector similarity search
+  - Combine results using RRF or learned weights
+  - Apply re-ranking based on linguistic features
+  - Cache frequent queries
+
+#### Phase 6.2.5: FAISS Integration & Caching
+
+- [ ] **Implement FAISSIndexManager** (`src/search/faiss_manager.py`)
+  - Manage multiple FAISS indices (full doc, concepts, per-field)
+  - Support GPU acceleration via faiss-gpu
+  - Incremental index updates
+  - Memory-mapped indices for scale
+
+- [ ] **Implement SemanticCache** (`src/search/semantic_cache.py`)
+  - Cache query embeddings and results
+  - Detect similar queries (cosine > 0.95)
+  - TTL-based expiration
+  - MongoDB-backed persistence
+
+- [ ] **Implement ResultFusion** (`src/search/result_fusion.py`)
+  - Reciprocal Rank Fusion (RRF) for combining rankings
+  - Weighted linear combination
+  - Learn-to-rank capabilities (future)
+  - Diversity-aware re-ranking
+
+#### Phase 6.2.6: Migration & Cleanup
+
+- [ ] **Remove brittle components**
+  - Delete src/search/field_weights.py (hard-coded movie fields)
+  - Delete src/search/positional_scorer.py (over-engineered)
+  - Delete src/search/match_quality.py (arbitrary scores)
+  - Archive old tests as reference
+
+- [ ] **Update existing components**
+  - Adapt text_processor.py to use linguistic plugins
+  - Enhance similarity_engine.py with new embeddings
+  - Keep fuzzy_matcher.py as utility for specific use cases
+
+- [ ] **Update ingestion pipeline**
+  - Add linguistic plugin execution during ingestion
+  - Store analysis results in MongoDB
+  - Maintain backward compatibility with existing data
+
+#### Phase 6.2.7: Testing & Validation
+
+- [ ] **Create media-agnostic test suite**
+  ```python
+  # Movies
+  test_cases = [
+    "90s action films with Tom Cruise",
+    "movies like Blade Runner but from the 2010s", 
+    "Spielberg dinosaur movies",
+    "sci-fi thrillers about time travel"
+  ]
+  
+  # Books (future-proof)
+  book_tests = [
+    "dystopian novels about surveillance",
+    "fantasy books similar to Lord of the Rings",
+    "Stephen King horror from the 80s"
+  ]
+  
+  # Music (future-proof)  
+  music_tests = [
+    "80s synthwave with dark themes",
+    "electronic music like Daft Punk",
+    "jazz albums from the 60s"
+  ]
+  ```
+
+- [ ] **Performance benchmarks**
+  - Measure plugin execution times
+  - MongoDB query performance (with explain)
+  - FAISS search latency
+  - End-to-end response times
+  - Compare with old brittle system
+
+- [ ] **Quality metrics**
+  - Precision/recall for known queries
+  - User satisfaction scores
+  - Result diversity metrics
+  - Failure case analysis
+
+**Success Criteria:**
+- [ ] Google 2010+ search sophistication
+- [ ] Works for movies without any movie-specific code
+- [ ] Easily extensible to books, music, etc.
+- [ ] Sub-200ms query latency for 95% of queries
+- [ ] Better results than old brittle system
+- [ ] Leverages MongoDB and FAISS effectively
+
+### (OLD Phase 6.3 and Stage 7 REPLACED BY NEW 6.2 ABOVE)
+
+**Note:** The old Phase 6.3 (Movie-Specific Search Enhancements) and Stage 7 (Hybrid Search System) have been consolidated into the new Phase 6.2 above because:
+- Movie-specific code violates the media-agnostic principle
+- The linguistic plugins handle intent detection, entity extraction, and complex queries generically
+- FAISS integration and semantic caching are included in Phase 6.2.5
+- The hybrid scoring system is part of Phase 6.2.4
+- All functionality is preserved but made generic and more sophisticated
 
 ## Stage 8: Hardware Optimization & Performance
 
@@ -926,3 +1142,38 @@ DEFERRED FOR LATER - Will return to this after comprehensive testing phase
 - **Performance Verified**: Plugin system performing excellently with sub-1ms response times
 - **Monitoring Confirmed**: Prometheus metrics and Grafana dashboards fully operational
 - **Quality Assurance**: Comprehensive error handling, failure scenarios, and recovery testing completed
+
+### Stage 6.2 Architecture Overhaul (January 2025)
+
+**MAJOR REFACTORING**: Replaced brittle field-specific weighting system with advanced language intelligence
+
+**Problems with Old System:**
+- Hard-coded movie fields (field_weights.py) - not media agnostic
+- Arbitrary scoring multipliers (3.0x title, 2.5x genre) - no linguistic basis
+- Over-engineered positional scoring - Google doesn't do this
+- No use of MongoDB text search capabilities
+- No modern NLP (ConceptNet, FrameNet, spaCy)
+- Different code paths for ingestion vs queries
+
+**New Language Intelligence System:**
+- **Symmetric Design**: Same linguistic plugins analyze content AND queries
+- **Deep Language Understanding**: ConceptNet expansions, temporal parsing, semantic roles
+- **Media Agnostic**: Works for movies, books, music without modification
+- **Leverages Proven Code**: 
+  - data/synonyms_generator.py (Gensim > WordNet)
+  - data/old_search.py (field embeddings)
+- **MongoDB Native**: Uses $text search and array operations
+- **Google 2010+ Sophistication**: Understands "90s sci-fi with robots" properly
+
+**Key Components:**
+- Linguistic plugins for dual-use analysis
+- MongoDB schema with rich linguistic metadata
+- Symmetric query processing
+- FAISS integration for vector search
+- Result fusion strategies
+
+**Expected Outcomes:**
+- Sub-200ms query latency
+- Works for any text-based media
+- Better results than brittle system
+- Extensible via plugin architecture
