@@ -19,6 +19,7 @@ from src.plugins.base import (
     PluginExecutionContext, PluginExecutionResult
 )
 from src.plugins.config import GlobalPluginConfigManager, get_global_config_manager
+from src.plugins.mongo_manager import get_plugin_manager
 from ..shared.hardware_config import get_resource_limits
 
 logger = logging.getLogger(__name__)
@@ -48,11 +49,20 @@ class PluginRegistry:
         self._reload_lock = asyncio.Lock()
         self._loaded_modules: Set[str] = set()
         self._config_manager = get_global_config_manager()
+        self._mongo_manager = None
         
     async def initialize(self) -> None:
         """Initialize the plugin registry and discover plugins."""
         async with self._initialization_lock:
             logger.info("Initializing plugin registry...")
+            
+            # Initialize MongoDB manager
+            try:
+                self._mongo_manager = await get_plugin_manager()
+                logger.info("MongoDB plugin manager initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize MongoDB plugin manager: {e}")
+                logger.info("Continuing without MongoDB integration")
             
             # Discover and register plugins
             await self._discover_plugins()
@@ -221,10 +231,51 @@ class PluginRegistry:
             self._plugins[metadata.name] = registered_plugin
             self._plugins_by_type[metadata.plugin_type].append(metadata.name)
             
+            # Store plugin metadata in MongoDB
+            await self._store_plugin_in_mongodb(metadata, file_path)
+            
             logger.info(f"Registered plugin: {metadata.name} (type: {metadata.plugin_type})")
             
         except Exception as e:
             logger.error(f"Failed to register plugin class {plugin_class.__name__}: {e}")
+    
+    async def _store_plugin_in_mongodb(self, metadata: PluginMetadata, file_path: str) -> None:
+        """Store plugin metadata in MongoDB."""
+        if not self._mongo_manager:
+            return
+        
+        try:
+            # Calculate file hash and size
+            file_hash = self._calculate_file_hash(file_path)
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            
+            # Register in MongoDB
+            plugin_id = await self._mongo_manager.register_plugin(
+                plugin_metadata=metadata,
+                file_path=file_path,
+                file_hash=file_hash,
+                file_size=file_size
+            )
+            
+            if plugin_id:
+                logger.debug(f"Stored plugin {metadata.name} in MongoDB with ID: {plugin_id}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to store plugin {metadata.name} in MongoDB: {e}")
+    
+    def _calculate_file_hash(self, file_path: str) -> str:
+        """Calculate SHA-256 hash of a file."""
+        import hashlib
+        
+        try:
+            hash_sha256 = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_sha256.update(chunk)
+            return hash_sha256.hexdigest()
+        except Exception as e:
+            logger.warning(f"Failed to calculate hash for {file_path}: {e}")
+            return "unknown"
     
     async def _initialize_plugins(self) -> None:
         """Initialize all enabled plugins."""
@@ -432,7 +483,8 @@ class PluginRegistry:
             "enabled_plugins": sum(1 for p in self._plugins.values() if p.is_enabled),
             "initialized_plugins": sum(1 for p in self._plugins.values() if p.instance is not None),
             "plugins_by_type": {},
-            "plugin_details": {}
+            "plugin_details": {},
+            "mongodb_integration": self._mongo_manager is not None
         }
         
         # Count by type
@@ -451,11 +503,34 @@ class PluginRegistry:
             }
             
             if registered_plugin.instance:
-                plugin_status["health"] = await registered_plugin.instance.health_check()
+                health_info = await registered_plugin.instance.health_check()
+                plugin_status["health"] = health_info
+                
+                # Update MongoDB with performance metrics if available
+                if self._mongo_manager and health_info.get("metrics"):
+                    await self._update_mongodb_metrics(name, health_info["metrics"])
             
             status["plugin_details"][name] = plugin_status
         
+        # Include MongoDB statistics if available
+        if self._mongo_manager:
+            try:
+                mongodb_stats = await self._mongo_manager.get_plugin_statistics()
+                status["mongodb_stats"] = mongodb_stats
+            except Exception as e:
+                logger.warning(f"Failed to get MongoDB statistics: {e}")
+        
         return status
+    
+    async def _update_mongodb_metrics(self, plugin_name: str, metrics: Dict[str, Any]) -> None:
+        """Update plugin performance metrics in MongoDB."""
+        if not self._mongo_manager:
+            return
+        
+        try:
+            await self._mongo_manager.update_plugin_metrics(plugin_name, metrics)
+        except Exception as e:
+            logger.debug(f"Failed to update MongoDB metrics for {plugin_name}: {e}")
     
     async def cleanup(self) -> None:
         """Clean up all plugins."""

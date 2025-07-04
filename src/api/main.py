@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
-from src.api.routes import health, chat, plugins
+from src.api.routes import health, chat, plugins, admin
 from src.api.plugin_registry import plugin_registry
 from src.api.plugin_watcher import plugin_watcher
 from src.api.plugin_metrics import get_plugin_metrics
@@ -134,6 +134,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/health", tags=["Health"])
     app.include_router(chat.router, prefix="/chat", tags=["Chat"])
     app.include_router(plugins.router, prefix="/plugins", tags=["Plugins"])
+    app.include_router(admin.router, tags=["Admin"])
 
     # Root endpoint
     @app.get("/")

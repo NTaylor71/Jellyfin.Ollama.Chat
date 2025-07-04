@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional, List, Type, Union, get_type_hints
 from pathlib import Path
 from enum import Enum
 import logging
+from datetime import datetime
 from pydantic import BaseModel, ValidationError, Field
 
 logger = logging.getLogger(__name__)
@@ -175,8 +176,67 @@ class PluginConfigManager:
         
         return env_config
     
+    async def _load_mongodb_config(self) -> Dict[str, Any]:
+        """Load configuration from MongoDB."""
+        try:
+            # Import here to avoid circular imports
+            from ..plugins.mongo_manager import get_plugin_manager
+            
+            plugin_manager = await get_plugin_manager()
+            plugin_doc = await plugin_manager.get_plugin(self.plugin_name)
+            
+            if plugin_doc and plugin_doc.default_config:
+                # Update config values with MongoDB source
+                for key, value in plugin_doc.default_config.items():
+                    self.config_values[key] = ConfigValue(
+                        value=value,
+                        source=ConfigSource.MONGODB,
+                        description="Loaded from MongoDB plugin registry"
+                    )
+                
+                logger.debug(f"Loaded MongoDB config for plugin {self.plugin_name}")
+                return plugin_doc.default_config
+            
+            return {}
+            
+        except Exception as e:
+            logger.debug(f"Failed to load MongoDB config for plugin {self.plugin_name}: {e}")
+            return {}
+    
+    async def load_config_async(self) -> BasePluginConfig:
+        """Load configuration from all sources in priority order (async version)."""
+        # Load in order: defaults -> file -> MongoDB -> environment -> runtime
+        config_dict = {}
+        
+        # 1. Load defaults
+        config_dict.update(self._load_default_config())
+        
+        # 2. Load from file (overrides defaults)
+        config_dict.update(self._load_file_config())
+        
+        # 3. Load from MongoDB (overrides file)
+        config_dict.update(await self._load_mongodb_config())
+        
+        # 4. Load from environment (overrides MongoDB)
+        config_dict.update(self._load_env_config())
+        
+        # 5. Runtime values are handled separately via update_config()
+        
+        try:
+            # Validate and create config instance
+            self._current_config = self.config_class(**config_dict)
+            logger.info(f"Successfully loaded configuration for plugin {self.plugin_name}")
+            return self._current_config
+            
+        except ValidationError as e:
+            logger.error(f"Configuration validation failed for plugin {self.plugin_name}: {e}")
+            # Return config with just defaults
+            default_config = self._load_default_config()
+            self._current_config = self.config_class(**default_config)
+            return self._current_config
+    
     def load_config(self) -> BasePluginConfig:
-        """Load configuration from all sources in priority order."""
+        """Load configuration from all sources in priority order (sync version)."""
         # Load in order: defaults -> file -> environment -> runtime
         config_dict = {}
         
@@ -267,6 +327,48 @@ class PluginConfigManager:
             
         except Exception as e:
             logger.error(f"Failed to save config file {config_file}: {e}")
+            return False
+    
+    async def save_config_to_mongodb(self, config_dict: Optional[Dict[str, Any]] = None) -> bool:
+        """Save current configuration to MongoDB."""
+        if config_dict is None:
+            if self._current_config is None:
+                logger.error("No configuration to save")
+                return False
+            config_dict = self._current_config.model_dump()
+        
+        try:
+            from ..plugins.mongo_manager import get_plugin_manager
+            
+            plugin_manager = await get_plugin_manager()
+            plugin_doc = await plugin_manager.get_plugin(self.plugin_name)
+            
+            if not plugin_doc:
+                logger.error(f"Plugin {self.plugin_name} not found in MongoDB")
+                return False
+            
+            # Update plugin document with new config
+            from pymongo import UpdateOne
+            update_doc = {
+                "default_config": config_dict,
+                "updated_at": datetime.utcnow()
+            }
+            
+            plugins_coll = plugin_manager.mongo_client.get_collection(plugin_manager.plugins_collection)
+            result = await plugins_coll.update_one(
+                {"name": self.plugin_name},
+                {"$set": update_doc}
+            )
+            
+            if result.matched_count > 0:
+                logger.info(f"Saved configuration for plugin {self.plugin_name} to MongoDB")
+                return True
+            else:
+                logger.error(f"Failed to update MongoDB config for plugin {self.plugin_name}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to save config to MongoDB: {e}")
             return False
     
     def get_config_summary(self) -> Dict[str, Any]:
