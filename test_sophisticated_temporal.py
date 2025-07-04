@@ -12,19 +12,19 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.plugins.linguistic.temporal import SophisticatedTemporalPlugin
+from src.plugins.temporal import SpacyWithFallbackIngestionAndQueryPlugin
 
 
 class TestSophisticatedTemporal:
     """Test suite for sophisticated temporal parsing."""
     
     def __init__(self):
-        self.plugin = SophisticatedTemporalPlugin()
+        self.plugin = SpacyWithFallbackIngestionAndQueryPlugin()
         self.test_results = []
         
     async def setup(self):
         """Initialize the plugin."""
-        print("🚀 Initializing SophisticatedTemporalPlugin...")
+        print("🚀 Initializing SpacyWithFallbackIngestionAndQueryPlugin...")
         # Pass empty config dict as required
         success = await self.plugin.initialize({})
         if success:
@@ -323,7 +323,7 @@ class TestSophisticatedTemporal:
 
 async def main():
     """Run comprehensive temporal plugin tests."""
-    print("🧪 SophisticatedTemporalPlugin Comprehensive Test Suite")
+    print("🧪 SpacyWithFallbackIngestionAndQueryPlugin Comprehensive Test Suite")
     print("=" * 80)
     print("Testing Google 2010-level temporal understanding for movie search")
     

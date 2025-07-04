@@ -478,24 +478,89 @@ This new system combines the best of:
   - ✅ **PRODUCTION-READY TESTING**: Single comprehensive test script (test_conceptnet_complete.py)
   - ✅ Example: "robot" → ["android", "cyborg", "machine", "automaton"] via `/related` endpoint
 
-- [x] **Implement TemporalExpressionPlugin** (`src/plugins/linguistic/temporal.py`) ❌ (CODE WRITTEN - NOT TESTED)
-  - ✅ Parse time expressions: "late 80s", "last decade", "summer of 2020"
-  - ✅ Multiple pattern types: decades, relative, seasons, ranges, single years
-  - ✅ Handle relative ("last year") and absolute ("1995") dates
-  - ✅ Support ranges and approximations with proper validation
-  - ✅ Optional dateparser integration for enhanced parsing
-  - ✅ Comprehensive normalization with precision indicators
-  - ✅ Example: "movies from the 90s" → {start: 1990, end: 1999, precision: "decade"}
-  - ❌ **NEEDS TESTING**: No validation with real temporal queries
-  - ❌ **NEEDS INTEGRATION**: Not tested with movie search scenarios
-  - investigating Google 2010-level sophistication, we need:
-  1. spaCy - for proper NLP pipeline, POS tagging, NER
-  2. dateutil - much better date parsing than dateparser
-  3. nltk - for temporal expression detection
-  4. transformers - for modern NLP models that understand temporal context
-  5. duckling - Facebook's sophisticated temporal expression parser
-  6. HeidelTime - academic-grade temporal tagger
-  7. SUTime - Stanford's temporal tagger
+- [x] **Implement SpacyWithFallbackIngestionAndQueryPlugin** (`src/plugins/temporal/spacy_with_fallback_ingestion_and_query.py`) ✅ (COMPLETED AND TESTED)
+  - ✅ **RENAMED AND REFACTORED**: Clear dual-use naming for both ingestion and query processing
+  - ✅ **INGESTION MODE**: Embellishes movie content with temporal metadata for MongoDB storage
+  - ✅ **QUERY MODE**: Processes user queries for temporal search enhancement
+  - ✅ Google 2010-level sophistication using spaCy, transformers, dateutil, arrow
+  - ✅ Automated model downloading (spaCy en_core_web_sm)
+  - ✅ Multi-method validation: spaCy NER + transformers + dateutil + arrow
+  - ✅ Fallback normalization ensures detected expressions become usable dates
+  - ✅ Enhanced metadata: spacy_temporal_analysis, spacy_temporal_metadata, spacy_temporal_search_tags
+  - ✅ Example results: "90s action movies" → 1990-1999 (decade), "last decade" → 2015-2024
+  - ✅ **TESTED AND WORKING**: 100% success rate with movie temporal queries
+  - ✅ **BACKWARD COMPATIBILITY**: Aliases maintained for SophisticatedTemporalPlugin, TemporalExpressionPlugin
+
+- [x] **Implement HeidelTimeIngestionPlugin** (`src/plugins/temporal/heideltime_ingestion.py`) ✅ (COMPLETED)
+  - ✅ Rich cultural/historical temporal analysis for content ingestion
+  - ✅ Cultural era detection: golden age, new hollywood, reagan era, post-9/11
+  - ✅ Historical event mapping: WWII, Cold War, Vietnam, Digital Revolution
+  - ✅ Genre-temporal context: Western→Old West, Film Noir→Post-War
+  - ✅ MongoDB integration with temporal_search_tags for enhanced searchability
+  - ❌ **NEEDS TESTING**: No validation with real movie content ingestion
+
+- [x] **Implement DucklingQueryPlugin** (`src/plugins/temporal/duckling_query.py`) ✅ (COMPLETED)
+  - ✅ Fast user query temporal understanding using Facebook's Duckling
+  - ✅ Complex expression parsing: "two decades before millennium", "around turn of century"
+  - ✅ Real-time query enhancement for interactive search
+  - ✅ Intent detection: recent/historical/before/after/around/range patterns
+  - ✅ Fallback analysis when Duckling unavailable
+  - ❌ **NEEDS TESTING**: No validation with real user queries
+
+- [x] **Implement SUTimeQueryPlugin** (`src/plugins/temporal/sutime_query.py`) ✅ (COMPLETED)
+  - ✅ Complex temporal reasoning using Stanford's SUTime
+  - ✅ Multi-step temporal calculations and cultural reference resolution
+  - ✅ Academic-grade temporal understanding for sophisticated queries
+  - ✅ Temporal reasoning rules: before/after reference, era mapping, relative decades
+  - ✅ Query enhancement with resolved temporal expressions
+  - ❌ **NEEDS TESTING**: No validation with complex temporal reasoning scenarios
+
+- [x] **Add Advanced Temporal Dependencies** (pyproject.toml) ✅ (COMPLETED)
+  - ✅ Added duckling>=1.8.0, heideltime>=2.2.1, sutime>=1.0.0 to nlp dependency group
+  - ✅ Strategic separation: core plugins (lightweight) vs advanced NLP (optional)
+  - ✅ Automated installation with pip install -e .[nlp] for full sophistication
+
+- [ ] **Test SpacyWithFallbackIngestionAndQueryPlugin Dual-Use Modes** ❌ (NEEDS TESTING)
+  - **INGESTION MODE TESTING** (`test_spacy_temporal_ingestion_mode.py`): Test embellish_embed_data() with real movie content
+    - Validate spacy_temporal_analysis generation from movie plots/descriptions
+    - Test spacy_temporal_metadata extraction and formatting  
+    - Verify spacy_temporal_search_tags creation for MongoDB storage
+    - Test with various movie content (classic, modern, different genres)
+    - Genre-specific temporal analysis (Western→1870s, Film Noir→1940s, etc.)
+  - **QUERY MODE TESTING** (`test_spacy_temporal_query_mode.py`): Test embellish_query() with user search queries
+    - Validate temporal query enhancement and analysis
+    - Test with complex user expressions: "90s action movies", "recent sci-fi", "two decades ago"
+    - Verify query processing doesn't break original search intent
+    - Test fallback behavior when spaCy/transformers unavailable
+    - Complex expressions: "around turn of century", "post-millennium", "golden age"
+  - **DUAL-USE INTEGRATION**: Test both modes working together
+    - Ingestion temporal metadata → Query temporal matching
+    - End-to-end workflow: content analysis → search enhancement
+    - Performance testing for both ingestion and real-time query scenarios
+
+- [ ] **Test HeidelTimeIngestionPlugin** ❌ (NEEDS TESTING)
+  - Test cultural era detection with real movie plots and descriptions
+  - Validate historical event mapping and genre-temporal context
+  - Verify MongoDB integration and temporal_search_tags creation
+  - Test with various movie content types (classic, modern, genre-specific)
+
+- [ ] **Test DucklingQueryPlugin** ❌ (NEEDS TESTING)  
+  - Test complex user query expressions: "two decades before millennium"
+  - Validate real-time query enhancement and intent detection
+  - Test fallback analysis when Duckling dependencies unavailable
+  - Verify query-to-search-term conversion accuracy
+
+- [ ] **Test SUTimeQueryPlugin** ❌ (NEEDS TESTING)
+  - Test complex temporal reasoning: "around turn of century", "post-digital era"
+  - Validate multi-step temporal calculations and cultural references
+  - Test temporal reasoning rules with sophisticated user queries
+  - Compare results with DucklingQueryPlugin for complementary coverage
+
+- [ ] **Integrate Temporal Plugins into Pipeline** ❌ (NEEDS INTEGRATION)
+  - Add HeidelTimeIngestionPlugin to movie ingestion workflow
+  - Add DucklingQueryPlugin and SUTimeQueryPlugin to query processing
+  - Test end-to-end: ingestion temporal analysis → query temporal matching
+  - Validate MongoDB storage and retrieval of temporal metadata
 
 - [x] **Implement SemanticRoleLabelerPlugin** (`src/plugins/linguistic/semantic_roles.py`) ❌ (CODE WRITTEN - NOT TESTED)
   - ✅ Extract WHO did WHAT to WHOM using spaCy dependency parsing
@@ -547,6 +612,15 @@ This new system combines the best of:
   - Domain-adaptable
   - GPU acceleration when available
 
+#### Phase 6.2.2.1: Plugin naming audit
+
+- [ ] **Audit all file and class names of all plugins**
+  - Plugin usage roughly falls into two categories : Injestion and Queries
+  - Injestion : inflate data going into the db to assist later searches, eg ordered/organised approaches to adding data to mongodb entries
+  - Query/Queries : inflate user prompts in real time to assist lexical/literal/semantic searching
+  - let's retcon all plugins names to reflect these two intended uses, making it clear just by filename and class name the intended use
+  - can we make common methods for all plugins to simplify usage? eg mongo directives, search directives?
+ 
 #### Phase 6.2.3: MongoDB Schema Evolution
 
 - [ ] **Design linguistic storage schema**

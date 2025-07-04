@@ -1,6 +1,6 @@
 """
-Sophisticated temporal expression plugin using modern NLP libraries.
-Handles complex temporal expressions with Google 2010-level sophistication.
+spaCy-based dual-use temporal analysis plugin for both ingestion and query processing.
+Provides sophisticated temporal understanding with fallback strategies.
 """
 
 import re
@@ -39,15 +39,18 @@ except ImportError as e:
     TRANSFORMERS_AVAILABLE = False
     logging.getLogger(__name__).debug(f"transformers not available: {e}. Install with: pip install transformers torch")
 
-from .base import DualUsePlugin
+from ..linguistic.base import DualUsePlugin
 
 
-class SophisticatedTemporalPlugin(DualUsePlugin):
+class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
     """
-    Sophisticated temporal expression parser using modern NLP.
+    Dual-use spaCy-based temporal analysis for both content ingestion and user queries.
     
-    Uses spaCy for entity recognition, dateutil for parsing,
-    arrow for relative dates, and transformers for complex understanding.
+    INGESTION MODE: Analyzes movie content for temporal metadata storage
+    QUERY MODE: Processes user queries for temporal search enhancement
+    
+    Uses spaCy + transformers + dateutil + arrow with sophisticated fallback strategies.
+    Provides Google 2010-level temporal understanding for both use cases.
     """
     
     def __init__(self):
@@ -61,16 +64,16 @@ class SophisticatedTemporalPlugin(DualUsePlugin):
         self.ner_pipeline = None
     
     async def initialize(self, config: Dict[str, Any]) -> bool:
-        """Initialize the plugin."""
+        """Initialize the dual-use temporal plugin."""
         try:
             self._initialize_models()
             return True
         except Exception as e:
-            self.logger.error(f"Failed to initialize temporal plugin: {e}")
+            self.logger.error(f"Failed to initialize spaCy temporal plugin: {e}")
             return False
     
     async def embellish_query(self, query: str, context) -> str:
-        """Embellish query with temporal analysis."""
+        """QUERY MODE: Embellish user query with temporal analysis."""
         try:
             # Perform temporal analysis on the query
             analysis = await self.analyze(query, context.metadata if hasattr(context, 'metadata') else None)
@@ -84,7 +87,7 @@ class SophisticatedTemporalPlugin(DualUsePlugin):
             return query
     
     async def embellish_embed_data(self, data: Dict[str, Any], context) -> Dict[str, Any]:
-        """Embellish data with temporal analysis."""
+        """INGESTION MODE: Embellish content data with temporal analysis."""
         try:
             # Extract text for analysis
             text_content = ""
@@ -100,18 +103,19 @@ class SophisticatedTemporalPlugin(DualUsePlugin):
                 context_dict = context.metadata if hasattr(context, 'metadata') else None
                 temporal_analysis = await self.analyze(text_content.strip(), context_dict)
                 
-                # Add temporal analysis to enhanced_fields
+                # Add temporal analysis to enhanced_fields for ingestion storage
                 if 'enhanced_fields' not in data:
                     data['enhanced_fields'] = {}
                 
-                data['enhanced_fields']['temporal_analysis'] = temporal_analysis
+                data['enhanced_fields']['spacy_temporal_analysis'] = temporal_analysis
                 
-                # Extract useful temporal metadata
+                # Extract useful temporal metadata for search
                 if temporal_analysis.get('normalized'):
                     temporal_metadata = {
                         'detected_time_periods': [],
                         'temporal_scope': temporal_analysis.get('temporal_scope', 'unknown'),
-                        'confidence': temporal_analysis.get('confidence_level', 'medium')
+                        'confidence': temporal_analysis.get('confidence_level', 'medium'),
+                        'analysis_methods': temporal_analysis.get('analysis_methods', [])
                     }
                     
                     for norm in temporal_analysis['normalized']:
@@ -119,10 +123,16 @@ class SophisticatedTemporalPlugin(DualUsePlugin):
                             'text': norm.get('text'),
                             'start': norm.get('start'),
                             'end': norm.get('end'),
-                            'precision': norm.get('precision')
+                            'precision': norm.get('precision'),
+                            'method': norm.get('method', 'unknown')
                         })
                     
-                    data['enhanced_fields']['temporal_metadata'] = temporal_metadata
+                    data['enhanced_fields']['spacy_temporal_metadata'] = temporal_metadata
+                    
+                    # Create searchable temporal tags for ingestion
+                    search_tags = self._create_ingestion_search_tags(temporal_analysis)
+                    if search_tags:
+                        data['enhanced_fields']['spacy_temporal_search_tags'] = search_tags
             
             return data
             
@@ -199,7 +209,7 @@ class SophisticatedTemporalPlugin(DualUsePlugin):
             
             # Summary logging
             if available_methods:
-                self.logger.info(f"🧠 Sophisticated temporal analysis initialized with methods: {', '.join(available_methods)}")
+                self.logger.info(f"🧠 spaCy temporal analysis initialized with methods: {', '.join(available_methods)}")
             else:
                 self.logger.warning("⚠️ No sophisticated temporal analysis libraries available. Install [nlp] dependencies for full functionality.")
                     
@@ -801,7 +811,33 @@ class SophisticatedTemporalPlugin(DualUsePlugin):
         except Exception as e:
             self.logger.debug(f"Error in fallback normalization: {e}")
             return None
+    
+    def _create_ingestion_search_tags(self, analysis: Dict[str, Any]) -> List[str]:
+        """Create searchable tags for content ingestion."""
+        tags = []
+        
+        # Add decade tags
+        for norm in analysis.get("normalized", []):
+            precision = norm.get("precision")
+            start = norm.get("start")
+            end = norm.get("end")
+            
+            if precision == "decade" and isinstance(start, int):
+                decade = f"{start}s"
+                tags.append(f"spacy_decade_{decade}")
+            elif precision == "year" and isinstance(start, int):
+                tags.append(f"spacy_year_{start}")
+            elif precision == "current_decade":
+                current_decade = (self.current_year // 10) * 10
+                tags.append(f"spacy_decade_{current_decade}s")
+        
+        # Add method tags
+        for method in analysis.get("analysis_methods", []):
+            tags.append(f"spacy_method_{method}")
+        
+        return list(set(tags))  # Remove duplicates
 
 
 # Maintain backward compatibility
-TemporalExpressionPlugin = SophisticatedTemporalPlugin
+SophisticatedTemporalPlugin = SpacyWithFallbackIngestionAndQueryPlugin
+TemporalExpressionPlugin = SpacyWithFallbackIngestionAndQueryPlugin
