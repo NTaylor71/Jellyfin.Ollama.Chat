@@ -170,6 +170,44 @@ class Settings(BaseSettings):
     RATE_LIMIT_BURST: int = Field(default=10)
     
     # ==========================================================================
+    # MONGODB CONFIGURATION
+    # ==========================================================================
+    
+    MONGODB_HOST: str = Field(default="localhost")
+    MONGODB_PORT: int = Field(default=27017)
+    MONGODB_DATABASE: str = Field(default="jellyfin_rag")
+    MONGODB_USERNAME: Optional[str] = Field(default=None)
+    MONGODB_PASSWORD: Optional[str] = Field(default=None)
+    MONGODB_AUTH_SOURCE: str = Field(default="admin")
+    
+    # Docker overrides
+    DOCKER_MONGODB_HOST: str = Field(default="mongodb")
+    DOCKER_MONGODB_PORT: int = Field(default=27017)
+    
+    @property
+    def mongodb_host(self) -> str:
+        """Get MongoDB host based on environment."""
+        if self.is_docker:
+            return self.DOCKER_MONGODB_HOST
+        return self.MONGODB_HOST
+    
+    @property
+    def mongodb_port(self) -> int:
+        """Get MongoDB port based on environment."""
+        if self.is_docker:
+            return self.DOCKER_MONGODB_PORT
+        return self.MONGODB_PORT
+    
+    @property
+    def mongodb_url(self) -> str:
+        """Get complete MongoDB URL."""
+        auth_part = ""
+        if self.MONGODB_USERNAME and self.MONGODB_PASSWORD:
+            auth_part = f"{self.MONGODB_USERNAME}:{self.MONGODB_PASSWORD}@"
+        
+        return f"mongodb://{auth_part}{self.mongodb_host}:{self.mongodb_port}/{self.MONGODB_DATABASE}"
+    
+    # ==========================================================================
     # EXTERNAL SERVICES
     # ==========================================================================
     

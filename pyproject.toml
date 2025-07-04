@@ -72,9 +72,15 @@ plugins = [
     "scikit-learn>=1.3.0"
 ]
 
+# MongoDB - document storage and data pipeline
+mongodb = [
+    "motor>=3.3.0",
+    "pymongo>=4.6.0"
+]
+
 # Local development - everything for local work
 local = [
-    "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins]"
+    "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb]"
 ]
 
 [tool.setuptools.packages.find]

@@ -9,6 +9,8 @@ networks:
 volumes:
   redis-data:
     driver: local
+  mongodb-data:
+    driver: local
   faiss-data:
     driver: local
   logs-data:
@@ -19,6 +21,34 @@ volumes:
     driver: local
 
 services:
+  # ===========================================================================
+  # DATABASE SERVICES
+  # ===========================================================================
+
+  mongodb:
+    image: mongo:7.0
+    container_name: rag-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=jellyfin_rag
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ===========================================================================
   # REDIS QUEUE SYSTEM
   # ===========================================================================
@@ -68,6 +98,7 @@ services:
       - ENV=docker
       - ENABLE_METRICS=true
       - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - LOG_LEVEL=DEBUG
@@ -78,6 +109,8 @@ services:
       - rag-network
     depends_on:
       redis:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -104,12 +137,15 @@ services:
     environment:
       - ENV=docker
       - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
       - LOG_LEVEL=DEBUG
       - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
     networks:
       - rag-network
     depends_on:
       redis:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "from src.redis_worker.queue_manager import RedisQueueManager; RedisQueueManager().redis_client.ping()"]
