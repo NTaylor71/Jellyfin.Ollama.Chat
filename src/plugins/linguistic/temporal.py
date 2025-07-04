@@ -1,6 +1,6 @@
 """
-Temporal expression plugin for parsing time-related queries.
-Handles expressions like "90s movies", "last decade", "summer of 2020".
+Sophisticated temporal expression plugin using modern NLP libraries.
+Handles complex temporal expressions with Google 2010-level sophistication.
 """
 
 import re
@@ -8,303 +8,800 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 import logging
 
+# Core NLP libraries
 try:
-    import dateparser
-    DATEPARSER_AVAILABLE = True
-except ImportError:
-    DATEPARSER_AVAILABLE = False
+    import spacy
+    from spacy.matcher import Matcher
+    SPACY_AVAILABLE = True
+except ImportError as e:
+    SPACY_AVAILABLE = False
+    logging.getLogger(__name__).debug(f"spaCy not available: {e}. Install with: pip install spacy && python -m spacy download en_core_web_sm")
+
+try:
+    from dateutil.parser import parse as dateutil_parse
+    from dateutil.relativedelta import relativedelta
+    DATEUTIL_AVAILABLE = True
+except ImportError as e:
+    DATEUTIL_AVAILABLE = False
+    logging.getLogger(__name__).debug(f"python-dateutil not available: {e}. Install with: pip install python-dateutil")
+
+try:
+    import arrow
+    ARROW_AVAILABLE = True
+except ImportError as e:
+    ARROW_AVAILABLE = False
+    logging.getLogger(__name__).debug(f"arrow not available: {e}. Install with: pip install arrow")
+
+try:
+    from transformers import pipeline
+    TRANSFORMERS_AVAILABLE = True
+except ImportError as e:
+    TRANSFORMERS_AVAILABLE = False
+    logging.getLogger(__name__).debug(f"transformers not available: {e}. Install with: pip install transformers torch")
 
 from .base import DualUsePlugin
 
 
-class TemporalExpressionPlugin(DualUsePlugin):
-    """Parse and normalize temporal expressions in text."""
+class SophisticatedTemporalPlugin(DualUsePlugin):
+    """
+    Sophisticated temporal expression parser using modern NLP.
+    
+    Uses spaCy for entity recognition, dateutil for parsing,
+    arrow for relative dates, and transformers for complex understanding.
+    """
     
     def __init__(self):
         super().__init__()
         self.current_year = datetime.now().year
+        self.current_date = datetime.now()
+        
+        # Initialize NLP models
+        self.nlp = None
+        self.matcher = None
+        self.ner_pipeline = None
+    
+    async def initialize(self, config: Dict[str, Any]) -> bool:
+        """Initialize the plugin."""
+        try:
+            self._initialize_models()
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to initialize temporal plugin: {e}")
+            return False
+    
+    async def embellish_query(self, query: str, context) -> str:
+        """Embellish query with temporal analysis."""
+        try:
+            # Perform temporal analysis on the query
+            analysis = await self.analyze(query, context.metadata if hasattr(context, 'metadata') else None)
+            
+            # For now, return the original query (could expand with temporal terms)
+            # In future iterations, we could expand queries like "90s movies" to "1990s movies"
+            return query
+            
+        except Exception as e:
+            self.logger.error(f"Error in temporal query embellishment: {e}")
+            return query
+    
+    async def embellish_embed_data(self, data: Dict[str, Any], context) -> Dict[str, Any]:
+        """Embellish data with temporal analysis."""
+        try:
+            # Extract text for analysis
+            text_content = ""
+            if isinstance(data, dict):
+                # Extract text from common fields
+                for field in ['overview', 'description', 'plot', 'summary', 'name', 'title']:
+                    if field in data and data[field]:
+                        text_content += f" {data[field]}"
+            else:
+                text_content = str(data)
+            
+            if text_content.strip():
+                context_dict = context.metadata if hasattr(context, 'metadata') else None
+                temporal_analysis = await self.analyze(text_content.strip(), context_dict)
+                
+                # Add temporal analysis to enhanced_fields
+                if 'enhanced_fields' not in data:
+                    data['enhanced_fields'] = {}
+                
+                data['enhanced_fields']['temporal_analysis'] = temporal_analysis
+                
+                # Extract useful temporal metadata
+                if temporal_analysis.get('normalized'):
+                    temporal_metadata = {
+                        'detected_time_periods': [],
+                        'temporal_scope': temporal_analysis.get('temporal_scope', 'unknown'),
+                        'confidence': temporal_analysis.get('confidence_level', 'medium')
+                    }
+                    
+                    for norm in temporal_analysis['normalized']:
+                        temporal_metadata['detected_time_periods'].append({
+                            'text': norm.get('text'),
+                            'start': norm.get('start'),
+                            'end': norm.get('end'),
+                            'precision': norm.get('precision')
+                        })
+                    
+                    data['enhanced_fields']['temporal_metadata'] = temporal_metadata
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Error in temporal embellishment: {e}")
+            return data
         
     def _initialize_models(self):
-        """Initialize temporal processing patterns."""
-        # Decade patterns
-        self.decade_patterns = [
-            (r'\b(\d{2})s\b', lambda m: (int(m.group(1)) * 10 + 1900 if int(m.group(1)) >= 20 else int(m.group(1)) * 10 + 2000, 10)),
-            (r'\b(\d{4})s\b', lambda m: (int(m.group(1)), 10)),
-            (r'\bearly (\d{2})s\b', lambda m: (int(m.group(1)) * 10 + 1900 if int(m.group(1)) >= 20 else int(m.group(1)) * 10 + 2000, 3)),
-            (r'\bmid[- ]?(\d{2})s\b', lambda m: (int(m.group(1)) * 10 + 1900 + 3 if int(m.group(1)) >= 20 else int(m.group(1)) * 10 + 2000 + 3, 4)),
-            (r'\blate (\d{2})s\b', lambda m: (int(m.group(1)) * 10 + 1900 + 7 if int(m.group(1)) >= 20 else int(m.group(1)) * 10 + 2000 + 7, 3)),
-        ]
+        """Initialize sophisticated NLP models."""
+        available_methods = []
         
-        # Relative patterns
-        self.relative_patterns = [
-            (r'\blast decade\b', lambda: (self.current_year - 10, 10)),
-            (r'\blast (\d+) years?\b', lambda m: (self.current_year - int(m.group(1)), int(m.group(1)))),
-            (r'\brecent years?\b', lambda: (self.current_year - 5, 5)),
-            (r'\bthis decade\b', lambda: (self.current_year // 10 * 10, self.current_year % 10 + 1)),
-            (r'\bprevious decade\b', lambda: (self.current_year // 10 * 10 - 10, 10)),
-        ]
-        
-        # Season patterns
-        self.season_patterns = [
-            (r'\bspring (?:of )?(\d{4})\b', lambda m: self._season_to_dates(int(m.group(1)), "spring")),
-            (r'\bsummer (?:of )?(\d{4})\b', lambda m: self._season_to_dates(int(m.group(1)), "summer")),
-            (r'\bfall (?:of )?(\d{4})\b', lambda m: self._season_to_dates(int(m.group(1)), "fall")),
-            (r'\bautumn (?:of )?(\d{4})\b', lambda m: self._season_to_dates(int(m.group(1)), "fall")),
-            (r'\bwinter (?:of )?(\d{4})\b', lambda m: self._season_to_dates(int(m.group(1)), "winter")),
-        ]
-        
-        # Year range patterns
-        self.range_patterns = [
-            (r'\b(\d{4})[- ](?:to|through) (\d{4})\b', lambda m: (int(m.group(1)), int(m.group(2)) - int(m.group(1)) + 1)),
-            (r'\bbetween (\d{4}) and (\d{4})\b', lambda m: (int(m.group(1)), int(m.group(2)) - int(m.group(1)) + 1)),
-            (r'\bfrom (\d{4}) to (\d{4})\b', lambda m: (int(m.group(1)), int(m.group(2)) - int(m.group(1)) + 1)),
-        ]
-        
-        # Single year patterns
-        self.year_patterns = [
-            (r'\bin (\d{4})\b', lambda m: (int(m.group(1)), 1)),
-            (r'\b(\d{4}) (?:movies?|films?|releases?)\b', lambda m: (int(m.group(1)), 1)),
-        ]
-        
-    def _season_to_dates(self, year: int, season: str) -> Tuple[str, str]:
-        """Convert season to start/end dates."""
-        seasons = {
-            "spring": ("03-01", "05-31"),
-            "summer": ("06-01", "08-31"),
-            "fall": ("09-01", "11-30"),
-            "winter": ("12-01", "02-28")  # Simplified winter
-        }
-        
-        start_month_day, end_month_day = seasons.get(season, ("01-01", "12-31"))
-        
-        # Handle winter spanning years
-        if season == "winter":
-            start_date = f"{year}-{start_month_day}"
-            end_date = f"{year + 1}-{end_month_day}"
-        else:
-            start_date = f"{year}-{start_month_day}"
-            end_date = f"{year}-{end_month_day}"
+        try:
+            # Initialize spaCy
+            if SPACY_AVAILABLE:
+                try:
+                    self.nlp = spacy.load("en_core_web_sm")
+                    self.matcher = Matcher(self.nlp.vocab)
+                    self._setup_temporal_patterns()
+                    self.logger.info("✅ spaCy temporal model loaded successfully")
+                    available_methods.append("spacy")
+                except OSError as e:
+                    self.logger.info(f"📦 spaCy model not found, attempting automatic download...")
+                    try:
+                        import subprocess
+                        import sys
+                        # Attempt automatic model download
+                        result = subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], 
+                                              capture_output=True, text=True, timeout=300)
+                        if result.returncode == 0:
+                            self.logger.info("✅ spaCy model downloaded successfully, loading...")
+                            self.nlp = spacy.load("en_core_web_sm")
+                            self.matcher = Matcher(self.nlp.vocab)
+                            self._setup_temporal_patterns()
+                            self.logger.info("✅ spaCy temporal model loaded successfully")
+                            available_methods.append("spacy")
+                        else:
+                            self.logger.warning(f"⚠️ Failed to auto-download spaCy model: {result.stderr}")
+                            self.nlp = None
+                    except Exception as download_error:
+                        self.logger.warning(f"⚠️ Could not auto-download spaCy model: {download_error}")
+                        self.nlp = None
+            else:
+                self.logger.debug("📦 spaCy not available - install with: pip install spacy")
+                    
+            # Initialize transformers NER pipeline
+            if TRANSFORMERS_AVAILABLE:
+                try:
+                    self.ner_pipeline = pipeline(
+                        "ner",
+                        model="dbmdz/bert-large-cased-finetuned-conll03-english",
+                        aggregation_strategy="simple"
+                    )
+                    self.logger.info("✅ Transformers NER pipeline loaded successfully")
+                    available_methods.append("transformers")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Could not load transformers pipeline: {e}")
+                    self.ner_pipeline = None
+            else:
+                self.logger.debug("📦 Transformers not available - install with: pip install transformers torch")
             
-        return start_date, end_date
+            # Log dateutil availability
+            if DATEUTIL_AVAILABLE:
+                available_methods.append("dateutil")
+                self.logger.debug("✅ python-dateutil available for sophisticated date parsing")
+            else:
+                self.logger.debug("📦 python-dateutil not available - install with: pip install python-dateutil")
+            
+            # Log arrow availability
+            if ARROW_AVAILABLE:
+                available_methods.append("arrow")
+                self.logger.debug("✅ arrow available for relative date calculations")
+            else:
+                self.logger.debug("📦 arrow not available - install with: pip install arrow")
+            
+            # Summary logging
+            if available_methods:
+                self.logger.info(f"🧠 Sophisticated temporal analysis initialized with methods: {', '.join(available_methods)}")
+            else:
+                self.logger.warning("⚠️ No sophisticated temporal analysis libraries available. Install [nlp] dependencies for full functionality.")
+                    
+        except Exception as e:
+            self.logger.error(f"💥 Error initializing temporal models: {e}")
+    
+    def _setup_temporal_patterns(self):
+        """Setup sophisticated temporal patterns for spaCy matcher."""
+        if not self.matcher:
+            return
+            
+        # Decade patterns with context
+        decade_patterns = [
+            [{"LOWER": {"IN": ["early", "mid", "late"]}}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+            [{"LIKE_NUM": True}, {"LOWER": "s"}],
+            [{"LOWER": "the"}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+            [{"LOWER": {"IN": ["nineteen", "twenty"]}}, {"LOWER": {"REGEX": r"(eighties|nineties|hundreds|tens|twenties|thirties|forties|fifties|sixties|seventies)"}}]
+        ]
+        
+        # Relative time patterns
+        relative_patterns = [
+            [{"LOWER": {"IN": ["last", "past", "previous"]}}, {"LOWER": {"IN": ["decade", "century", "year", "years"]}}, {"IS_ALPHA": True, "OP": "?"}],
+            [{"LOWER": {"IN": ["recent", "lately", "nowadays"]}}, {"IS_ALPHA": True, "OP": "*"}],
+            [{"LIKE_NUM": True}, {"LOWER": {"IN": ["years", "decades"]}}, {"LOWER": "ago"}],
+            [{"LOWER": {"IN": ["this", "current"]}}, {"LOWER": {"IN": ["decade", "century", "year"]}}]
+        ]
+        
+        # Season and period patterns
+        season_patterns = [
+            [{"LOWER": {"IN": ["spring", "summer", "fall", "autumn", "winter"]}}, {"LOWER": "of", "OP": "?"}, {"LIKE_NUM": True}],
+            [{"LOWER": {"IN": ["beginning", "start", "end"]}}, {"LOWER": "of"}, {"LOWER": "the", "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s", "OP": "?"}]
+        ]
+        
+        # Add patterns to matcher
+        self.matcher.add("DECADE", decade_patterns)
+        self.matcher.add("RELATIVE", relative_patterns)
+        self.matcher.add("SEASON", season_patterns)
     
     async def analyze(self, text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Extract and normalize temporal expressions from text."""
+        """Extract temporal expressions using sophisticated NLP."""
         try:
-            expressions = []
-            normalized = []
+            results = {
+                "expressions": [],
+                "normalized": [],
+                "confidence_scores": [],
+                "analysis_methods": []
+            }
             
-            text_lower = text.lower()
+            # Method 1: spaCy NER + custom patterns
+            if self.nlp:
+                spacy_results = self._analyze_with_spacy(text)
+                results["expressions"].extend(spacy_results["expressions"])
+                results["normalized"].extend(spacy_results["normalized"])
+                results["analysis_methods"].append("spacy")
             
-            # Process different pattern types
-            expressions.extend(self._extract_decade_expressions(text_lower))
-            expressions.extend(self._extract_relative_expressions(text_lower))
-            expressions.extend(self._extract_season_expressions(text_lower))
-            expressions.extend(self._extract_range_expressions(text_lower))
-            expressions.extend(self._extract_year_expressions(text_lower))
+            # Method 2: Transformers NER
+            if self.ner_pipeline:
+                transformer_results = self._analyze_with_transformers(text)
+                results["expressions"].extend(transformer_results["expressions"])
+                results["normalized"].extend(transformer_results["normalized"])
+                results["analysis_methods"].append("transformers")
             
-            # Try dateparser if available
-            if DATEPARSER_AVAILABLE:
-                expressions.extend(self._extract_with_dateparser(text))
+            # Method 3: dateutil parsing
+            if DATEUTIL_AVAILABLE:
+                dateutil_results = self._analyze_with_dateutil(text)
+                results["expressions"].extend(dateutil_results["expressions"])
+                results["normalized"].extend(dateutil_results["normalized"])
+                results["analysis_methods"].append("dateutil")
             
-            # Normalize all expressions
-            for expr in expressions:
-                norm = self._normalize_expression(expr)
+            # Method 4: Arrow relative dates
+            if ARROW_AVAILABLE:
+                arrow_results = self._analyze_with_arrow(text)
+                results["expressions"].extend(arrow_results["expressions"])
+                results["normalized"].extend(arrow_results["normalized"])
+                results["analysis_methods"].append("arrow")
+            
+            # Merge and deduplicate results
+            final_results = self._merge_and_deduplicate(results)
+            
+            # Add semantic analysis
+            final_results.update(self._semantic_temporal_analysis(text, final_results))
+            
+            return final_results
+            
+        except Exception as e:
+            self.logger.error(f"Error in sophisticated temporal analysis: {e}")
+            return {"error": str(e), "expressions": [], "normalized": [], "fallback": True}
+    
+    def _analyze_with_spacy(self, text: str) -> Dict[str, Any]:
+        """Analyze temporal expressions using spaCy."""
+        expressions = []
+        normalized = []
+        
+        try:
+            doc = self.nlp(text)
+            
+            # Extract DATE entities
+            for ent in doc.ents:
+                if ent.label_ == "DATE":
+                    expr = {
+                        "text": ent.text,
+                        "start_char": ent.start_char,
+                        "end_char": ent.end_char,
+                        "confidence": ent._.get("confidence", 0.8),
+                        "method": "spacy_ner"
+                    }
+                    expressions.append(expr)
+                    
+                    # Normalize the expression
+                    norm = self._normalize_spacy_date(ent.text)
+                    if norm:
+                        normalized.append(norm)
+            
+            # Use custom patterns
+            matches = self.matcher(doc)
+            for match_id, start, end in matches:
+                span = doc[start:end]
+                label = self.nlp.vocab.strings[match_id]
+                
+                expr = {
+                    "text": span.text,
+                    "start_char": span.start_char,
+                    "end_char": span.end_char,
+                    "confidence": 0.9,
+                    "method": f"spacy_pattern_{label.lower()}"
+                }
+                expressions.append(expr)
+                
+                # Normalize based on pattern type
+                norm = self._normalize_spacy_pattern(span.text, label)
                 if norm:
                     normalized.append(norm)
+                    
+        except Exception as e:
+            self.logger.debug(f"spaCy analysis error: {e}")
+        
+        return {"expressions": expressions, "normalized": normalized}
+    
+    def _analyze_with_transformers(self, text: str) -> Dict[str, Any]:
+        """Analyze temporal expressions using transformer models."""
+        expressions = []
+        normalized = []
+        
+        try:
+            # Use NER pipeline to find entities
+            entities = self.ner_pipeline(text)
             
-            # Remove duplicates
-            unique_normalized = []
-            seen = set()
-            for norm in normalized:
-                key = (norm.get("start"), norm.get("end"), norm.get("precision"))
-                if key not in seen:
-                    seen.add(key)
+            for entity in entities:
+                if entity["entity_group"] in ["DATE", "TIME", "MISC"]:
+                    expr = {
+                        "text": entity["word"],
+                        "start_char": entity["start"],
+                        "end_char": entity["end"],
+                        "confidence": entity["score"],
+                        "method": "transformers_ner"
+                    }
+                    expressions.append(expr)
+                    
+                    # Try to normalize
+                    norm = self._normalize_transformer_entity(entity["word"])
+                    if norm:
+                        normalized.append(norm)
+                        
+        except Exception as e:
+            self.logger.debug(f"Transformers analysis error: {e}")
+        
+        return {"expressions": expressions, "normalized": normalized}
+    
+    def _analyze_with_dateutil(self, text: str) -> Dict[str, Any]:
+        """Analyze temporal expressions using dateutil parser."""
+        expressions = []
+        normalized = []
+        
+        try:
+            # Extract potential date phrases
+            date_phrases = self._extract_date_phrases(text)
+            
+            for phrase in date_phrases:
+                try:
+                    parsed = dateutil_parse(phrase, fuzzy=True)
+                    expr = {
+                        "text": phrase,
+                        "confidence": 0.7,
+                        "method": "dateutil"
+                    }
+                    expressions.append(expr)
+                    
+                    norm = {
+                        "text": phrase,
+                        "start": parsed.year,
+                        "end": parsed.year,
+                        "precision": "year",
+                        "parsed_date": parsed.isoformat(),
+                        "method": "dateutil"
+                    }
+                    normalized.append(norm)
+                    
+                except Exception:
+                    continue
+                    
+        except Exception as e:
+            self.logger.debug(f"dateutil analysis error: {e}")
+        
+        return {"expressions": expressions, "normalized": normalized}
+    
+    def _analyze_with_arrow(self, text: str) -> Dict[str, Any]:
+        """Analyze relative temporal expressions using arrow."""
+        expressions = []
+        normalized = []
+        
+        try:
+            # Define relative patterns with arrow
+            relative_mappings = {
+                r'\blast\s+decade\b': lambda: arrow.now().shift(years=-10),
+                r'\bpast\s+decade\b': lambda: arrow.now().shift(years=-10),
+                r'\brecent\s+years?\b': lambda: arrow.now().shift(years=-3),
+                r'\bthis\s+decade\b': lambda: arrow.now().replace(year=arrow.now().year // 10 * 10),
+                r'\b(\d+)\s+years?\s+ago\b': lambda m: arrow.now().shift(years=-int(m.group(1))),
+                r'\btwo\s+decades?\s+ago\b': lambda: arrow.now().shift(years=-20),
+                r'\ba\s+decade\s+ago\b': lambda: arrow.now().shift(years=-10),
+            }
+            
+            for pattern, calculator in relative_mappings.items():
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    try:
+                        if r'(\d+)' in pattern:
+                            target_date = calculator(match)
+                        else:
+                            target_date = calculator()
+                        
+                        expr = {
+                            "text": match.group(0),
+                            "start_char": match.start(),
+                            "end_char": match.end(),
+                            "confidence": 0.8,
+                            "method": "arrow_relative"
+                        }
+                        expressions.append(expr)
+                        
+                        norm = {
+                            "text": match.group(0),
+                            "start": target_date.year,
+                            "end": target_date.year,
+                            "precision": "year",
+                            "arrow_date": target_date.isoformat(),
+                            "method": "arrow"
+                        }
+                        normalized.append(norm)
+                        
+                    except Exception:
+                        continue
+                        
+        except Exception as e:
+            self.logger.debug(f"Arrow analysis error: {e}")
+        
+        return {"expressions": expressions, "normalized": normalized}
+    
+    def _extract_date_phrases(self, text: str) -> List[str]:
+        """Extract potential date phrases from text."""
+        phrases = []
+        
+        # Common temporal phrase patterns
+        patterns = [
+            r'\b(?:in\s+)?(?:the\s+)?(?:early\s+|late\s+|mid\s+)?(?:19|20)\d{2}s?\b',
+            r'\b(?:last|past|recent|this|current)\s+(?:few\s+)?(?:years?|decades?|century)\b',
+            r'\b(?:spring|summer|fall|autumn|winter)\s+(?:of\s+)?(?:19|20)\d{2}\b',
+            r'\b(?:beginning|start|end)\s+of\s+(?:the\s+)?(?:19|20)\d{2}s?\b',
+            r'\b(?:between|from)\s+(?:19|20)\d{2}\s+(?:and|to)\s+(?:19|20)\d{2}\b',
+            r'\b\d{1,2}\s+(?:years?|decades?)\s+ago\b',
+            r'\b(?:around|about|circa)\s+(?:19|20)\d{2}\b'
+        ]
+        
+        for pattern in patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                phrases.append(match.group(0))
+        
+        return phrases
+    
+    def _normalize_spacy_date(self, date_text: str) -> Optional[Dict[str, Any]]:
+        """Normalize spaCy detected dates."""
+        try:
+            # Try different normalization strategies
+            if DATEUTIL_AVAILABLE:
+                try:
+                    parsed = dateutil_parse(date_text, fuzzy=True)
+                    return {
+                        "text": date_text,
+                        "start": parsed.year,
+                        "end": parsed.year,
+                        "precision": "year",
+                        "method": "spacy_dateutil"
+                    }
+                except Exception:
+                    pass
+            
+            # Handle decade patterns
+            if 's' in date_text.lower():
+                decade_match = re.search(r'(\d{2,4})s', date_text)
+                if decade_match:
+                    year = int(decade_match.group(1))
+                    if year < 100:
+                        year = year + 1900 if year >= 20 else year + 2000
+                    return {
+                        "text": date_text,
+                        "start": year,
+                        "end": year + 9,
+                        "precision": "decade",
+                        "method": "spacy_decade"
+                    }
+            
+            return None
+            
+        except Exception:
+            return None
+    
+    def _normalize_spacy_pattern(self, text: str, label: str) -> Optional[Dict[str, Any]]:
+        """Normalize spaCy pattern matches."""
+        try:
+            if label == "DECADE":
+                return self._normalize_decade_expression(text)
+            elif label == "RELATIVE":
+                return self._normalize_relative_expression(text)
+            elif label == "SEASON":
+                return self._normalize_season_expression(text)
+            return None
+        except Exception:
+            return None
+    
+    def _normalize_transformer_entity(self, entity_text: str) -> Optional[Dict[str, Any]]:
+        """Normalize transformer detected entities."""
+        try:
+            if DATEUTIL_AVAILABLE:
+                parsed = dateutil_parse(entity_text, fuzzy=True)
+                return {
+                    "text": entity_text,
+                    "start": parsed.year,
+                    "end": parsed.year,
+                    "precision": "year",
+                    "method": "transformer_dateutil"
+                }
+        except Exception:
+            pass
+        return None
+    
+    def _normalize_decade_expression(self, text: str) -> Optional[Dict[str, Any]]:
+        """Normalize decade expressions."""
+        try:
+            # Extract decade information
+            decade_match = re.search(r'(\d{2,4})s', text)
+            if decade_match:
+                year = int(decade_match.group(1))
+                if year < 100:
+                    year = year + 1900 if year >= 20 else year + 2000
+                
+                # Handle early/mid/late modifiers
+                if 'early' in text.lower():
+                    return {"text": text, "start": year, "end": year + 2, "precision": "early_decade", "method": "spacy_decade"}
+                elif 'mid' in text.lower():
+                    return {"text": text, "start": year + 3, "end": year + 6, "precision": "mid_decade", "method": "spacy_decade"}
+                elif 'late' in text.lower():
+                    return {"text": text, "start": year + 7, "end": year + 9, "precision": "late_decade", "method": "spacy_decade"}
+                else:
+                    return {"text": text, "start": year, "end": year + 9, "precision": "decade", "method": "spacy_decade"}
+            
+            return None
+        except Exception:
+            return None
+    
+    def _normalize_relative_expression(self, text: str) -> Optional[Dict[str, Any]]:
+        """Normalize relative expressions."""
+        try:
+            current_year = self.current_year
+            
+            if 'last decade' in text.lower() or 'past decade' in text.lower():
+                return {"text": text, "start": current_year - 10, "end": current_year - 1, "precision": "decade", "method": "spacy_relative"}
+            elif 'recent years' in text.lower():
+                return {"text": text, "start": current_year - 5, "end": current_year, "precision": "recent", "method": "spacy_relative"}
+            elif 'this decade' in text.lower():
+                decade_start = current_year // 10 * 10
+                return {"text": text, "start": decade_start, "end": current_year, "precision": "current_decade", "method": "spacy_relative"}
+            
+            # Handle "X years ago"
+            years_match = re.search(r'(\d+)\s+years?\s+ago', text)
+            if years_match:
+                years_ago = int(years_match.group(1))
+                target_year = current_year - years_ago
+                return {"text": text, "start": target_year, "end": target_year, "precision": "year", "method": "spacy_relative"}
+            
+            return None
+        except Exception:
+            return None
+    
+    def _normalize_season_expression(self, text: str) -> Optional[Dict[str, Any]]:
+        """Normalize season expressions."""
+        try:
+            season_match = re.search(r'(spring|summer|fall|autumn|winter).*?(\d{4})', text, re.IGNORECASE)
+            if season_match:
+                season = season_match.group(1).lower()
+                year = int(season_match.group(2))
+                
+                season_months = {
+                    "spring": (3, 5),
+                    "summer": (6, 8),
+                    "fall": (9, 11),
+                    "autumn": (9, 11),
+                    "winter": (12, 2)
+                }
+                
+                start_month, end_month = season_months.get(season, (1, 12))
+                
+                return {
+                    "text": text,
+                    "start": f"{year}-{start_month:02d}-01",
+                    "end": f"{year}-{end_month:02d}-28",
+                    "precision": "season",
+                    "season": season,
+                    "year": year,
+                    "method": "spacy_season"
+                }
+            
+            return None
+        except Exception:
+            return None
+    
+    def _merge_and_deduplicate(self, results: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge results from different methods and remove duplicates."""
+        # Simple deduplication based on text similarity
+        seen_texts = set()
+        unique_expressions = []
+        unique_normalized = []
+        
+        for expr in results["expressions"]:
+            text_key = expr["text"].lower().strip()
+            if text_key not in seen_texts:
+                seen_texts.add(text_key)
+                unique_expressions.append(expr)
+        
+        # Process normalization with better logic
+        for norm in results["normalized"]:
+            if norm:  # Skip None results
+                text_key = norm["text"].lower().strip()
+                if text_key not in seen_texts:
+                    seen_texts.add(text_key)
                     unique_normalized.append(norm)
+                else:
+                    # Update existing with higher confidence
+                    for i, existing in enumerate(unique_normalized):
+                        if existing["text"].lower().strip() == text_key:
+                            if norm.get("confidence", 0) > existing.get("confidence", 0):
+                                unique_normalized[i] = norm
+                            break
+        
+        # CRITICAL FIX: Force normalization of detected expressions that weren't normalized
+        for expr in unique_expressions:
+            expr_text = expr["text"].lower().strip()
+            # Check if this expression was normalized
+            already_normalized = any(norm["text"].lower().strip() == expr_text for norm in unique_normalized)
             
-            return {
-                "expressions": [expr["text"] for expr in expressions],
-                "normalized": unique_normalized,
-                "decade_detected": any(norm.get("precision") == "decade" for norm in unique_normalized),
-                "year_ranges": [norm for norm in unique_normalized if norm.get("precision") in ["year", "range"]],
-                "seasons": [norm for norm in unique_normalized if norm.get("precision") == "season"]
+            if not already_normalized:
+                # Force normalization using fallback method
+                fallback_norm = self._fallback_normalize_expression(expr["text"], expr.get("method", "unknown"))
+                if fallback_norm:
+                    unique_normalized.append(fallback_norm)
+        
+        return {
+            "expressions": unique_expressions,
+            "normalized": unique_normalized,
+            "analysis_methods": results["analysis_methods"],
+            "total_expressions": len(unique_expressions)
+        }
+    
+    def _semantic_temporal_analysis(self, text: str, results: Dict[str, Any]) -> Dict[str, Any]:
+        """Add semantic understanding to temporal analysis."""
+        analysis = {
+            "temporal_context": {},
+            "confidence_level": "medium",
+            "temporal_scope": "unknown"
+        }
+        
+        try:
+            # Analyze temporal scope
+            if any(norm.get("precision") == "decade" for norm in results["normalized"]):
+                analysis["temporal_scope"] = "decade"
+            elif any(norm.get("precision") == "year" for norm in results["normalized"]):
+                analysis["temporal_scope"] = "year"
+            elif any(norm.get("precision") == "season" for norm in results["normalized"]):
+                analysis["temporal_scope"] = "season"
+            
+            # Analyze confidence
+            confidences = [expr.get("confidence", 0.5) for expr in results["expressions"]]
+            if confidences:
+                avg_confidence = sum(confidences) / len(confidences)
+                if avg_confidence >= 0.8:
+                    analysis["confidence_level"] = "high"
+                elif avg_confidence >= 0.6:
+                    analysis["confidence_level"] = "medium"
+                else:
+                    analysis["confidence_level"] = "low"
+            
+            # Add temporal context
+            analysis["temporal_context"] = {
+                "has_relative_dates": any("relative" in expr.get("method", "") for expr in results["expressions"]),
+                "has_absolute_dates": any("decade" in expr.get("method", "") or "year" in expr.get("method", "") for expr in results["expressions"]),
+                "method_diversity": len(set(results["analysis_methods"])),
+                "processing_sophisticated": len(results["analysis_methods"]) > 1
             }
             
         except Exception as e:
-            self.logger.error(f"Error in temporal analysis: {e}")
-            return {"error": str(e), "expressions": [], "normalized": []}
+            self.logger.debug(f"Error in semantic analysis: {e}")
+        
+        return analysis
     
-    def _extract_decade_expressions(self, text: str) -> List[Dict[str, Any]]:
-        """Extract decade expressions like '90s', 'early 2000s'."""
-        expressions = []
-        
-        for pattern, handler in self.decade_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    start_year, duration = handler(match)
-                    expressions.append({
-                        "text": match.group(0),
-                        "type": "decade",
-                        "start_year": start_year,
-                        "duration": duration,
-                        "match_span": match.span()
-                    })
-                except Exception as e:
-                    self.logger.debug(f"Error processing decade match: {e}")
-        
-        return expressions
-    
-    def _extract_relative_expressions(self, text: str) -> List[Dict[str, Any]]:
-        """Extract relative expressions like 'last decade', 'recent years'."""
-        expressions = []
-        
-        for pattern, handler in self.relative_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    if callable(handler):
-                        result = handler()
+    def _fallback_normalize_expression(self, text: str, method: str) -> Optional[Dict[str, Any]]:
+        """Fallback normalization for expressions that weren't normalized by specific methods."""
+        try:
+            text_lower = text.lower().strip()
+            
+            # Handle decade patterns
+            if 's' in text_lower and any(char.isdigit() for char in text_lower):
+                import re
+                decade_match = re.search(r'(\d{2,4})s', text_lower)
+                if decade_match:
+                    year_part = int(decade_match.group(1))
+                    if year_part < 100:
+                        # Two digit year: 90s -> 1990s or 00s -> 2000s  
+                        start_year = year_part + 1900 if year_part >= 20 else year_part + 2000
                     else:
-                        result = handler(match)
+                        # Four digit year: 1990s -> 1990s
+                        start_year = year_part
                     
-                    start_year, duration = result
-                    expressions.append({
-                        "text": match.group(0),
-                        "type": "relative",
-                        "start_year": start_year,
-                        "duration": duration,
-                        "match_span": match.span()
-                    })
-                except Exception as e:
-                    self.logger.debug(f"Error processing relative match: {e}")
-        
-        return expressions
-    
-    def _extract_season_expressions(self, text: str) -> List[Dict[str, Any]]:
-        """Extract season expressions like 'summer of 2020'."""
-        expressions = []
-        
-        for pattern, handler in self.season_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    start_date, end_date = handler(match)
-                    expressions.append({
-                        "text": match.group(0),
-                        "type": "season",
-                        "start_date": start_date,
-                        "end_date": end_date,
-                        "match_span": match.span()
-                    })
-                except Exception as e:
-                    self.logger.debug(f"Error processing season match: {e}")
-        
-        return expressions
-    
-    def _extract_range_expressions(self, text: str) -> List[Dict[str, Any]]:
-        """Extract year range expressions like '1990-1995', 'between 2000 and 2010'."""
-        expressions = []
-        
-        for pattern, handler in self.range_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    start_year, duration = handler(match)
-                    expressions.append({
-                        "text": match.group(0),
-                        "type": "range",
-                        "start_year": start_year,
-                        "duration": duration,
-                        "match_span": match.span()
-                    })
-                except Exception as e:
-                    self.logger.debug(f"Error processing range match: {e}")
-        
-        return expressions
-    
-    def _extract_year_expressions(self, text: str) -> List[Dict[str, Any]]:
-        """Extract single year expressions like 'in 1995', '2020 movies'."""
-        expressions = []
-        
-        for pattern, handler in self.year_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                try:
-                    start_year, duration = handler(match)
-                    # Basic validation
-                    if 1900 <= start_year <= self.current_year + 5:
-                        expressions.append({
-                            "text": match.group(0),
-                            "type": "year",
-                            "start_year": start_year,
-                            "duration": duration,
-                            "match_span": match.span()
-                        })
-                except Exception as e:
-                    self.logger.debug(f"Error processing year match: {e}")
-        
-        return expressions
-    
-    def _extract_with_dateparser(self, text: str) -> List[Dict[str, Any]]:
-        """Extract dates using dateparser library if available."""
-        expressions = []
-        
-        try:
-            # Look for date-like phrases
-            date_phrases = re.findall(r'\b(?:(?:last|next|this)\s+)?(?:january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b[^.]*?(?:\d{4}|\b(?:year|decade|century)\b)', text, re.IGNORECASE)
+                    return {
+                        "text": text,
+                        "start": start_year,
+                        "end": start_year + 9,
+                        "precision": "decade",
+                        "method": f"fallback_{method}"
+                    }
             
-            for phrase in date_phrases:
-                parsed = dateparser.parse(phrase)
-                if parsed:
-                    expressions.append({
-                        "text": phrase,
-                        "type": "dateparser",
-                        "parsed_date": parsed.isoformat(),
-                        "year": parsed.year
-                    })
-        
+            # Handle relative patterns
+            if "last decade" in text_lower or "past decade" in text_lower:
+                current_year = self.current_year
+                return {
+                    "text": text,
+                    "start": current_year - 10,
+                    "end": current_year - 1,
+                    "precision": "decade",
+                    "method": f"fallback_{method}"
+                }
+            
+            # Handle "X decades ago"
+            if "decades ago" in text_lower:
+                import re
+                num_match = re.search(r'(\w+)\s+decades?\s+ago', text_lower)
+                if num_match:
+                    num_word = num_match.group(1)
+                    # Convert word to number
+                    word_to_num = {
+                        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+                        "a": 1, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5
+                    }
+                    decades_back = word_to_num.get(num_word, 2)  # Default to 2
+                    target_year = self.current_year - (decades_back * 10)
+                    
+                    return {
+                        "text": text,
+                        "start": target_year,
+                        "end": target_year + 9,
+                        "precision": "decade",
+                        "method": f"fallback_{method}"
+                    }
+            
+            # Handle "this decade"
+            if "this decade" in text_lower:
+                decade_start = self.current_year // 10 * 10
+                return {
+                    "text": text,
+                    "start": decade_start,
+                    "end": self.current_year,
+                    "precision": "current_decade",
+                    "method": f"fallback_{method}"
+                }
+            
+            # Handle single years
+            if text_lower.isdigit() and len(text_lower) == 4:
+                year = int(text_lower)
+                if 1900 <= year <= 2030:
+                    return {
+                        "text": text,
+                        "start": year,
+                        "end": year,
+                        "precision": "year",
+                        "method": f"fallback_{method}"
+                    }
+            
+            return None
+            
         except Exception as e:
-            self.logger.debug(f"Dateparser error: {e}")
-        
-        return expressions
-    
-    def _normalize_expression(self, expr: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Normalize a temporal expression to standard format."""
-        try:
-            expr_type = expr["type"]
-            
-            if expr_type in ["decade", "relative", "range", "year"]:
-                start_year = expr["start_year"]
-                duration = expr["duration"]
-                end_year = start_year + duration - 1
-                
-                return {
-                    "text": expr["text"],
-                    "start": start_year,
-                    "end": end_year,
-                    "precision": "decade" if duration >= 10 else "year" if duration == 1 else "range",
-                    "type": expr_type
-                }
-            
-            elif expr_type == "season":
-                return {
-                    "text": expr["text"],
-                    "start": expr["start_date"],
-                    "end": expr["end_date"],
-                    "precision": "season",
-                    "type": expr_type
-                }
-            
-            elif expr_type == "dateparser" and "year" in expr:
-                return {
-                    "text": expr["text"],
-                    "start": expr["year"],
-                    "end": expr["year"],
-                    "precision": "year",
-                    "type": expr_type
-                }
-        
-        except Exception as e:
-            self.logger.debug(f"Error normalizing expression: {e}")
-        
-        return None
+            self.logger.debug(f"Error in fallback normalization: {e}")
+            return None
+
+
+# Maintain backward compatibility
+TemporalExpressionPlugin = SophisticatedTemporalPlugin

@@ -488,6 +488,14 @@ This new system combines the best of:
   - ✅ Example: "movies from the 90s" → {start: 1990, end: 1999, precision: "decade"}
   - ❌ **NEEDS TESTING**: No validation with real temporal queries
   - ❌ **NEEDS INTEGRATION**: Not tested with movie search scenarios
+  - investigating Google 2010-level sophistication, we need:
+  1. spaCy - for proper NLP pipeline, POS tagging, NER
+  2. dateutil - much better date parsing than dateparser
+  3. nltk - for temporal expression detection
+  4. transformers - for modern NLP models that understand temporal context
+  5. duckling - Facebook's sophisticated temporal expression parser
+  6. HeidelTime - academic-grade temporal tagger
+  7. SUTime - Stanford's temporal tagger
 
 - [x] **Implement SemanticRoleLabelerPlugin** (`src/plugins/linguistic/semantic_roles.py`) ❌ (CODE WRITTEN - NOT TESTED)
   - ✅ Extract WHO did WHAT to WHOM using spaCy dependency parsing
