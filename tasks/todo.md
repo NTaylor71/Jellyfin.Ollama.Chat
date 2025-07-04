@@ -158,11 +158,75 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
   - ✅ Resource usage tracking (CPU, memory, execution time, concurrency, queue size)
   - ✅ Data processing volume metrics
   - ✅ Plugin execution phase breakdown monitoring
+  - ✅ Dashboard tested and validated with real plugin metrics data
+  - ✅ Chat endpoint integration confirmed working with `/chat/` endpoint
 
 - [ ] **Update integration tests**
   - Modify test_full_integration.py for plugins
   - Test plugin failure scenarios
   - Validate hot-reload functionality
+
+## Stage 4.6: Comprehensive Testing & Quality Assurance
+
+### Phase 4.6.1: Unit Test Audit & Validation
+- [ ] **Audit all existing unit tests**
+  - Review and run all test_*.py files in project
+  - Identify any failing or outdated tests
+  - Update tests for new plugin system features
+  - Ensure 100% test coverage for critical components
+
+- [ ] **Plugin system unit test validation**
+  - Validate test_plugin_registry.py (11/11 tests)
+  - Validate test_plugin_hot_reload.py (13/13 tests) 
+  - Validate test_plugin_execution.py (13/13 tests)
+  - Validate test_cpu_optimization.py (18/18 tests)
+  - Run test_plugin_performance_monitoring.py
+  - Fix any test failures or deprecation warnings
+
+- [ ] **Core system unit test validation**
+  - Run and validate test_config.py
+  - Run and validate test_api.py 
+  - Run and validate test_redis_queue.py
+  - Run and validate all other existing unit tests
+  - Document test results and any required fixes
+
+### Phase 4.6.2: Integration Test Audit & Enhancement
+- [ ] **Full integration test audit**
+  - Run test_full_integration.py and document current state
+  - Run test_fastapi_metrics.py and validate metrics
+  - Run all test_*_integration.py files
+  - Identify gaps in integration test coverage
+
+- [ ] **Plugin integration test enhancement**
+  - Modify test_full_integration.py for plugin system
+  - Add plugin failure scenario testing
+  - Validate hot-reload functionality in integration context
+  - Test plugin performance under load
+
+- [ ] **End-to-end workflow testing**
+  - Test complete chat workflow with plugins
+  - Test monitoring and metrics collection
+  - Test error handling and recovery
+  - Validate all health endpoints
+
+### Phase 4.6.3: System Validation & Performance Testing
+- [ ] **System health validation**
+  - Validate all Docker services start correctly
+  - Test service-to-service communication
+  - Verify monitoring stack functionality
+  - Confirm all health checks pass
+
+- [ ] **Performance baseline establishment**
+  - Run performance tests with and without plugins
+  - Establish baseline metrics for comparison
+  - Document system resource usage patterns
+  - Identify any performance bottlenecks
+
+- [ ] **Documentation and test maintenance**
+  - Update test documentation
+  - Create test execution guide
+  - Document known issues and workarounds
+  - Establish testing best practices
 
 ## Stage 4.5: Security & Production Hardening ✅ (COMPLETED)
 
@@ -204,7 +268,9 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
   - ✅ Configuration examples for secure setup
   - ✅ Vulnerability reporting guidelines
 
-### Phase 4.5.2: Production Security Recommendations
+### Phase 4.5.2: Production Security Recommendations (DEFERRED)
+<!--
+DEFERRED FOR LATER - Will return to this after comprehensive testing phase
 - [ ] **Authentication middleware implementation**
   - Add API key validation middleware
   - Implement JWT token verification
@@ -228,6 +294,7 @@ Transform the production RAG system from Stage 3 into a comprehensive movie sear
   - Failed authentication attempt tracking
   - Suspicious query pattern detection
   - Automated security scanning in CI/CD
+-->
 
 **Security Score Achievement**: 6/10 → 8.5/10 (Medium Risk → Low Risk)
 
