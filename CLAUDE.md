@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+## RULES 
+
 1. First think through the problem, read the codebase for relevant files, and write a plan to tasks/todo.md.
 2. The plan should have a list of todo items that you can check off as you complete them
 3. Before you begin working, check in with me and I will verify the plan.
@@ -11,11 +13,12 @@
 │   back to you that way
 9. remember we use only toml and dev_setup.ps1 to set local dev .venv and rebuild docker stack too
 10. when sub-classing, be sure to implement base class required methods
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+11. always test before declaring stages complete - i run the scripts on the host and give you the console feedback
 
 ## Project Overview
 
 **Jellyfin.Ollama.Chat** is a production-grade RAG (Retrieval-Augmented Generation) system with microservices architecture. The system provides intelligent chat capabilities with FAISS vector search and Redis-based queue processing.
 
 simple, focused implementations that maintain existing patterns while adding powerful new capabilities
+
+RAW EXAMPLE JELLYFIN movie data can be found here : data/example_movie_data.py
