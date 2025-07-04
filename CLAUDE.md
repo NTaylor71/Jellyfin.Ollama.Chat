@@ -14,6 +14,7 @@
 9. remember we use only toml and dev_setup.ps1 to set local dev .venv and rebuild docker stack too
 10. when sub-classing, be sure to implement base class required methods
 11. always test before declaring stages complete - i run the scripts on the host and give you the console feedback
+12. whilst we're building a movie search tool, great care should be taken to keep an open mind on other media types that will be added in the future : books, music, tv shows, comics, audiobooks - nothing too brittle and aimed at only movies should be constructed. we want to avoid brittle.
 
 ## Project Overview
 
