@@ -5,13 +5,11 @@ These plugins work symmetrically on both content (during ingestion) and queries 
 
 from .base import LinguisticPlugin, DualUsePlugin
 from .conceptnet import ConceptNetExpansionPlugin
-from .temporal import TemporalExpressionPlugin
 from .semantic_roles import SemanticRoleLabelerPlugin
 
 __all__ = [
     "LinguisticPlugin",
     "DualUsePlugin", 
     "ConceptNetExpansionPlugin",
-    "TemporalExpressionPlugin",
     "SemanticRoleLabelerPlugin"
 ]

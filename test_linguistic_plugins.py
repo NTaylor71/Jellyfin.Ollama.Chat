@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from plugins.linguistic.conceptnet import ConceptNetExpansionPlugin
-from plugins.linguistic.temporal import TemporalExpressionPlugin
+from plugins.temporal.spacy_with_fallback_ingestion_and_query import SpacyWithFallbackIngestionAndQueryPlugin as TemporalExpressionPlugin
 from plugins.linguistic.semantic_roles import SemanticRoleLabelerPlugin
 
 

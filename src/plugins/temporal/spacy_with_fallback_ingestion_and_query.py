@@ -39,7 +39,7 @@ except ImportError as e:
     TRANSFORMERS_AVAILABLE = False
     logging.getLogger(__name__).debug(f"transformers not available: {e}. Install with: pip install transformers torch")
 
-from ..linguistic.base import DualUsePlugin
+from src.plugins.linguistic.base import DualUsePlugin
 
 
 class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
@@ -221,32 +221,66 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
         if not self.matcher:
             return
             
-        # Decade patterns with context
-        decade_patterns = [
-            [{"LOWER": {"IN": ["early", "mid", "late"]}}, {"LIKE_NUM": True}, {"LOWER": "s"}],
-            [{"LIKE_NUM": True}, {"LOWER": "s"}],
-            [{"LOWER": "the"}, {"LIKE_NUM": True}, {"LOWER": "s"}],
-            [{"LOWER": {"IN": ["nineteen", "twenty"]}}, {"LOWER": {"REGEX": r"(eighties|nineties|hundreds|tens|twenties|thirties|forties|fifties|sixties|seventies)"}}]
-        ]
-        
-        # Relative time patterns
-        relative_patterns = [
-            [{"LOWER": {"IN": ["last", "past", "previous"]}}, {"LOWER": {"IN": ["decade", "century", "year", "years"]}}, {"IS_ALPHA": True, "OP": "?"}],
-            [{"LOWER": {"IN": ["recent", "lately", "nowadays"]}}, {"IS_ALPHA": True, "OP": "*"}],
-            [{"LIKE_NUM": True}, {"LOWER": {"IN": ["years", "decades"]}}, {"LOWER": "ago"}],
-            [{"LOWER": {"IN": ["this", "current"]}}, {"LOWER": {"IN": ["decade", "century", "year"]}}]
-        ]
-        
-        # Season and period patterns
-        season_patterns = [
-            [{"LOWER": {"IN": ["spring", "summer", "fall", "autumn", "winter"]}}, {"LOWER": "of", "OP": "?"}, {"LIKE_NUM": True}],
-            [{"LOWER": {"IN": ["beginning", "start", "end"]}}, {"LOWER": "of"}, {"LOWER": "the", "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s", "OP": "?"}]
-        ]
-        
-        # Add patterns to matcher
-        self.matcher.add("DECADE", decade_patterns)
-        self.matcher.add("RELATIVE", relative_patterns)
-        self.matcher.add("SEASON", season_patterns)
+        try:
+            # Decade patterns with context - enhanced for better detection
+            decade_patterns = [
+                # Standard decade patterns: 90s, 1990s, early 90s, late 2000s
+                [{"LOWER": {"IN": ["early", "mid", "late"]}, "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+                [{"LOWER": "the", "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+                # Text-based decades: eighties, nineties
+                [{"LOWER": {"IN": ["early", "mid", "late"]}, "OP": "?"}, {"LOWER": {"IN": ["eighties", "nineties", "seventies", "sixties", "fifties", "forties", "thirties", "twenties", "tens", "hundreds"]}}],
+                # Combined patterns: 80s and 90s
+                [{"LIKE_NUM": True}, {"LOWER": "s"}, {"LOWER": {"IN": ["and", "&"]}}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+                # Year ranges: 1990-2000, between 1990 and 2000
+                [{"LOWER": "between"}, {"LIKE_NUM": True}, {"LOWER": {"IN": ["and", "to", "-"]}}, {"LIKE_NUM": True}],
+                [{"LIKE_NUM": True}, {"LOWER": {"IN": ["-", "to"]}}, {"LIKE_NUM": True}]
+            ]
+            
+            # Relative time patterns - enhanced
+            relative_patterns = [
+                # Standard relative: last decade, past decade, recent years
+                [{"LOWER": {"IN": ["last", "past", "previous"]}}, {"LOWER": {"IN": ["decade", "century", "year", "years", "few"]}, "OP": "+"}, {"IS_ALPHA": True, "OP": "?"}],
+                [{"LOWER": {"IN": ["recent", "lately", "nowadays"]}}, {"IS_ALPHA": True, "OP": "*"}],
+                # X years/decades ago: two decades ago, 5 years ago
+                [{"LOWER": {"IN": ["one", "two", "three", "four", "five", "a", "couple"]}, "OP": "?"}, {"LIKE_NUM": True, "OP": "?"}, {"LOWER": {"IN": ["years", "decades"]}}, {"LOWER": "ago"}],
+                [{"LOWER": {"IN": ["this", "current"]}}, {"LOWER": {"IN": ["decade", "century", "year"]}}],
+                # Post/pre patterns: post-millennium, pre-digital
+                [{"LOWER": {"REGEX": r"(post|pre)-?\w+"}}],
+                # Turn of century patterns
+                [{"LOWER": {"IN": ["turn", "end", "beginning"]}}, {"LOWER": "of"}, {"LOWER": "the", "OP": "?"}, {"LOWER": {"IN": ["century", "millennium"]}}]
+            ]
+            
+            # Season and period patterns - enhanced
+            season_patterns = [
+                # Seasonal: summer of 1993, winter 2000
+                [{"LOWER": {"IN": ["spring", "summer", "fall", "autumn", "winter"]}}, {"LOWER": "of", "OP": "?"}, {"LIKE_NUM": True}],
+                [{"LOWER": {"IN": ["beginning", "start", "end"]}}, {"LOWER": "of"}, {"LOWER": "the", "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s", "OP": "?"}],
+                # Around/circa patterns: around 1995, circa 2000
+                [{"LOWER": {"IN": ["around", "about", "circa"]}}, {"LIKE_NUM": True}]
+            ]
+            
+            # Add patterns to matcher with error handling
+            patterns_added = 0
+            if decade_patterns:
+                self.matcher.add("DECADE", decade_patterns)
+                patterns_added += len(decade_patterns)
+                self.logger.debug(f"✅ Added {len(decade_patterns)} DECADE patterns")
+            if relative_patterns:
+                self.matcher.add("RELATIVE", relative_patterns)
+                patterns_added += len(relative_patterns)
+                self.logger.debug(f"✅ Added {len(relative_patterns)} RELATIVE patterns")
+            if season_patterns:
+                self.matcher.add("SEASON", season_patterns)
+                patterns_added += len(season_patterns)
+                self.logger.debug(f"✅ Added {len(season_patterns)} SEASON patterns")
+                
+            self.logger.info(f"✅ Set up {patterns_added} temporal patterns successfully")
+            
+        except Exception as e:
+            self.logger.error(f"⚠️ Error setting up temporal patterns: {e}")
+            import traceback
+            self.logger.error(f"Pattern setup traceback: {traceback.format_exc()}")
+            # Continue without patterns - fallback methods will still work
     
     async def analyze(self, text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Extract temporal expressions using sophisticated NLP."""
@@ -313,7 +347,7 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
                         "text": ent.text,
                         "start_char": ent.start_char,
                         "end_char": ent.end_char,
-                        "confidence": ent._.get("confidence", 0.8),
+                        "confidence": getattr(ent._, "confidence", 0.8),
                         "method": "spacy_ner"
                     }
                     expressions.append(expr)
@@ -493,21 +527,9 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
     def _normalize_spacy_date(self, date_text: str) -> Optional[Dict[str, Any]]:
         """Normalize spaCy detected dates."""
         try:
-            # Try different normalization strategies
-            if DATEUTIL_AVAILABLE:
-                try:
-                    parsed = dateutil_parse(date_text, fuzzy=True)
-                    return {
-                        "text": date_text,
-                        "start": parsed.year,
-                        "end": parsed.year,
-                        "precision": "year",
-                        "method": "spacy_dateutil"
-                    }
-                except Exception:
-                    pass
+            import re
             
-            # Handle decade patterns
+            # Handle decade patterns first (most common case)
             if 's' in date_text.lower():
                 decade_match = re.search(r'(\d{2,4})s', date_text)
                 if decade_match:
@@ -521,6 +543,41 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
                         "precision": "decade",
                         "method": "spacy_decade"
                     }
+            
+            # Handle post-millennium patterns
+            if "post-millennium" in date_text.lower():
+                return {
+                    "text": date_text,
+                    "start": 2000,
+                    "end": datetime.now().year,
+                    "precision": "post_period",
+                    "method": "spacy_event"
+                }
+            
+            # Handle recent patterns
+            if "recent" in date_text.lower():
+                current_year = datetime.now().year
+                return {
+                    "text": date_text,
+                    "start": current_year - 5,
+                    "end": current_year,
+                    "precision": "recent",
+                    "method": "spacy_relative"
+                }
+            
+            # Try dateutil parsing
+            if DATEUTIL_AVAILABLE:
+                try:
+                    parsed = dateutil_parse(date_text, fuzzy=True)
+                    return {
+                        "text": date_text,
+                        "start": parsed.year,
+                        "end": parsed.year,
+                        "precision": "year",
+                        "method": "spacy_dateutil"
+                    }
+                except Exception:
+                    pass
             
             return None
             
@@ -543,6 +600,45 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
     def _normalize_transformer_entity(self, entity_text: str) -> Optional[Dict[str, Any]]:
         """Normalize transformer detected entities."""
         try:
+            import re
+            
+            # Handle decade patterns
+            if 's' in entity_text.lower():
+                decade_match = re.search(r'(\d{2,4})s', entity_text)
+                if decade_match:
+                    year = int(decade_match.group(1))
+                    if year < 100:
+                        year = year + 1900 if year >= 20 else year + 2000
+                    return {
+                        "text": entity_text,
+                        "start": year,
+                        "end": year + 9,
+                        "precision": "decade",
+                        "method": "transformer_decade"
+                    }
+            
+            # Handle post-millennium
+            if "post-millennium" in entity_text.lower():
+                return {
+                    "text": entity_text,
+                    "start": 2000,
+                    "end": datetime.now().year,
+                    "precision": "post_period",
+                    "method": "transformer_event"
+                }
+            
+            # Handle recent
+            if "recent" in entity_text.lower():
+                current_year = datetime.now().year
+                return {
+                    "text": entity_text,
+                    "start": current_year - 5,
+                    "end": current_year,
+                    "precision": "recent",
+                    "method": "transformer_relative"
+                }
+            
+            # Try dateutil parsing
             if DATEUTIL_AVAILABLE:
                 parsed = dateutil_parse(entity_text, fuzzy=True)
                 return {
@@ -728,10 +824,49 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
         """Fallback normalization for expressions that weren't normalized by specific methods."""
         try:
             text_lower = text.lower().strip()
+            import re
             
-            # Handle decade patterns
+            # Handle decade patterns (including complex ones)
             if 's' in text_lower and any(char.isdigit() for char in text_lower):
-                import re
+                # Handle compound decades: "80s and 90s", "1980s and 1990s"
+                compound_match = re.search(r'(\d{2,4})s\s+(?:and|&)\s+(\d{2,4})s', text_lower)
+                if compound_match:
+                    year1 = int(compound_match.group(1))
+                    year2 = int(compound_match.group(2))
+                    
+                    # Convert 2-digit to 4-digit years
+                    if year1 < 100:
+                        year1 = year1 + 1900 if year1 >= 20 else year1 + 2000
+                    if year2 < 100:
+                        year2 = year2 + 1900 if year2 >= 20 else year2 + 2000
+                    
+                    return {
+                        "text": text,
+                        "start": min(year1, year2),
+                        "end": max(year1, year2) + 9,
+                        "precision": "multi_decade",
+                        "method": f"fallback_{method}"
+                    }
+                
+                # Handle single decades with modifiers: "early 2000s", "late 90s"
+                modifier_match = re.search(r'(early|mid|late)\s+(\d{2,4})s', text_lower)
+                if modifier_match:
+                    modifier = modifier_match.group(1)
+                    year_part = int(modifier_match.group(2))
+                    
+                    if year_part < 100:
+                        start_year = year_part + 1900 if year_part >= 20 else year_part + 2000
+                    else:
+                        start_year = year_part
+                    
+                    if modifier == "early":
+                        return {"text": text, "start": start_year, "end": start_year + 2, "precision": "early_decade", "method": f"fallback_{method}"}
+                    elif modifier == "mid":
+                        return {"text": text, "start": start_year + 3, "end": start_year + 6, "precision": "mid_decade", "method": f"fallback_{method}"}
+                    elif modifier == "late":
+                        return {"text": text, "start": start_year + 7, "end": start_year + 9, "precision": "late_decade", "method": f"fallback_{method}"}
+                
+                # Handle standard decades
                 decade_match = re.search(r'(\d{2,4})s', text_lower)
                 if decade_match:
                     year_part = int(decade_match.group(1))
@@ -747,6 +882,63 @@ class SpacyWithFallbackIngestionAndQueryPlugin(DualUsePlugin):
                         "start": start_year,
                         "end": start_year + 9,
                         "precision": "decade",
+                        "method": f"fallback_{method}"
+                    }
+            
+            # Handle "around X" patterns
+            around_match = re.search(r'(?:around|about|circa)\s+(\d{4})', text_lower)
+            if around_match:
+                year = int(around_match.group(1))
+                return {
+                    "text": text,
+                    "start": year - 2,
+                    "end": year + 2,
+                    "precision": "approximate_year",
+                    "method": f"fallback_{method}"
+                }
+            
+            # Handle year ranges: "between 1990 and 2000"
+            range_match = re.search(r'(?:between\s+)?(\d{4})(?:\s+(?:and|to|-)\s+)(\d{4})', text_lower)
+            if range_match:
+                start_year = int(range_match.group(1))
+                end_year = int(range_match.group(2))
+                return {
+                    "text": text,
+                    "start": start_year,
+                    "end": end_year,
+                    "precision": "year_range",
+                    "method": f"fallback_{method}"
+                }
+            
+            # Handle "turn of century/millennium"
+            if "turn" in text_lower and ("century" in text_lower or "millennium" in text_lower):
+                if "millennium" in text_lower:
+                    return {
+                        "text": text,
+                        "start": 1995,
+                        "end": 2005,
+                        "precision": "millennium_turn",
+                        "method": f"fallback_{method}"
+                    }
+                else:  # century
+                    return {
+                        "text": text,
+                        "start": 1995,
+                        "end": 2005,
+                        "precision": "century_turn",
+                        "method": f"fallback_{method}"
+                    }
+            
+            # Handle "post-X" patterns
+            post_match = re.search(r'post-?(\w+)', text_lower)
+            if post_match:
+                term = post_match.group(1)
+                if term in ["millennium", "2000"]:
+                    return {
+                        "text": text,
+                        "start": 2000,
+                        "end": self.current_year,
+                        "precision": "post_period",
                         "method": f"fallback_{method}"
                     }
             

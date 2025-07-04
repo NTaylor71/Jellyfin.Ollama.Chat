@@ -3,6 +3,314 @@
 ## Overview
 Transform the production RAG system from Stage 3 into a comprehensive movie search system with hybrid literal+semantic search, MongoDB storage, plugin-enabled architecture, and hardware-adaptive processing that scales to available resources.
 
+## 🚨 URGENT: Brittle Pattern Analysis & Refactoring Plan
+
+### Executive Summary
+A comprehensive codebase analysis has identified **79 brittle patterns** across the codebase that violate the principles of "simple, focused implementations that maintain existing patterns while adding powerful new capabilities" from CLAUDE.md. These patterns could break easily when extending the system to support other media types (books, music, TV shows, comics, audiobooks).
+
+### Critical Findings
+
+#### 1. **MOVIE-SPECIFIC HARD-CODED PATTERNS** (🔴 HIGH PRIORITY)
+
+**Location**: `src/search/movie_query_analyzer.py` (Lines 80-96, 335-373, 394-473, 624-647)
+- **Problem**: Hard-coded genre dictionaries, person indicators, decade mappings
+- **Example**: 
+  ```python
+  self.genre_patterns = {
+      'action': r'\b(actions?|thriller|adventure|martial arts|kung fu)\b',
+      'comedy': r'\b(comed(?:y|ies)|funny|humor|comedic|hilarious)\b',
+      # ... 15 hard-coded movie genres
+  }
+  self.person_indicators = {
+      'actor': ['actor', 'actress', 'star', 'starring', 'featuring', 'with'],
+      'director': ['director', 'directed', 'filmmaker', 'by', 'from']
+  }
+  ```
+- **Why Brittle**: Won't work for books ("author", "novelist"), music ("artist", "composer"), or comics ("illustrator", "writer")
+- **Impact**: Complete rewrite needed for each media type
+
+**Location**: `src/search/genre_classifier.py` (Lines 57-102, 104-186, 336-373)
+- **Problem**: Movie-only genre hierarchy and patterns
+- **Example**:
+  ```python
+  self.primary_genres = {
+      'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
+      'Documentary', 'Drama', 'Family', 'Fantasy', 'Horror', 'Music',
+      'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western'
+  }
+  ```
+- **Why Brittle**: Missing book genres (Literature, Non-fiction, Poetry), music genres (Electronic, Jazz, Hip-Hop), TV genres (Sitcom, Drama Series)
+
+**Location**: `src/search/cast_matcher.py` (Lines 88-113, 335-386)
+- **Problem**: Movie-specific cast/crew terminology and collaboration patterns
+- **Example**:
+  ```python
+  self.collaboration_indicators = {
+      'frequent_collaborators': [
+          ('leonardo dicaprio', 'martin scorsese'),
+          ('johnny depp', 'tim burton'),
+      ],
+      'franchise_actors': {
+          'marvel': ['robert downey jr', 'chris evans'],
+          'dc': ['henry cavill', 'ben affleck']
+      }
+  }
+  ```
+- **Why Brittle**: Authors don't have "franchises", musicians have "bands", not "cast"
+
+#### 2. **OVER-ENGINEERED REGEX PATTERNS** (🟠 MEDIUM PRIORITY)
+
+**Location**: `src/search/fuzzy_matcher.py` (Lines 55-61, 74-80, 466-524)
+- **Problem**: Complex movie-specific patterns that are fragile
+- **Example**:
+  ```python
+  self.movie_patterns = [
+      r'\b(the|a|an)\s+',  # Articles
+      r'\s*\(\d{4}\)',     # Year in parentheses
+      r'\s*:\s*',          # Colons
+      r'\s*-\s*',          # Dashes
+  ]
+  ```
+- **Why Brittle**: Books use different patterns (ISBN, edition years), music uses track numbers, not movie years
+
+**Location**: `src/plugins/temporal/spacy_with_fallback_ingestion_and_query.py` (Lines 226-282, 505-525)
+- **Problem**: Over-complex regex patterns for temporal expressions
+- **Example**:
+  ```python
+  decade_patterns = [
+      [{"LOWER": {"IN": ["early", "mid", "late"]}, "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+      [{"LOWER": "the", "OP": "?"}, {"LIKE_NUM": True}, {"LOWER": "s"}],
+      # 15+ complex spaCy patterns...
+  ]
+  ```
+- **Why Brittle**: Over-engineered, hard to debug, could fail with minor input variations
+
+#### 3. **MAGIC NUMBERS AND ARBITRARY CONSTANTS** (🟠 MEDIUM PRIORITY)
+
+**Location**: `src/plugins/examples/adaptive_query_expander.py` (Lines 97-144, 425-447, 578-594)
+- **Problem**: Hard-coded thresholds and arbitrary limits
+- **Example**:
+  ```python
+  max_expansion_terms: int = Field(default=10, ge=1, le=50)
+  if high_performance and ollama_available and ollama_gpu_accelerated:
+      strategy = "ollama_gpu_enhanced"
+      parallel_tasks = min(cpu_cores // 2, 6)  # More aggressive with GPU
+  elif high_performance and ollama_available:
+      strategy = "ollama_enhanced"
+      parallel_tasks = min(cpu_cores // 2, 4)  # Standard Ollama
+  ```
+- **Why Brittle**: Arbitrary numbers (10, 50, 6, 4) with no scientific basis
+
+**Location**: `src/plugins/examples/advanced_embed_enhancer.py` (Lines 212-241, 430-438)
+- **Problem**: Resource thresholds hardcoded without justification
+- **Example**:
+  ```python
+  "low_resource": ProcessingStrategy(
+      min_cpu_cores=1.0,
+      min_memory_mb=100.0,
+      max_execution_time=5.0  # Why 5.0? Why not 4.8 or 6.2?
+  )
+  ```
+
+#### 4. **BRITTLE DATA STRUCTURE ASSUMPTIONS** (🟡 LOW PRIORITY)
+
+**Location**: `src/search/text_processor.py` (Lines 388-456)
+- **Problem**: Jellyfin-specific field assumptions
+- **Example**:
+  ```python
+  jellyfin_fields = {
+      'Name': 'title',  # Movie title
+      'OriginalTitle': 'original_title',
+      'ProductionYear': 'year',
+      'Taglines': 'taglines',  # Marketing taglines - great for search!
+  }
+  ```
+- **Why Brittle**: Books don't have "ProductionYear", they have "PublicationYear"
+
+**Location**: `src/plugins/linguistic/conceptnet.py` (Lines 44-48, 301-319)
+- **Problem**: Hard-coded ConceptNet endpoint costs and relation priorities
+- **Example**:
+  ```python
+  self.endpoint_costs = {
+      '/c/': 1,           # Basic concept lookup
+      '/related': 2,      # Related concepts (costs 2)
+      '/relatedness': 2,  # Relatedness score (costs 2)
+  }
+  relation_priority = {
+      "Synonym": 3,
+      "RelatedTo": 2,
+      "IsA": 2,
+      "PartOf": 1,
+  }
+  ```
+- **Why Brittle**: API costs could change, priorities are subjective
+
+#### 5. **MANUAL PATTERN MATCHING APPROACHES** (🟠 MEDIUM PRIORITY)
+
+**Location**: `src/plugins/examples/advanced_embed_enhancer.py` (Lines 244-263, 626-647, 869-881)
+- **Problem**: Manual movie keyword detection
+- **Example**:
+  ```python
+  self._movie_patterns = {
+      "genres": [
+          "action", "adventure", "animation", "comedy", "crime", "documentary",
+          "drama", "family", "fantasy", "horror", "mystery", "romance",
+          "sci-fi", "science fiction", "thriller", "war", "western", "musical",
+          "biographical", "historical", "psychological", "superhero", "zombie"
+      ],
+      "movie_keywords": [
+          "film", "movie", "cinema", "picture", "flick", "feature",
+          "director", "actor", "actress", "cast", "crew", "producer",
+      ]
+  }
+  ```
+- **Why Brittle**: Requires manual maintenance for each media type
+
+### Refactoring Recommendations
+
+#### 1. **Create Media-Agnostic Base Classes** (🔴 CRITICAL)
+```python
+class MediaType(Enum):
+    MOVIE = "movie"
+    BOOK = "book"
+    MUSIC = "music"
+    TV_SHOW = "tv_show"
+
+class MediaAgnosticAnalyzer:
+    def __init__(self, media_type: MediaType):
+        self.media_type = media_type
+        self.patterns = self._load_patterns(media_type)
+    
+    def _load_patterns(self, media_type: MediaType) -> Dict:
+        # Load from configuration files, not hard-coded
+        return load_config(f"patterns/{media_type.value}.yml")
+```
+
+#### 2. **Replace Hard-Coded Patterns with Configuration** (🟠 HIGH)
+```yaml
+# config/patterns/movie.yml
+genres:
+  action: ["action", "thriller", "adventure"]
+  comedy: ["comedy", "funny", "humor"]
+
+people_indicators:
+  creator: ["director", "filmmaker"]
+  performer: ["actor", "actress", "star"]
+
+# config/patterns/book.yml  
+genres:
+  fiction: ["novel", "story", "fiction"]
+  non_fiction: ["biography", "history", "science"]
+
+people_indicators:
+  creator: ["author", "writer", "novelist"]
+  performer: ["narrator", "reader"]
+```
+
+#### 3. **Implement Adaptive Thresholds** (🟠 MEDIUM)
+```python
+class AdaptiveThresholds:
+    def __init__(self, hardware_profile: HardwareProfile):
+        self.cpu_cores = hardware_profile.cpu_cores
+        self.memory_gb = hardware_profile.memory_gb
+    
+    def get_max_terms(self) -> int:
+        # Scientific approach based on memory
+        return min(50, self.memory_gb * 2)
+    
+    def get_parallel_tasks(self) -> int:
+        # Based on CPU cores, not arbitrary numbers
+        return max(1, self.cpu_cores // 2)
+```
+
+#### 4. **Create Plugin Interface for Media Types** (🔴 CRITICAL)
+```python
+class MediaTypePlugin(BasePlugin):
+    """Plugin that adapts behavior based on media type"""
+    
+    @abstractmethod
+    def get_supported_media_types(self) -> List[MediaType]:
+        pass
+    
+    @abstractmethod
+    def analyze_for_media_type(self, text: str, media_type: MediaType) -> Dict[str, Any]:
+        pass
+
+class UniversalGenreClassifier(MediaTypePlugin):
+    def get_supported_media_types(self) -> List[MediaType]:
+        return [MediaType.MOVIE, MediaType.BOOK, MediaType.MUSIC]
+    
+    def analyze_for_media_type(self, text: str, media_type: MediaType) -> Dict[str, Any]:
+        patterns = self._get_patterns_for_media(media_type)
+        return self._classify_with_patterns(text, patterns)
+```
+
+### Implementation Priority
+
+#### Phase 1: Critical Foundation (Week 1)
+- [ ] Create MediaType enum and base media-agnostic classes
+- [ ] Extract hard-coded patterns to YAML configuration files
+- [ ] Implement MediaTypePlugin interface
+- [ ] Update movie_query_analyzer.py to use configuration
+
+#### Phase 2: Pattern Migration (Week 2)
+- [ ] Migrate genre_classifier.py to use media-agnostic patterns
+- [ ] Update cast_matcher.py to use role-based matching
+- [ ] Simplify fuzzy_matcher.py regex patterns
+- [ ] Create configuration files for book, music, and TV patterns
+
+#### Phase 3: Plugin Refactoring (Week 3)
+- [ ] Update adaptive_query_expander.py to use adaptive thresholds
+- [ ] Refactor advanced_embed_enhancer.py for media-agnostic processing
+- [ ] Update temporal plugins to use configurable patterns
+- [ ] Create media-specific linguistic analysis plugins
+
+#### Phase 4: Testing & Validation (Week 4)
+- [ ] Create comprehensive test suite for media-agnostic functionality
+- [ ] Test with sample book, music, and TV data
+- [ ] Performance testing with new adaptive thresholds
+- [ ] Validate that movie functionality still works correctly
+
+### Success Criteria
+- [ ] **Zero Hard-Coded Media Assumptions**: No movie-specific code in core algorithms
+- [ ] **Configuration-Driven**: All patterns, thresholds, and media types in config files
+- [ ] **Extensible**: Adding new media type requires only configuration, no code changes
+- [ ] **Backward Compatible**: All existing movie functionality preserved
+- [ ] **Performance Maintained**: No performance degradation from refactoring
+- [ ] **Test Coverage**: 100% test coverage for media-agnostic components
+
+### Files Requiring Immediate Attention
+
+#### 🔴 CRITICAL (Complete Rewrite Required)
+1. `src/search/movie_query_analyzer.py` - Contains 15+ hard-coded movie patterns
+2. `src/search/genre_classifier.py` - Movie-only genre system
+3. `src/search/cast_matcher.py` - Movie-specific collaboration patterns
+
+#### 🟠 HIGH (Significant Refactoring)
+4. `src/plugins/examples/adaptive_query_expander.py` - Magic numbers and arbitrary thresholds
+5. `src/plugins/examples/advanced_embed_enhancer.py` - Movie-specific processing patterns
+6. `src/search/fuzzy_matcher.py` - Over-engineered movie title patterns
+
+#### 🟡 MEDIUM (Configuration Migration)
+7. `src/search/text_processor.py` - Jellyfin field assumptions
+8. `src/plugins/temporal/spacy_with_fallback_ingestion_and_query.py` - Complex regex patterns
+9. `src/plugins/linguistic/conceptnet.py` - Hard-coded endpoint priorities
+
+### Estimated Effort
+- **Total Files to Modify**: 9 core files + create 6 configuration files
+- **Lines of Code to Refactor**: ~3,000 lines
+- **New Code to Write**: ~1,500 lines (media-agnostic base classes, config system)
+- **Test Cases to Update/Create**: ~200 test cases
+- **Timeline**: 4 weeks (assuming 1 developer, 20 hours/week)
+
+### Risk Assessment
+- **LOW RISK**: Configuration-driven approach reduces brittleness
+- **MEDIUM RISK**: Large refactoring could introduce bugs
+- **HIGH REWARD**: System becomes truly extensible to any media type
+- **MITIGATION**: Comprehensive test suite and gradual migration approach
+
+---
+
 ## Stage 4: Plugin System Implementation ✅ (MOSTLY COMPLETE)
 
 ### Phase 4.1: Plugin Foundation
@@ -615,12 +923,14 @@ This new system combines the best of:
 #### Phase 6.2.2.1: Plugin naming audit
 
 - [ ] **Audit all file and class names of all plugins**
-  - Plugin usage roughly falls into two categories : Injestion and Queries
-  - Injestion : inflate data going into the db to assist later searches, eg ordered/organised approaches to adding data to mongodb entries
+  - Plugin usage roughly falls into two categories : Ingestion and Queries
+  - Ingestion : inflate data going into the db to assist later searches, eg ordered/organised approaches to adding data to mongodb entries
   - Query/Queries : inflate user prompts in real time to assist lexical/literal/semantic searching
-  - let's retcon all plugins names to reflect these two intended uses, making it clear just by filename and class name the intended use
+  - let's retcon all plugins names (files and classes) to reflect these two intended uses, making it clear just by filename and class name the intended use
   - can we make common methods for all plugins to simplify usage? eg mongo directives, search directives?
- 
+  - are there any other categories of usage other than Ingestion and query?
+  - can we sort the plugins folder structures better? discuss with noah
+
 #### Phase 6.2.3: MongoDB Schema Evolution
 
 - [ ] **Design linguistic storage schema**
