@@ -74,13 +74,13 @@ except Exception:
     _STOP_WORDS = _BASIC_STOPWORDS
     _NLTK_AVAILABLE = False
 
-from ..base import (
+from src.plugins.base import (
     QueryEmbellisherPlugin, PluginMetadata, PluginResourceRequirements, 
     PluginExecutionContext, PluginExecutionResult, PluginType, ExecutionPriority
 )
-from ..config import BasePluginConfig
-from ...shared.config import get_settings
-from ...shared.hardware_config import get_resource_limits, get_hardware_profile
+from src.plugins.config import BasePluginConfig
+from src.shared.config import get_settings
+from src.shared.hardware_config import get_resource_limits, get_hardware_profile
 from typing import Type
 from pydantic import Field
 

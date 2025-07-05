@@ -51,6 +51,8 @@ def clean_for_cache_key(text: str) -> str:
     Applies ASCII normalization plus additional cleaning for consistent cache keys.
     Used by CacheKey.generate_key() and throughout the caching system.
     
+    Preserves underscores in field names (like "release_date") but cleans other text.
+    
     Args:
         text: Input text to clean
         
@@ -62,18 +64,20 @@ def clean_for_cache_key(text: str) -> str:
         'action_movie'
         >>> clean_for_cache_key("Sci-Fi & Fantasy")
         'sci_fi_fantasy'
+        >>> clean_for_cache_key("release_date")
+        'release_date'
     """
     # Apply ASCII normalization
     ascii_text = to_ascii(text.lower())
     
-    # Remove non-alphanumeric characters except spaces and hyphens
-    cleaned = re.sub(r'[^a-z0-9\s\-]', '', ascii_text)
+    # Remove non-alphanumeric characters except spaces, hyphens, and underscores
+    cleaned = re.sub(r'[^a-z0-9\s\-_]', '', ascii_text)
     
-    # Replace spaces and hyphens with underscores
+    # Replace spaces and hyphens with underscores, but preserve existing underscores
     cleaned = re.sub(r'[\s\-]+', '_', cleaned)
     
-    # Remove leading/trailing underscores and collapse multiple underscores
-    cleaned = re.sub(r'_+', '_', cleaned).strip('_')
+    # Collapse multiple underscores but preserve single ones
+    cleaned = re.sub(r'_{2,}', '_', cleaned).strip('_')
     
     return cleaned
 

@@ -13,8 +13,8 @@ from typing import Dict, Any, Optional, List
 import httpx
 import structlog
 
-from ..base import EmbedDataEmbellisherPlugin, PluginMetadata, PluginResourceRequirements, PluginExecutionContext, PluginExecutionResult
-from ...shared.hardware_config import get_hardware_profile
+from src.plugins.base import EmbedDataEmbellisherPlugin, PluginMetadata, PluginResourceRequirements, PluginExecutionContext, PluginExecutionResult
+from src.shared.hardware_config import get_hardware_profile
 
 logger = structlog.get_logger(__name__)
 

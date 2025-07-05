@@ -21,7 +21,7 @@ except ImportError:
     np = None
     _FAISS_AVAILABLE = False
 
-from ..base import (
+from src.plugins.base import (
     FAISSCRUDPlugin,
     PluginMetadata,
     PluginType,
@@ -30,7 +30,7 @@ from ..base import (
     PluginExecutionResult,
     ExecutionPriority
 )
-from ...shared.hardware_config import get_resource_limits, ResourceType
+from src.shared.hardware_config import get_resource_limits, ResourceType
 
 
 class FAISSOperation(str, Enum):

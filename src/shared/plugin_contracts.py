@@ -18,12 +18,37 @@ class PluginType(Enum):
 
 
 class CacheType(Enum):
-    """Types of cached intelligence results."""
+    """Types of cached field expansion results for data ingestion."""
+    # Concept expansion
     CONCEPTNET = "conceptnet"
-    LLM = "llm"
-    GENSIM = "gensim"
-    NLTK = "nltk"
+    LLM_CONCEPT = "llm_concept"
+    
+    # Synonym/similarity expansion  
+    GENSIM_SIMILARITY = "gensim_similarity"
+    WORDNET_SYNONYMS = "wordnet_synonyms"
+    
+    # Temporal extraction/parsing
+    DUCKLING_TIME = "duckling_time"
+    HEIDELTIME = "heideltime"
+    SUTIME = "sutime"
+    
+    # NLP processing
+    SPACY_NER = "spacy_ner"
+    NLTK_TOKENIZE = "nltk_tokenize"
+    SENTIMENT_ANALYSIS = "sentiment_analysis"
+    
+    # Field-specific expansions
+    TAG_EXPANSION = "tag_expansion"
+    GENRE_EXPANSION = "genre_expansion"
+    PEOPLE_EXPANSION = "people_expansion"
+    
+    # Custom plugin types
     CUSTOM = "custom"
+    
+    # Backward compatibility aliases
+    LLM = "llm_concept"  # Alias for LLM_CONCEPT
+    GENSIM = "gensim_similarity"  # Alias for GENSIM_SIMILARITY
+    NLTK = "nltk_tokenize"  # Alias for NLTK_TOKENIZE
 
 
 @dataclass
@@ -69,43 +94,51 @@ class ConfidenceScore:
 @dataclass
 class CacheKey:
     """
-    Consistent cache key generation for Stage 2 ConceptCache.
+    Consistent cache key generation for any field expansion during data ingestion.
     
-    Format: "cache_type:input_term:media_context"
-    Example: "conceptnet:action:movie"
+    Format: "cache_type:field_name:input_value:media_context"
+    Examples:
+    - "conceptnet:tags:action:movie" (ConceptNet expansion of "action" tag)
+    - "gensim_similarity:genres:thriller:movie" (Gensim similarity for "thriller" genre)
+    - "duckling_time:release_date:next friday:movie" (Duckling parsing of "next friday")
+    - "tag_expansion:tags:sci-fi:movie" (Tag similarity expansion)
     """
     cache_type: CacheType
-    input_term: str
-    media_context: str = "movie"  # Default to movie for now
+    field_name: str  # Which field is being expanded (tags, genres, people, etc.)
+    input_value: str  # The actual value being processed
+    media_context: str = "movie"  # Media type context
     
     def generate_key(self) -> str:
         """
         Generate normalized cache key string.
         
         Uses shared to_ascii function for consistent normalization.
+        Cache type is preserved exactly as enum value.
         """
         from src.shared.text_utils import clean_for_cache_key
         
-        # Use optimized cache key cleaning
-        normalized_type = clean_for_cache_key(self.cache_type.value)
-        normalized_term = clean_for_cache_key(self.input_term)
+        # Cache type preserved exactly (it's already lowercase and clean)
+        cache_type_clean = self.cache_type.value
+        normalized_field = clean_for_cache_key(self.field_name)
+        normalized_value = clean_for_cache_key(self.input_value)
         normalized_context = clean_for_cache_key(self.media_context)
         
-        return f"{normalized_type}:{normalized_term}:{normalized_context}"
+        return f"{cache_type_clean}:{normalized_field}:{normalized_value}:{normalized_context}"
     
     @classmethod
     def from_string(cls, key_string: str) -> 'CacheKey':
         """Parse cache key from string format."""
         parts = key_string.split(":")
-        if len(parts) != 3:
-            raise ValueError(f"Invalid cache key format: {key_string}")
+        if len(parts) != 4:
+            raise ValueError(f"Invalid cache key format: {key_string}. Expected format: cache_type:field_name:input_value:media_context")
         
-        cache_type_str, input_term, media_context = parts
+        cache_type_str, field_name, input_value, media_context = parts
         cache_type = CacheType(cache_type_str)
         
         return cls(
             cache_type=cache_type,
-            input_term=input_term,
+            field_name=field_name,
+            input_value=input_value,
             media_context=media_context
         )
 
@@ -140,18 +173,19 @@ class PluginResult:
     
     def to_cache_document(self) -> Dict[str, Any]:
         """
-        Convert to MongoDB document format for Stage 2 ConceptCache.
+        Convert to MongoDB document format for generic field expansion cache.
         
-        Matches the cache structure defined in Stage 2.1:
+        Supports any type of field expansion during data ingestion:
         {
           "_id": ObjectId,
-          "cache_key": "concept:action:movie",
-          "input_term": "action",
+          "cache_key": "conceptnet:tags:action:movie",
+          "field_name": "tags",
+          "input_value": "action",
           "media_type": "movie", 
           "expansion_type": "conceptnet",
-          "expanded_terms": ["fight", "combat", "battle", "intense"],
-          "confidence_scores": {"fight": 0.9, "combat": 0.85},
-          "source_metadata": {"api": "conceptnet", "endpoint": "/related"},
+          "expansion_result": {...},  // Generic result structure
+          "confidence_scores": {...},
+          "source_metadata": {...},
           "created_at": ISODate,
           "expires_at": ISODate
         }
@@ -161,22 +195,15 @@ class PluginResult:
         if self.cache_ttl_seconds:
             expires_at = datetime.utcnow().timestamp() + self.cache_ttl_seconds
         
-        # Extract expanded terms for concept expansion results
-        expanded_terms = []
-        if "expanded_concepts" in self.enhanced_data:
-            expanded_terms = list(self.enhanced_data["expanded_concepts"])
-        elif "concepts" in self.enhanced_data:
-            expanded_terms = list(self.enhanced_data["concepts"])
-        
         return {
             "cache_key": self.cache_key.generate_key(),
-            "input_term": self.cache_key.input_term,
+            "field_name": self.cache_key.field_name,
+            "input_value": self.cache_key.input_value,
             "media_type": self.cache_key.media_context,
             "expansion_type": self.cache_key.cache_type.value,
-            "expanded_terms": expanded_terms,
+            "expansion_result": self.enhanced_data,  # Generic result structure
             "confidence_scores": self.confidence_score.per_item,
             "overall_confidence": self.confidence_score.overall,
-            "enhanced_data": self.enhanced_data,
             "source_metadata": {
                 "plugin_name": self.plugin_metadata.plugin_name,
                 "plugin_version": self.plugin_metadata.plugin_version,
@@ -217,7 +244,7 @@ class PluginResult:
         )
         
         return cls(
-            enhanced_data=doc.get("enhanced_data", {}),
+            enhanced_data=doc.get("expansion_result", {}),  # Use generic expansion_result
             confidence_score=confidence_score,
             plugin_metadata=plugin_metadata,
             cache_key=cache_key,
@@ -231,25 +258,32 @@ class PluginResult:
 
 # Helper functions for plugin developers
 
-def create_concept_expansion_result(
-    input_term: str,
-    expanded_concepts: List[str],
+def create_field_expansion_result(
+    field_name: str,
+    input_value: str,
+    expansion_result: Dict[str, Any],
     confidence_scores: Dict[str, float],
     plugin_name: str,
     plugin_version: str,
     cache_type: CacheType,
     execution_time_ms: float,
     media_context: str = "movie",
+    plugin_type: PluginType = PluginType.ENHANCEMENT,
     **kwargs
 ) -> PluginResult:
     """
-    Convenience function for creating concept expansion results (Stage 3).
+    Generic function for creating any field expansion result.
     
-    Used by ConceptNet, LLM, and other concept expansion plugins.
+    Examples:
+    - ConceptNet expansion of "action" tag
+    - Gensim similarity for "thriller" genre  
+    - Duckling time parsing of "next friday"
+    - Tag expansion for "sci-fi"
     """
     cache_key = CacheKey(
         cache_type=cache_type,
-        input_term=input_term,
+        field_name=field_name,
+        input_value=input_value,
         media_context=media_context
     )
     
@@ -263,22 +297,53 @@ def create_concept_expansion_result(
     plugin_metadata = PluginMetadata(
         plugin_name=plugin_name,
         plugin_version=plugin_version,
-        plugin_type=PluginType.CONCEPT_EXPANSION,
+        plugin_type=plugin_type,
         execution_time_ms=execution_time_ms,
         **kwargs
     )
     
-    enhanced_data = {
+    return PluginResult(
+        enhanced_data=expansion_result,
+        confidence_score=confidence_score,
+        plugin_metadata=plugin_metadata,
+        cache_key=cache_key,
+        cache_ttl_seconds=3600  # 1 hour default
+    )
+
+
+# Backward compatibility helper
+def create_concept_expansion_result(
+    input_term: str,
+    expanded_concepts: List[str],
+    confidence_scores: Dict[str, float],
+    plugin_name: str,
+    plugin_version: str,
+    cache_type: CacheType,
+    execution_time_ms: float,
+    media_context: str = "movie",
+    **kwargs
+) -> PluginResult:
+    """
+    Backward compatibility wrapper for concept expansion.
+    Use create_field_expansion_result() for new code.
+    """
+    expansion_result = {
         "expanded_concepts": expanded_concepts,
         "original_term": input_term
     }
     
-    return PluginResult(
-        enhanced_data=enhanced_data,
-        confidence_score=confidence_score,
-        plugin_metadata=plugin_metadata,
-        cache_key=cache_key,
-        cache_ttl_seconds=3600  # 1 hour default for concept expansion
+    return create_field_expansion_result(
+        field_name="concept",  # Generic field name for concepts
+        input_value=input_term,
+        expansion_result=expansion_result,
+        confidence_scores=confidence_scores,
+        plugin_name=plugin_name,
+        plugin_version=plugin_version,
+        cache_type=cache_type,
+        execution_time_ms=execution_time_ms,
+        media_context=media_context,
+        plugin_type=PluginType.CONCEPT_EXPANSION,
+        **kwargs
     )
 
 
