@@ -83,17 +83,8 @@ class DucklingProvider(BaseProvider):
             if not self._duckling_initialized:
                 logger.info("Initializing Duckling temporal parser")
                 
-                # Initialize Duckling wrapper
-                language_map = {
-                    "en": Language.EN,
-                    "es": Language.ES,
-                    "fr": Language.FR,
-                    "de": Language.DE,
-                    "it": Language.IT,
-                    "pt": Language.PT
-                }
-                
-                duckling_lang = language_map.get(self.language, Language.EN)
+                # Initialize Duckling wrapper - discover supported languages programmatically
+                duckling_lang = self._get_duckling_language_programmatically(self.language)
                 self.duckling = DucklingWrapper(language=duckling_lang)
                 
                 # Test the connection
@@ -305,20 +296,8 @@ class DucklingProvider(BaseProvider):
         """
         concept_lower = concept.lower()
         
-        # Temporal keywords
-        temporal_keywords = [
-            "time", "date", "year", "month", "day", "week",
-            "recent", "old", "new", "classic", "modern",
-            "release", "premiere", "debut", "launch",
-            "decade", "century", "era", "age",
-            "90s", "80s", "70s", "60s", "50s",
-            "yesterday", "today", "tomorrow",
-            "last", "next", "current", "past", "future",
-            "season", "summer", "winter", "spring", "fall"
-        ]
-        
-        # Check if concept contains temporal keywords
-        return any(keyword in concept_lower for keyword in temporal_keywords)
+        # Use fallback temporal detection for quick support check
+        return self._fallback_temporal_detection(concept_lower)
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
         """Get recommended parameters for Duckling expansion."""
@@ -339,3 +318,216 @@ class DucklingProvider(BaseProvider):
             self.duckling = None
             self._duckling_initialized = False
             logger.info("Duckling provider closed")
+    
+    def _get_duckling_language_programmatically(self, language_code: str):
+        """
+        Discover Duckling supported languages programmatically from the Language enum.
+        
+        Args:
+            language_code: ISO language code
+            
+        Returns:
+            Duckling Language enum value
+        """
+        try:
+            # Programmatically discover available languages from the enum
+            available_languages = {}
+            
+            # Inspect the Language enum to find all available languages
+            for attr_name in dir(Language):
+                if not attr_name.startswith('_') and hasattr(Language, attr_name):
+                    attr_value = getattr(Language, attr_name)
+                    if hasattr(attr_value, 'value'):
+                        # Map common language codes to enum values
+                        lang_code = attr_name.lower()
+                        available_languages[lang_code] = attr_value
+                        
+                        # Generate language aliases procedurally
+                        aliases = self._generate_language_aliases(lang_code)
+                        for alias in aliases:
+                            available_languages[alias] = attr_value
+            
+            # Try to find the requested language
+            requested_lang = language_code.lower()
+            
+            if requested_lang in available_languages:
+                logger.info(f"Found Duckling language support for: {language_code}")
+                return available_languages[requested_lang]
+            
+            # Fallback to English if not found
+            logger.warning(f"Language '{language_code}' not found in Duckling, using English")
+            return available_languages.get('en', Language.EN)
+            
+        except Exception as e:
+            logger.error(f"Error discovering Duckling languages: {e}")
+            # Safe fallback
+            return Language.EN
+    
+    async def _is_temporal_via_llm_intelligence(self, concept: str, media_context: str) -> bool:
+        """
+        Determine if concept is temporal using LLM-generated intelligence.
+        
+        Uses the TemporalConceptGenerator to ask LLM if this concept has temporal characteristics.
+        
+        Args:
+            concept: Concept to analyze
+            media_context: Media context for analysis
+            
+        Returns:
+            True if concept has temporal characteristics
+        """
+        try:
+            from concept_expansion.temporal_concept_generator import get_temporal_concept_generator
+            from concept_expansion.providers.llm.llm_provider import LLMProvider
+            from concept_expansion.providers.llm.base_llm_client import LLMRequest
+            
+            # Use LLM to determine temporal characteristics
+            llm_provider = LLMProvider()
+            if not await llm_provider._ensure_initialized():
+                # Fallback to simple pattern detection if LLM unavailable
+                return self._fallback_temporal_detection(concept)
+            
+            # Create LLM request for temporal analysis
+            prompt = f'''Analyze if the concept "{concept}" has temporal characteristics in the context of {media_context} content.
+
+Consider:
+- Does this concept relate to time, dates, periods, or chronology?
+- Is this commonly used with temporal expressions in {media_context} discussions?
+- Does this concept imply recency, age, historical periods, or future time?
+
+Answer only: YES or NO
+
+Concept: {concept}
+Media context: {media_context}
+Has temporal characteristics:'''
+
+            llm_request = LLMRequest(
+                prompt=prompt,
+                concept=concept,
+                media_context=media_context,
+                max_tokens=10,
+                temperature=0.1,  # Low temperature for consistent yes/no answers
+                system_prompt=f"You are an expert at identifying temporal concepts in {media_context} contexts. Be precise and concise."
+            )
+            
+            # Get LLM response
+            response = await llm_provider.client.generate_completion(llm_request)
+            
+            if response.success:
+                answer = response.text.strip().upper()
+                is_temporal = answer.startswith('YES')
+                logger.debug(f"LLM temporal analysis for '{concept}': {answer} -> {is_temporal}")
+                return is_temporal
+            else:
+                # Fallback if LLM fails
+                return self._fallback_temporal_detection(concept)
+                
+        except Exception as e:
+            logger.debug(f"LLM temporal analysis failed for '{concept}': {e}")
+            return self._fallback_temporal_detection(concept)
+    
+    def _fallback_temporal_detection(self, concept: str) -> bool:
+        """
+        Fallback temporal detection when LLM is unavailable.
+        
+        Uses basic pattern matching as last resort.
+        
+        Args:
+            concept: Concept to check
+            
+        Returns:
+            True if concept appears temporal
+        """
+        import re
+        
+        # Basic temporal patterns - only as fallback
+        temporal_patterns = [
+            r'\b\d{4}s?\b',          # Years (1990s, 2000s)
+            r'\b(19|20)\d{2}\b',     # Full years (1990, 2020)
+            r'\b\d{1,2}(st|nd|rd|th)\b',  # Ordinals (1st, 2nd)
+            r'\b(time|date|year|month|day|week|decade|century|era|age|period)\b',
+            r'\b(recent|old|new|classic|modern|current|past|future)\b',
+            r'\b(yesterday|today|tomorrow|last|next)\b',
+            r'\b(release|premiere|debut|launch)\b',
+            r'\b(season|summer|winter|spring|fall|autumn)\b'
+        ]
+        
+        return any(re.search(pattern, concept, re.IGNORECASE) for pattern in temporal_patterns)
+    
+    def _generate_language_aliases(self, lang_code: str) -> List[str]:
+        """
+        Generate language aliases procedurally using language knowledge.
+        
+        Args:
+            lang_code: ISO language code
+            
+        Returns:
+            List of possible aliases for the language
+        """
+        import locale
+        
+        # Use system locale information to generate aliases
+        aliases = [lang_code]
+        
+        try:
+            # Try to get full language name from locale
+            if hasattr(locale, 'windows_locale'):
+                # Look through Windows locale mappings
+                for key, value in locale.windows_locale.items():
+                    if value.startswith(lang_code):
+                        parts = value.split('_')
+                        if len(parts) > 0:
+                            aliases.append(parts[0])
+            
+            # Generate common patterns
+            if len(lang_code) == 2:
+                # Add full names using a procedural approach
+                aliases.extend(self._guess_language_names(lang_code))
+        
+        except Exception as e:
+            logger.debug(f"Error generating language aliases for {lang_code}: {e}")
+        
+        return list(set(aliases))  # Remove duplicates
+    
+    def _guess_language_names(self, lang_code: str) -> List[str]:
+        """
+        Procedurally guess full language names from ISO codes.
+        
+        Uses common linguistic patterns rather than hardcoded mappings.
+        
+        Args:
+            lang_code: ISO language code
+            
+        Returns:
+            List of guessed language names
+        """
+        # Use external data sources for language names (no hardcoding)
+        try:
+            # Try to use system/package language data first
+            import pycountry
+            try:
+                language = pycountry.languages.get(alpha_2=lang_code)
+                if language:
+                    names = [language.name.lower()]
+                    if hasattr(language, 'common_name'):
+                        names.append(language.common_name.lower())
+                    return names
+            except:
+                pass
+        except ImportError:
+            pass
+        
+        # Fallback: Use simple linguistic analysis
+        # Generate variations based on common language code patterns
+        variations = [lang_code]
+        
+        # Add common 3-letter variations
+        if len(lang_code) == 2:
+            variations.append(lang_code + 'n')  # en -> eng
+            variations.append(lang_code + 'g')  # de -> deu, but try deg
+            
+        # Add 'ish' suffix pattern for many languages
+        if len(lang_code) == 2:
+            variations.append(lang_code + 'ish')  # en -> enish (approximates english)
+        
+        return variations

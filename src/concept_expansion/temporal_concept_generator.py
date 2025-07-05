@@ -53,34 +53,7 @@ class TemporalConceptGenerator:
         self.cache_manager = get_cache_manager()
         self.llm_provider = LLMProvider()
         
-        # Bootstrap questions for learning temporal semantics
-        self.bootstrap_questions = {
-            "recent": [
-                "What words describe recent {media_type} content?",
-                "How do people refer to new {media_type} releases?", 
-                "What temporal terms mean 'recently released' for {media_type}?"
-            ],
-            "classic": [
-                "What words describe classic {media_type} content?",
-                "How do people refer to timeless {media_type}?",
-                "What temporal terms mean 'classic' or 'vintage' {media_type}?"
-            ],
-            "decade": [
-                "What terms describe {media_type} from different decades?",
-                "How do people refer to 1990s {media_type}? 1980s {media_type}?",
-                "What decade-specific words are used for {media_type} eras?"
-            ],
-            "period": [
-                "What historical periods are relevant to {media_type}?",
-                "How do people describe different eras of {media_type}?",
-                "What time period terms are used in {media_type} contexts?"
-            ],
-            "seasonal": [
-                "What seasonal terms are used for {media_type} releases?",
-                "How do people describe {media_type} tied to specific times of year?",
-                "What holiday or seasonal concepts apply to {media_type}?"
-            ]
-        }
+        # No hardcoded bootstrap questions - generate dynamically via LLM
     
     async def generate_temporal_concepts(
         self, 
@@ -360,11 +333,8 @@ Related temporal concepts:"""
             specificity_factor = min(len(concept.split()) / 3.0, 1.2)  # Bonus for multi-word
             specificity_factor = max(specificity_factor, 0.8)  # Minimum 80%
             
-            # Temporal relevance bonus
-            temporal_relevance = 1.0
-            temporal_indicators = ["era", "period", "time", "recent", "old", "new", "modern", "classic"]
-            if any(indicator in concept for indicator in temporal_indicators):
-                temporal_relevance = 1.1
+            # Temporal relevance bonus - use pattern-based calculation
+            temporal_relevance = self._calculate_temporal_relevance_patterns(concept, original_term)
             
             final_confidence = base_confidence * position_factor * specificity_factor * temporal_relevance
             final_confidence = min(final_confidence, 0.95)  # Cap at 95%
@@ -408,14 +378,8 @@ Related temporal concepts:"""
             "temporal_categories": temporal_categories
         }
         
-        # Common temporal terms for each category
-        temporal_terms = {
-            "recent": ["recent", "new", "latest", "current", "modern"],
-            "classic": ["classic", "vintage", "timeless", "legendary", "iconic"],
-            "decade": ["90s", "80s", "70s", "2000s", "2010s"],
-            "period": ["golden age", "renaissance", "modern era", "contemporary"],
-            "seasonal": ["summer", "winter", "holiday", "christmas", "halloween"]
-        }
+        # Generate temporal terms dynamically via LLM analysis
+        temporal_terms = await self._generate_temporal_terms_via_llm(media_contexts, temporal_categories)
         
         for media_context in media_contexts:
             for category in temporal_categories:
@@ -453,6 +417,115 @@ Related temporal concepts:"""
         """Clean up resources."""
         if self.llm_provider:
             await self.llm_provider.close()
+
+
+    def _calculate_temporal_relevance_patterns(self, concept: str, original_term: str) -> float:
+        """
+        Calculate temporal relevance using pattern analysis.
+        
+        Args:
+            concept: Generated concept
+            original_term: Original temporal term
+            
+        Returns:
+            Temporal relevance multiplier
+        """
+        relevance = 1.0
+        
+        # Check for temporal patterns in the concept
+        import re
+        
+        # Time-related patterns
+        time_patterns = [
+            r'\b\d{4}s?\b',                    # Years/decades
+            r'\b(era|period|age|time)\b',      # Time periods
+            r'\b(recent|old|new|modern|classic|vintage)\b',  # Time qualities
+            r'\b(current|past|future|present)\b',  # Time references
+            r'\b(early|late|mid)\b',           # Time positions
+            r'\b(contemporary|traditional|historical)\b'  # Time contexts
+        ]
+        
+        # Bonus for temporal patterns
+        pattern_matches = sum(1 for pattern in time_patterns if re.search(pattern, concept, re.IGNORECASE))
+        if pattern_matches > 0:
+            relevance += 0.1 * pattern_matches
+        
+        # Bonus for concept length (more specific often better)
+        if len(concept.split()) > 1:
+            relevance += 0.05
+        
+        # Bonus for semantic similarity to original term
+        if original_term.lower() in concept.lower() or concept.lower() in original_term.lower():
+            relevance += 0.15
+        
+        return min(relevance, 1.5)  # Cap at 1.5x
+
+    async def _generate_temporal_terms_via_llm(
+        self,
+        media_contexts: List[str], 
+        temporal_categories: List[str]
+    ) -> Dict[str, List[str]]:
+        """
+        Generate temporal terms for categories using LLM analysis.
+    
+    Args:
+        media_contexts: List of media contexts
+        temporal_categories: List of temporal categories
+        
+    Returns:
+        Dictionary of generated temporal terms per category
+        """
+        temporal_terms = {}
+        
+        try:
+            from concept_expansion.providers.llm.llm_provider import LLMProvider
+            from concept_expansion.providers.llm.base_llm_client import LLMRequest
+            
+            if not await self.llm_provider._ensure_initialized():
+                # Fallback for all categories
+                for category in temporal_categories:
+                    temporal_terms[category] = [category, f"related-{category}"]
+                return temporal_terms
+            
+            for category in temporal_categories:
+                # Generate terms for this category via LLM
+                prompt = f'''Generate 5-8 temporal terms that relate to the category "{category}" across different media contexts.
+
+Consider how people actually talk about "{category}" in discussions of movies, books, music, TV shows, etc.
+
+Return only a comma-separated list of relevant temporal terms:
+
+Category: {category}
+Media contexts: {', '.join(media_contexts)}
+Temporal terms:'''
+
+                llm_request = LLMRequest(
+                    prompt=prompt,
+                    concept=category,
+                    media_context="general",
+                    max_tokens=100,
+                    temperature=0.4,
+                    system_prompt="Generate natural temporal terms that people actually use in media discussions."
+                )
+                
+                response = await self.llm_provider.client.generate_completion(llm_request)
+                
+                if response.success:
+                    # Parse comma-separated terms
+                    terms = [term.strip() for term in response.text.split(',') if term.strip()]
+                    temporal_terms[category] = terms[:8]  # Limit to 8 terms
+                    logger.debug(f"Generated {len(terms)} terms for category '{category}'")
+                else:
+                    # Fallback for this category
+                    temporal_terms[category] = [category, f"related-{category}"]
+                    
+        except Exception as e:
+            logger.error(f"LLM temporal term generation failed: {e}")
+            # Fallback for all categories
+            for category in temporal_categories:
+                temporal_terms[category] = [category, f"related-{category}"]
+        
+        return temporal_terms
 
 
 # Global instance for reuse

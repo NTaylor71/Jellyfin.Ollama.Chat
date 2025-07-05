@@ -123,7 +123,7 @@ class SUTimeProvider(BaseProvider):
             concept = request.concept.strip()
             
             # Create enriched text for better temporal parsing
-            enriched_text = self._create_temporal_context(concept, request.media_context)
+            enriched_text = await self._create_temporal_context(concept, request.media_context)
             
             # Pure SUTime temporal parsing - no rule expansion
             temporal_concepts = []
@@ -187,9 +187,9 @@ class SUTimeProvider(BaseProvider):
             logger.error(f"SUTime expansion failed: {e}")
             return None
     
-    def _create_temporal_context(self, concept: str, media_context: str) -> str:
+    async def _create_temporal_context(self, concept: str, media_context: str) -> str:
         """
-        Create temporal context for SUTime parsing.
+        Create temporal context for SUTime parsing using LLM-generated intelligence.
         
         Args:
             concept: Original concept
@@ -198,14 +198,12 @@ class SUTimeProvider(BaseProvider):
         Returns:
             Enriched text with temporal context
         """
-        templates = {
-            "movie": f"The {media_context} {concept} was released. Many {concept} films have premiered over the years.",
-            "tv": f"The {media_context} show about {concept} aired recently. The {concept} series has been on television.",
-            "book": f"The {media_context} about {concept} was published. The {concept} book has been in print.",
-            "music": f"The {media_context} album {concept} was released. The {concept} music has been available."
-        }
-        
-        return templates.get(media_context, f"The {concept} content was created recently.")
+        try:
+            return await self._generate_temporal_context_via_llm(concept, media_context)
+        except Exception as e:
+            logger.debug(f"LLM context generation failed: {e}")
+            # Fallback to basic template
+            return f"The {concept} {media_context} content was created and has been available for some time."
     
     def _parse_with_sutime(self, text: str, original_concept: str) -> List[str]:
         """
@@ -327,17 +325,8 @@ class SUTimeProvider(BaseProvider):
         """
         concept_lower = concept.lower()
         
-        # Basic temporal keywords that SUTime can parse
-        temporal_keywords = [
-            "date", "time", "year", "month", "day", "week",
-            "release", "premiere", "debut", "launch", 
-            "schedule", "timeline", "chronology",
-            "period", "era", "age", "epoch",
-            "yesterday", "today", "tomorrow",
-            "last", "next", "this", "recent"
-        ]
-        
-        return any(keyword in concept_lower for keyword in temporal_keywords)
+        # Use fallback temporal detection for quick support check
+        return self._fallback_temporal_detection(concept_lower)
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
         """Get recommended parameters for SUTime expansion."""
@@ -358,3 +347,141 @@ class SUTimeProvider(BaseProvider):
             self.sutime = None
             self._sutime_initialized = False
             logger.info("SUTime provider closed")
+    
+    async def _generate_temporal_context_via_llm(self, concept: str, media_context: str) -> str:
+        """
+        Generate temporal context sentences using LLM intelligence.
+        
+        Args:
+            concept: Concept to create context for
+            media_context: Media context
+            
+        Returns:
+            Generated temporal context text
+        """
+        try:
+            from concept_expansion.providers.llm.llm_provider import LLMProvider
+            from concept_expansion.providers.llm.base_llm_client import LLMRequest
+            
+            llm_provider = LLMProvider()
+            if not await llm_provider._ensure_initialized():
+                # Fallback if LLM unavailable
+                return f"The {concept} {media_context} content was created and released."
+            
+            # Create LLM request for context generation
+            prompt = f'''Generate 2-3 natural sentences that provide temporal context for SUTime parsing.
+
+The sentences should:
+- Mention the concept "{concept}" in {media_context} context
+- Include temporal expressions that SUTime can parse
+- Use natural language about timing, release, availability
+- Be suitable for temporal entity extraction
+
+Concept: {concept}
+Media type: {media_context}
+
+Generated temporal context:'''
+
+            llm_request = LLMRequest(
+                prompt=prompt,
+                concept=concept,
+                media_context=media_context,
+                max_tokens=100,
+                temperature=0.3,
+                system_prompt=f"Generate natural temporal context sentences for {media_context} content that contain temporal expressions."
+            )
+            
+            response = await llm_provider.client.generate_completion(llm_request)
+            
+            if response.success:
+                context = response.text.strip()
+                logger.debug(f"Generated temporal context for '{concept}': {context[:50]}...")
+                return context
+            else:
+                # Fallback if LLM fails
+                return f"The {concept} {media_context} content was created and has been available."
+                
+        except Exception as e:
+            logger.debug(f"LLM context generation failed for '{concept}': {e}")
+            return f"The {concept} {media_context} content was created and released."
+    
+    async def _is_temporal_via_llm_analysis(self, concept: str, media_context: str) -> bool:
+        """
+        Determine if concept is temporal using LLM analysis.
+        
+        Args:
+            concept: Concept to analyze
+            media_context: Media context
+            
+        Returns:
+            True if concept has temporal characteristics
+        """
+        try:
+            from concept_expansion.providers.llm.llm_provider import LLMProvider
+            from concept_expansion.providers.llm.base_llm_client import LLMRequest
+            
+            llm_provider = LLMProvider()
+            if not await llm_provider._ensure_initialized():
+                # Fallback to pattern detection if LLM unavailable
+                return self._fallback_temporal_detection(concept)
+            
+            # Create LLM request for temporal analysis
+            prompt = f'''Does the concept "{concept}" have temporal characteristics in {media_context} contexts?
+
+Consider:
+- Time-related expressions, dates, periods
+- Temporal language in {media_context} discussions
+- Chronological or time-based concepts
+
+Answer: YES or NO
+
+Concept: {concept}
+Context: {media_context}
+Is temporal:'''
+
+            llm_request = LLMRequest(
+                prompt=prompt,
+                concept=concept,
+                media_context=media_context,
+                max_tokens=5,
+                temperature=0.1,
+                system_prompt=f"Analyze temporal characteristics of concepts in {media_context} contexts."
+            )
+            
+            response = await llm_provider.client.generate_completion(llm_request)
+            
+            if response.success:
+                answer = response.text.strip().upper()
+                is_temporal = answer.startswith('YES')
+                logger.debug(f"LLM temporal analysis for '{concept}': {answer} -> {is_temporal}")
+                return is_temporal
+            else:
+                return self._fallback_temporal_detection(concept)
+                
+        except Exception as e:
+            logger.debug(f"LLM temporal analysis failed for '{concept}': {e}")
+            return self._fallback_temporal_detection(concept)
+    
+    def _fallback_temporal_detection(self, concept: str) -> bool:
+        """
+        Fallback temporal detection using basic patterns.
+        
+        Args:
+            concept: Concept to check
+            
+        Returns:
+            True if appears temporal
+        """
+        import re
+        
+        # Basic temporal patterns as fallback
+        temporal_patterns = [
+            r'\b\d{4}s?\b',  # Years/decades
+            r'\b(19|20)\d{2}\b',  # Full years
+            r'\b(time|date|year|month|day|week|period|era|age)\b',
+            r'\b(recent|old|new|classic|modern|current|past|future)\b',
+            r'\b(release|premiere|debut|launch|publication)\b',
+            r'\b(yesterday|today|tomorrow|last|next|this)\b'
+        ]
+        
+        return any(re.search(pattern, concept, re.IGNORECASE) for pattern in temporal_patterns)

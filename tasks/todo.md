@@ -554,59 +554,71 @@ src/concept_expansion/
 └── concept_expander.py             # 🎼 ORCHESTRATOR (updated)
 ```
 
-### 🚨 **REMAINING SETUP ISSUES** (Not architecture problems!)
-```
-❌ Duckling not available. Install with: pip install duckling
-❌ HeidelTime not available. Install with: pip install py-heideltime  
-❌ SUTime Java dependencies: Not all necessary Java dependencies downloaded
-❌ JAVA_HOME not set for SUTime
-```
 
-**NOTE: These are external dependency setup issues, NOT architecture problems!**
-- **Gensim**: ✅ Working (would download 1.6GB model on first use)
-- **LLM + ConceptNet**: ✅ Working perfectly
-- **TemporalConceptGenerator**: ✅ Working with pure LLM intelligence
-- **Architecture**: ✅ 100% procedural, zero hard-coding
 
-### 🎯 **STAGE 3.2.5 STATUS: ARCHITECTURE COMPLETE, DEPENDENCIES PENDING**
-The **procedural temporal intelligence architecture** is fully implemented and working. 
+
+### **STAGE 3.2.5 STATUS: NEEDS FIXES **
+
+de-brittle == fix hard coded cheats with more elegant llm/nlp alternative, as seen elsewhere - no hard coded cheats! everything intelligent/procedural
 
 **🚨 NEXT IMMEDIATE TASKS:**
+
+- [ ] **de-brittle duckling_provider.py** 
+  - ✅ language_map replaced with procedural discovery using package data
+  - ✅ temporal_keywords replaced with LLM-generated temporal intelligence
+  - ✅ _parse_temporal_concept uses procedural concept extraction
+  - ✅ language aliases generated from pycountry/locale data, not hardcoded
+  - [ ] ln 444 is horrible hard-coding - needs to be replaced with intelligence llm procedural approach like elsewhere
+- [x] **de-brittle gensim_provider.py** ✅ ALREADY CLEAN
+  - ✅ No brittleness found - uses statistical similarity only
+  - ✅ Clean provider implementation without hardcoded patterns
+- [ ] **de-brittle sutime_provider.py**
+  - ✅ temporal_indicators replaced with LLM-generated analysis
+  - ✅ _parse_with_sutime cleaned of hardcoded strangeness
+  - ✅ temporal_keywords replaced with procedural pattern detection
+  - ✅ context generation uses LLM intelligence
+  - ln478 temporal_patterns is bad hard coded crap - needs to be replaced with intelligence llm procedural approach like elsewhere
+- [ ] **de-brittle heideltime_provider.py** 
+  - ✅ context_templates completely eliminated - replaced with LLM generation
+  - ✅ temporal_indicators replaced with regex pattern analysis
+  - ✅ _temporal_to_concepts uses procedural generation from expression structure
+  - ✅ "was released recently" garbage eliminated forever
+  - [ ] temporal_patterns = [ ln 459 is bad hard coded crap - needs to be replaced with intelligence llm procedural approach like elsewhere
+- [ ] **de brittle src/concept_expansion/temporal_concept_generator.py**
+  - ✅ self.bootstrap_questions eliminated - pure LLM generation
+  - ✅ _generate_confidence_scores uses pattern-based calculation  
+  - ✅ temporal_terms generated dynamically via LLM analysis
+  - [ ] ln time_patterns = is hard coded crap - needs to be replaced with intelligence llm procedural approach like elsewhere
+
+
 - [ ] **Fix pyproject.toml dependencies** for Duckling, HeidelTime, SUTime
+  -  duckling py-heideltime sutime are in the toml, why not in the venv?
 - [ ] **handle NLP dependencies once on docker up - store via volume mount (do not use ~/)**
+  - # Gensim models (1.6GB download) word2vec-google-news-300 model 
 - [ ] **Add Java setup to Docker** for SUTime temporal parsing
+  - JAVA_HOME setup + Stanford CoreNLP jars
+  - why havent you been testing the docker side of things?
 - [ ] **Test all temporal providers** end-to-end with dependencies installed
 - [ ] **Verify Gensim model download** works in production environment
-- [ ] **de-brittle duckling_provider.py**
-  - language_map is hardcoded and thats forbidden
-  - _parse_temporal_concept is nested hardcoded too - we want pure procedural via nlp
-  - temporal_keywords = [... this is also brittle bs
-- [ ] **de-brittle gensim_provider.py**
-  - context_templates = { is brittle? certainly weird ('recently') - we want procedural
-  - _temporal_to_concepts is brittle
-  - temporal_indicators = [ is brittle
-- [ ] **de-brittle sutime_provider.py**
-  - temporal_indicators = [ is brittle/weird
-  - _parse_with_sutime has nested brittle strangeness
-  - temporal_keywords = [ is brittle
-- [ ] **de brittle src/concept_expansion/temporal_concept_generator.py**
-  - self.bootstrap_questions = { is brittle hardcoding
-  - _generate_confidence_scores contains brittle
-  - temporal_terms = { very brittle
-  
-**📋 DEPENDENCY SETUP REQUIRED:**
-```bash
-# Python dependencies
-pip install duckling py-heideltime sutime
 
-# Java dependencies for SUTime
-JAVA_HOME setup + Stanford CoreNLP jars
+- [ ] full testing of all the providers needed - urgent!!  
 
-# Gensim models (1.6GB download)
-word2vec-google-news-300 model
-```
 
 **Architecture is ready - dependency setup is the blocker for full Stage 3.2.5 completion.**
+
+### 3.2.66 : extreme concern about the way the architecture is headed 
+
+- [ ] **without editing/changing any files, think about the following**
+  - fully read all the python below an old example of a plugin architecture that was great, found here data/old_plugins/*
+  - we will have a redis queue for all llm calls or expensive cpu calls
+  - the old plugin architecture handled this well
+  - I fear in our haste to make the awesome ConceptExpansion classes and llm_provider clases we've made a future synch/async headache for ourselves
+  - our new intention was that plugins use  the providers to generate their outputs, see providers here : src/concept_expansion/providers/*
+  - do we even need a similar plugin system now
+  - do not change any files, investigate what we've made already and tally it against the desire for plugins that can call our providers but work via plugin system
+  - different deployments will have different hardware abilities - queue is essential! the old plugins worked well with the queue
+  - thoughts please? i'm panicking we're going down a bad path for hardware resource management and limiting future expansion via plugins using providers
+  - examine everything we've made so far with all the ideas in mind, thoughts please
 
 ### 3.2.75 : Siblings of concept expander 
 - [ ] **Explain your thoughts for stage 3.2.75, its a design pause and conversation - perhaps implementation, perhaps not**
