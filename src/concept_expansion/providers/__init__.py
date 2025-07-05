@@ -5,7 +5,7 @@ Provides a clean separation of different expansion providers:
 - ConceptNet: Literal/linguistic relationships
 - LLM: Semantic understanding (Stage 3.2)
 - Gensim: Statistical similarity (Stage 3.3)
-- Temporal: Time parsing (Duckling, HeidelTime, SUTime)
+- Temporal: Time parsing (SpaCy, HeidelTime, SUTime)
 """
 
 from .base_provider import (

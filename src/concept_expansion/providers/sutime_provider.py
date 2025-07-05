@@ -464,7 +464,9 @@ Is temporal:'''
     
     def _fallback_temporal_detection(self, concept: str) -> bool:
         """
-        Fallback temporal detection using basic patterns.
+        Fallback temporal detection using LLM-based procedural intelligence.
+        
+        Uses TemporalConceptGenerator to determine if concept is temporal.
         
         Args:
             concept: Concept to check
@@ -472,16 +474,21 @@ Is temporal:'''
         Returns:
             True if appears temporal
         """
-        import re
-        
-        # Basic temporal patterns as fallback
-        temporal_patterns = [
-            r'\b\d{4}s?\b',  # Years/decades
-            r'\b(19|20)\d{2}\b',  # Full years
-            r'\b(time|date|year|month|day|week|period|era|age)\b',
-            r'\b(recent|old|new|classic|modern|current|past|future)\b',
-            r'\b(release|premiere|debut|launch|publication)\b',
-            r'\b(yesterday|today|tomorrow|last|next|this)\b'
-        ]
-        
-        return any(re.search(pattern, concept, re.IGNORECASE) for pattern in temporal_patterns)
+        try:
+            from concept_expansion.temporal_concept_generator import TemporalConceptGenerator
+            
+            # Use TemporalConceptGenerator for intelligent temporal detection
+            generator = TemporalConceptGenerator()
+            
+            # Quick temporal classification request
+            temporal_result = generator.classify_temporal_concept(concept)
+            
+            # Consider temporal if confidence > 0.3
+            return temporal_result.confidence_score.overall > 0.3
+            
+        except Exception as e:
+            logger.warning(f"LLM temporal detection failed: {e}")
+            
+            # Ultimate fallback: only numeric years as temporal
+            import re
+            return bool(re.search(r'\b\d{4}s?\b', concept))

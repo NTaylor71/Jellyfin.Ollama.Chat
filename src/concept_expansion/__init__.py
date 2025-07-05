@@ -10,7 +10,7 @@ from .concept_expander import ConceptExpander, ExpansionMethod
 from .providers.base_provider import BaseProvider, ProviderMetadata, ExpansionRequest
 from .providers.conceptnet_provider import ConceptNetProvider
 from .providers.gensim_provider import GensimProvider
-from .providers.duckling_provider import DucklingProvider
+from .providers.spacy_temporal_provider import SpacyTemporalProvider
 from .providers.heideltime_provider import HeidelTimeProvider
 from .providers.sutime_provider import SUTimeProvider
 
@@ -23,7 +23,7 @@ __all__ = [
     "ExpansionRequest",
     "ConceptNetProvider",
     "GensimProvider",
-    "DucklingProvider", 
+    "SpacyTemporalProvider", 
     "HeidelTimeProvider",
     "SUTimeProvider"
 ]

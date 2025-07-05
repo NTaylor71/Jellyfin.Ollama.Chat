@@ -80,7 +80,6 @@ nlp = [
     "spacy>=3.7.0",
     "transformers>=4.30.0",
     "torch>=2.0.0",
-    "duckling>=1.8.0",
     "py-heideltime",
     "sutime>=1.0.0"
 ]

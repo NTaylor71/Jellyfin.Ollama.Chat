@@ -1,6 +1,6 @@
 """
 Test script for generic FieldExpansionCache supporting all field expansion types.
-Tests cache operations for ConceptNet, Gensim, Duckling, Tag expansion, etc.
+Tests cache operations for ConceptNet, Gensim, SpaCy Temporal, Tag expansion, etc.
 """
 
 import asyncio
@@ -79,8 +79,8 @@ async def create_gensim_similarity(field_name: str, input_value: str) -> PluginR
     )
 
 
-async def create_duckling_time_parse(field_name: str, input_value: str) -> PluginResult:
-    """Create Duckling time parsing result."""
+async def create_spacy_temporal_parse(field_name: str, input_value: str) -> PluginResult:
+    """Create SpaCy temporal parsing result."""
     time_parses = {
         "next friday": {
             "parsed_time": "2025-07-11T00:00:00Z",
@@ -110,7 +110,7 @@ async def create_duckling_time_parse(field_name: str, input_value: str) -> Plugi
         input_value=input_value,
         expansion_result=parsed,
         confidence_scores={input_value: parsed["confidence"]},
-        plugin_name="DucklingTimePlugin",
+        plugin_name="SpacyTemporalPlugin",
         plugin_version="1.0.0",
         cache_type=CacheType.DUCKLING_TIME,
         execution_time_ms=45.0,
@@ -204,7 +204,7 @@ async def test_multiple_expansion_types():
         test_cases = [
             ("tags", "action", CacheType.CONCEPTNET, lambda: create_conceptnet_expansion("tags", "action")),
             ("genres", "thriller", CacheType.GENSIM_SIMILARITY, lambda: create_gensim_similarity("genres", "thriller")),
-            ("release_date", "next friday", CacheType.DUCKLING_TIME, lambda: create_duckling_time_parse("release_date", "next friday")),
+            ("release_date", "next friday", CacheType.DUCKLING_TIME, lambda: create_spacy_temporal_parse("release_date", "next friday")),
             ("tags", "sci-fi", CacheType.TAG_EXPANSION, lambda: create_tag_expansion("tags", "sci-fi")),
             ("overview", "Tom Cruise stars in this action movie", CacheType.SPACY_NER, lambda: create_spacy_ner("overview", "Tom Cruise stars in this action movie"))
         ]

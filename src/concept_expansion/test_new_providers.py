@@ -1,6 +1,6 @@
 """
 Test script for Stage 3.2.5 new concept expansion providers.
-Tests Gensim, Duckling, HeidelTime, and SUTime providers.
+Tests Gensim, SpaCy Temporal, HeidelTime, and SUTime providers.
 """
 
 import asyncio
@@ -103,9 +103,9 @@ async def test_all_new_providers():
             ]
         },
         
-        # Duckling - temporal parsing
+        # SpaCy Temporal - temporal parsing
         {
-            "method": ExpansionMethod.DUCKLING,
+            "method": ExpansionMethod.SPACY_TEMPORAL,
             "concepts": [
                 ("recent", "movie"),
                 ("last year", "movie"),
@@ -204,7 +204,7 @@ async def test_provider_integration():
         ExpansionMethod.CONCEPTNET,
         ExpansionMethod.LLM,
         ExpansionMethod.GENSIM,
-        ExpansionMethod.DUCKLING
+        ExpansionMethod.SPACY_TEMPORAL
     ]
     
     print(f"Concept: '{concept}'")

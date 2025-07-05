@@ -445,7 +445,9 @@ Generated document context:'''
     
     def _has_temporal_patterns(self, concept: str) -> bool:
         """
-        Check if concept has temporal patterns using regex analysis.
+        Check if concept has temporal patterns using LLM-based procedural intelligence.
+        
+        Uses TemporalConceptGenerator to determine if concept is temporal.
         
         Args:
             concept: Concept to check
@@ -453,25 +455,24 @@ Generated document context:'''
         Returns:
             True if appears temporal
         """
-        import re
-        
-        # Use regex patterns for temporal detection (no hardcoded word lists)
-        temporal_patterns = [
-            r'\b\d{4}s?\b',                    # Years/decades
-            r'\b(19|20)\d{2}\b',               # Full years
-            r'\b\d{1,2}(st|nd|rd|th)\b',       # Ordinals
-            r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\b',  # Months
-            r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b',  # Month abbreviations
-            r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',  # Days
-            r'\b(spring|summer|fall|winter|autumn)\b',  # Seasons
-            r'\b(yesterday|today|tomorrow|recent|old|new|classic|modern|current|past|future)\b',  # Time indicators
-            r'\b(last|next|previous|following|prior)\b',  # Relative time
-            r'\b(release|premiere|debut|launch|publication|broadcast)\b',  # Release terms
-            r'\b(decade|century|era|age|period|epoch|time|date|year|month|day|week|hour|minute)\b',  # Time units
-            r'\b(historical|chronological|temporal|sequential)\b'  # Time-related adjectives
-        ]
-        
-        return any(re.search(pattern, concept, re.IGNORECASE) for pattern in temporal_patterns)
+        try:
+            from concept_expansion.temporal_concept_generator import TemporalConceptGenerator
+            
+            # Use TemporalConceptGenerator for intelligent temporal detection
+            generator = TemporalConceptGenerator()
+            
+            # Quick temporal classification request
+            temporal_result = generator.classify_temporal_concept(concept)
+            
+            # Consider temporal if confidence > 0.3
+            return temporal_result.confidence_score.overall > 0.3
+            
+        except Exception as e:
+            logger.warning(f"LLM temporal detection failed: {e}")
+            
+            # Ultimate fallback: only numeric years as temporal
+            import re
+            return bool(re.search(r'\b\d{4}s?\b', concept))
     
     def _generate_concepts_from_temporal_expression(self, timex_type: str, value: str, text: str) -> List[str]:
         """

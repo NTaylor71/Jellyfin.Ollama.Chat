@@ -19,6 +19,8 @@ volumes:
     driver: local
   grafana-data:
     driver: local
+  nlp-models:
+    driver: local
 
 services:
   # ===========================================================================
@@ -161,12 +163,15 @@ services:
       - ./src:/app/src:ro  # Hot reload
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
+      - nlp-models:/app/nlp_models  # Persistent NLP models
     environment:
       - ENV=docker
       - REDIS_HOST=redis
       - MONGODB_HOST=mongodb
       - LOG_LEVEL=DEBUG
       - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+      - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+      - NLTK_DATA=/app/nlp_models
     networks:
       - rag-network
     depends_on:

@@ -18,7 +18,7 @@ from concept_expansion.providers.base_provider import BaseProvider, ExpansionReq
 from concept_expansion.providers.conceptnet_provider import ConceptNetProvider
 from concept_expansion.providers.llm.llm_provider import LLMProvider
 from concept_expansion.providers.gensim_provider import GensimProvider
-from concept_expansion.providers.duckling_provider import DucklingProvider
+from concept_expansion.providers.spacy_temporal_provider import SpacyTemporalProvider
 from concept_expansion.providers.heideltime_provider import HeidelTimeProvider
 from concept_expansion.providers.sutime_provider import SUTimeProvider
 from concept_expansion.temporal_concept_generator import TemporalConceptGenerator, TemporalConceptRequest
@@ -36,7 +36,7 @@ class ExpansionMethod(Enum):
     CONCEPTNET = "conceptnet"      # Literal/linguistic relationships, context-unaware
     LLM = "llm"                    # Semantic understanding, context-aware
     GENSIM = "gensim"              # Statistical similarity, corpus-based
-    DUCKLING = "duckling"          # Temporal parsing, time-aware
+    SPACY_TEMPORAL = "spacy_temporal"  # Temporal parsing, time-aware
     HEIDELTIME = "heideltime"      # Temporal extraction, context-aware
     SUTIME = "sutime"              # Temporal understanding, rule-based
     MULTI_SOURCE = "multi_source"  # Combined semantic + literal + temporal
@@ -75,7 +75,7 @@ class ConceptExpander:
         self.conceptnet_provider = ConceptNetProvider()
         self.llm_provider = LLMProvider()
         self.gensim_provider = GensimProvider()
-        self.duckling_provider = DucklingProvider()
+        self.spacy_temporal_provider = SpacyTemporalProvider()
         self.heideltime_provider = HeidelTimeProvider()
         self.sutime_provider = SUTimeProvider()
         
@@ -86,7 +86,7 @@ class ConceptExpander:
             ExpansionMethod.CONCEPTNET: self.conceptnet_provider,
             ExpansionMethod.LLM: self.llm_provider,
             ExpansionMethod.GENSIM: self.gensim_provider,
-            ExpansionMethod.DUCKLING: self.duckling_provider,
+            ExpansionMethod.SPACY_TEMPORAL: self.spacy_temporal_provider,
             ExpansionMethod.HEIDELTIME: self.heideltime_provider,
             ExpansionMethod.SUTIME: self.sutime_provider
         }
@@ -114,7 +114,7 @@ class ConceptExpander:
                 "weaknesses": ["limited to training data", "no semantic understanding"],
                 "best_for": ["text similarity", "topic modeling", "document similarity"]
             },
-            ExpansionMethod.DUCKLING: {
+            ExpansionMethod.SPACY_TEMPORAL: {
                 "type": "temporal",
                 "context_aware": True,
                 "strengths": ["natural language time parsing", "multi-language support", "fuzzy time expressions"],
@@ -222,8 +222,8 @@ class ConceptExpander:
             return await self._expand_with_gensim(
                 concept, media_context, field_name, max_concepts, start_time
             )
-        elif method == ExpansionMethod.DUCKLING:
-            return await self._expand_with_duckling(
+        elif method == ExpansionMethod.SPACY_TEMPORAL:
+            return await self._expand_with_spacy_temporal(
                 concept, media_context, field_name, max_concepts, start_time
             )
         elif method == ExpansionMethod.HEIDELTIME:
@@ -367,7 +367,7 @@ class ConceptExpander:
             logger.error(f"Gensim expansion failed: {e}")
             return None
     
-    async def _expand_with_duckling(
+    async def _expand_with_spacy_temporal(
         self,
         concept: str,
         media_context: str,
@@ -376,16 +376,16 @@ class ConceptExpander:
         start_time: datetime
     ) -> Optional[PluginResult]:
         """
-        Expand concept using Duckling temporal parsing + procedural intelligence.
+        Expand concept using SpaCy temporal parsing + procedural intelligence.
         
-        Combines pure Duckling parsing with TemporalConceptGenerator intelligence.
+        Combines pure SpaCy parsing with TemporalConceptGenerator intelligence.
         """
         try:
             all_concepts = []
             all_confidence_scores = {}
             
-            # Try pure Duckling parsing first
-            if await self.duckling_provider._ensure_initialized():
+            # Try pure SpaCy temporal parsing first
+            if await self.spacy_temporal_provider._ensure_initialized():
                 request = ExpansionRequest(
                     concept=concept,
                     media_context=media_context,
@@ -393,13 +393,13 @@ class ConceptExpander:
                     field_name=field_name
                 )
                 
-                duckling_result = await self.duckling_provider.expand_concept(request)
-                if duckling_result and duckling_result.success:
-                    parsed_concepts = duckling_result.enhanced_data.get("expanded_concepts", [])
-                    parsed_scores = duckling_result.confidence_score.per_item
+                spacy_result = await self.spacy_temporal_provider.expand_concept(request)
+                if spacy_result and spacy_result.success:
+                    parsed_concepts = spacy_result.enhanced_data.get("expanded_concepts", [])
+                    parsed_scores = spacy_result.confidence_score.per_item
                     all_concepts.extend(parsed_concepts)
                     all_confidence_scores.update(parsed_scores)
-                    logger.debug(f"Duckling parsed {len(parsed_concepts)} temporal concepts")
+                    logger.debug(f"SpaCy parsed {len(parsed_concepts)} temporal concepts")
             
             # Add procedural temporal intelligence
             temporal_request = TemporalConceptRequest(
@@ -442,24 +442,24 @@ class ConceptExpander:
                 expansion_result={
                     "expanded_concepts": final_concepts,
                     "original_concept": concept,
-                    "expansion_method": "duckling_with_intelligence",
+                    "expansion_method": "spacy_temporal_with_intelligence",
                     "parsing_concepts": len([c for c in final_concepts if c in all_concepts[:len(all_concepts)//2]]),
                     "intelligent_concepts": len([c for c in final_concepts if c in all_concepts[len(all_concepts)//2:]]),
                     "provider_type": "temporal_hybrid"
                 },
                 confidence_scores=final_scores,
-                plugin_name="DucklingWithIntelligence",
+                plugin_name="SpacyTemporalWithIntelligence",
                 plugin_version="1.0.0",
-                cache_type=CacheType.DUCKLING_TIME,
+                cache_type=CacheType.SPACY_TEMPORAL,
                 execution_time_ms=total_time_ms,
                 media_context=media_context,
                 plugin_type=PluginType.CONCEPT_EXPANSION,
-                api_endpoint="duckling_temporal_hybrid",
-                model_used="duckling+llm"
+                api_endpoint="spacy_temporal_hybrid",
+                model_used="spacy+llm"
             )
             
         except Exception as e:
-            logger.error(f"Duckling temporal expansion failed: {e}")
+            logger.error(f"SpaCy temporal expansion failed: {e}")
             return None
     
     async def _expand_with_heideltime(
@@ -652,7 +652,7 @@ class ConceptExpander:
             ExpansionMethod.CONCEPTNET: CacheType.CONCEPTNET,
             ExpansionMethod.LLM: CacheType.LLM_CONCEPT,
             ExpansionMethod.GENSIM: CacheType.GENSIM_SIMILARITY,
-            ExpansionMethod.DUCKLING: CacheType.DUCKLING_TIME,
+            ExpansionMethod.SPACY_TEMPORAL: CacheType.SPACY_TEMPORAL,
             ExpansionMethod.HEIDELTIME: CacheType.HEIDELTIME,
             ExpansionMethod.SUTIME: CacheType.SUTIME,
             ExpansionMethod.MULTI_SOURCE: CacheType.CUSTOM,

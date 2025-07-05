@@ -55,6 +55,106 @@ class TemporalConceptGenerator:
         
         # No hardcoded bootstrap questions - generate dynamically via LLM
     
+    def classify_temporal_concept(self, concept: str) -> PluginResult:
+        """
+        Classify if a concept is temporal using LLM-based procedural intelligence.
+        
+        Args:
+            concept: Concept to classify
+            
+        Returns:
+            PluginResult with temporal classification and confidence
+        """
+        try:
+            # Build LLM prompt for temporal classification
+            prompt = f"""Analyze if this concept is temporal (time-related):
+            
+Concept: "{concept}"
+            
+Consider:
+- Years, dates, time periods (1990s, recent, classic)
+- Time qualities (old, new, modern, vintage)
+- Time references (current, past, future)
+- Time contexts (contemporary, historical, traditional)
+- Release/publication terms (debut, premiere, launch)
+            
+Respond with:
+1. Classification: TEMPORAL or NON_TEMPORAL
+2. Confidence: 0.0-1.0
+3. Reason: brief explanation
+            
+Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
+            
+            from concept_expansion.providers.llm.base_llm_client import LLMRequest
+            llm_request = LLMRequest(
+                prompt=prompt,
+                concept=concept,
+                media_context="general",
+                max_tokens=50,
+                temperature=0.1
+            )
+            
+            # Synchronous call for classification
+            import asyncio
+            try:
+                llm_response = asyncio.run(self.llm_provider.client.generate_completion(llm_request))
+                if llm_response.success:
+                    response_text = llm_response.text.strip()
+                    parts = response_text.split()
+                    
+                    if len(parts) >= 2:
+                        classification = parts[0]
+                        confidence = float(parts[1])
+                        reason = " ".join(parts[2:]) if len(parts) > 2 else "LLM analysis"
+                        
+                        is_temporal = classification.upper() == "TEMPORAL"
+                        
+                        from shared.plugin_contracts import PluginResult
+                        return PluginResult(
+                            enhanced_data={
+                                "is_temporal": is_temporal,
+                                "classification": classification,
+                                "reason": reason
+                            },
+                            confidence_score=ConfidenceScore(overall=confidence),
+                            plugin_metadata=PluginMetadata(
+                                plugin_name="TemporalConceptGenerator",
+                                plugin_version="1.0.0",
+                                plugin_type=PluginType.CONCEPT_EXPANSION,
+                                execution_time_ms=50
+                            ),
+                            cache_key=None,
+                            cache_ttl_seconds=3600
+                        )
+                    
+            except Exception as e:
+                logger.debug(f"LLM temporal classification failed: {e}")
+                
+        except Exception as e:
+            logger.warning(f"Temporal classification failed: {e}")
+            
+        # Fallback: simple numeric year detection
+        import re
+        has_year = bool(re.search(r'\b\d{4}s?\b', concept))
+        
+        from shared.plugin_contracts import PluginResult
+        return PluginResult(
+            enhanced_data={
+                "is_temporal": has_year,
+                "classification": "TEMPORAL" if has_year else "NON_TEMPORAL",
+                "reason": "Fallback year detection"
+            },
+            confidence_score=ConfidenceScore(overall=0.6 if has_year else 0.4),
+            plugin_metadata=PluginMetadata(
+                plugin_name="TemporalConceptGenerator",
+                plugin_version="1.0.0",
+                plugin_type=PluginType.CONCEPT_EXPANSION,
+                execution_time_ms=5
+            ),
+            cache_key=None,
+            cache_ttl_seconds=3600
+        )
+    
     async def generate_temporal_concepts(
         self, 
         request: TemporalConceptRequest
@@ -421,7 +521,7 @@ Related temporal concepts:"""
 
     def _calculate_temporal_relevance_patterns(self, concept: str, original_term: str) -> float:
         """
-        Calculate temporal relevance using pattern analysis.
+        Calculate temporal relevance using LLM-based procedural intelligence.
         
         Args:
             concept: Generated concept
@@ -432,33 +532,52 @@ Related temporal concepts:"""
         """
         relevance = 1.0
         
-        # Check for temporal patterns in the concept
-        import re
+        try:
+            # Use LLM to assess temporal relevance instead of hard-coded patterns
+            prompt = f"""Analyze the temporal relevance between these concepts:
+            
+Original term: "{original_term}"
+Generated concept: "{concept}"
+            
+Rate temporal relevance on scale 1.0-1.5 where:
+- 1.0 = no temporal connection
+- 1.2 = some temporal connection
+- 1.5 = strong temporal connection
+            
+Consider: temporal similarity, semantic overlap, specificity
+Respond with just the number (e.g., 1.3)"""
+            
+            # Quick LLM call for relevance scoring
+            from concept_expansion.providers.llm.base_llm_client import LLMRequest
+            llm_request = LLMRequest(
+                prompt=prompt,
+                concept=f"{original_term}:{concept}",
+                media_context="general",
+                max_tokens=10,
+                temperature=0.1
+            )
+            
+            # Synchronous call for pattern analysis
+            import asyncio
+            try:
+                llm_response = asyncio.run(self.llm_provider.client.generate_completion(llm_request))
+                if llm_response.success:
+                    relevance = float(llm_response.text.strip())
+                    relevance = max(1.0, min(1.5, relevance))  # Clamp to valid range
+                else:
+                    relevance = 1.0
+            except:
+                relevance = 1.0
+                
+        except Exception as e:
+            logger.debug(f"LLM relevance calculation failed: {e}")
+            # Simple fallback: check for semantic similarity
+            if original_term.lower() in concept.lower() or concept.lower() in original_term.lower():
+                relevance = 1.2
+            else:
+                relevance = 1.0
         
-        # Time-related patterns
-        time_patterns = [
-            r'\b\d{4}s?\b',                    # Years/decades
-            r'\b(era|period|age|time)\b',      # Time periods
-            r'\b(recent|old|new|modern|classic|vintage)\b',  # Time qualities
-            r'\b(current|past|future|present)\b',  # Time references
-            r'\b(early|late|mid)\b',           # Time positions
-            r'\b(contemporary|traditional|historical)\b'  # Time contexts
-        ]
-        
-        # Bonus for temporal patterns
-        pattern_matches = sum(1 for pattern in time_patterns if re.search(pattern, concept, re.IGNORECASE))
-        if pattern_matches > 0:
-            relevance += 0.1 * pattern_matches
-        
-        # Bonus for concept length (more specific often better)
-        if len(concept.split()) > 1:
-            relevance += 0.05
-        
-        # Bonus for semantic similarity to original term
-        if original_term.lower() in concept.lower() or concept.lower() in original_term.lower():
-            relevance += 0.15
-        
-        return min(relevance, 1.5)  # Cap at 1.5x
+        return relevance
 
     async def _generate_temporal_terms_via_llm(
         self,
