@@ -10,18 +10,18 @@ import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from src.concept_expansion.providers.base_provider import (
+from concept_expansion.providers.base_provider import (
     BaseProvider, ProviderMetadata, ExpansionRequest, ProviderError, ProviderNotAvailableError
 )
-from src.concept_expansion.providers.llm.base_llm_client import (
+from concept_expansion.providers.llm.base_llm_client import (
     BaseLLMClient, LLMRequest, LLMResponse,
     LLMClientError, LLMClientNotAvailableError
 )
-from src.shared.plugin_contracts import (
+from shared.plugin_contracts import (
     PluginResult, CacheKey, CacheType, ConfidenceScore, PluginMetadata, PluginType,
     create_field_expansion_result
 )
-from src.shared.config import get_settings
+from shared.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +294,7 @@ class LLMProvider(BaseProvider):
         """
         if backend == "ollama":
             try:
-                from src.concept_expansion.providers.llm.ollama_backend_client import OllamaBackendClient
+                from concept_expansion.providers.llm.ollama_backend_client import OllamaBackendClient
                 return OllamaBackendClient()
             except ImportError as e:
                 logger.error(f"Could not import Ollama backend: {e}")

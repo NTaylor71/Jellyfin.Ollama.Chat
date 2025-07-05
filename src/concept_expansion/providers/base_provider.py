@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 
-from src.shared.plugin_contracts import PluginResult
+from shared.plugin_contracts import PluginResult
 
 
 @dataclass

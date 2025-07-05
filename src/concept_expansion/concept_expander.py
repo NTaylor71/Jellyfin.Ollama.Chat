@@ -14,11 +14,16 @@ from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from datetime import datetime
 
-from src.concept_expansion.providers.base_provider import BaseProvider, ExpansionRequest
-from src.concept_expansion.providers.conceptnet_provider import ConceptNetProvider
-from src.concept_expansion.providers.llm.llm_provider import LLMProvider
-from src.data.cache_manager import get_cache_manager, CacheStrategy
-from src.shared.plugin_contracts import (
+from concept_expansion.providers.base_provider import BaseProvider, ExpansionRequest
+from concept_expansion.providers.conceptnet_provider import ConceptNetProvider
+from concept_expansion.providers.llm.llm_provider import LLMProvider
+from concept_expansion.providers.gensim_provider import GensimProvider
+from concept_expansion.providers.duckling_provider import DucklingProvider
+from concept_expansion.providers.heideltime_provider import HeidelTimeProvider
+from concept_expansion.providers.sutime_provider import SUTimeProvider
+from concept_expansion.temporal_concept_generator import TemporalConceptGenerator, TemporalConceptRequest
+from data.cache_manager import get_cache_manager, CacheStrategy
+from shared.plugin_contracts import (
     PluginResult, CacheKey, CacheType, ConfidenceScore, PluginMetadata, PluginType,
     create_field_expansion_result
 )
@@ -69,9 +74,21 @@ class ConceptExpander:
         # Initialize providers
         self.conceptnet_provider = ConceptNetProvider()
         self.llm_provider = LLMProvider()
+        self.gensim_provider = GensimProvider()
+        self.duckling_provider = DucklingProvider()
+        self.heideltime_provider = HeidelTimeProvider()
+        self.sutime_provider = SUTimeProvider()
+        
+        # Initialize procedural temporal intelligence
+        self.temporal_concept_generator = TemporalConceptGenerator(cache_strategy)
+        
         self.providers = {
             ExpansionMethod.CONCEPTNET: self.conceptnet_provider,
-            ExpansionMethod.LLM: self.llm_provider
+            ExpansionMethod.LLM: self.llm_provider,
+            ExpansionMethod.GENSIM: self.gensim_provider,
+            ExpansionMethod.DUCKLING: self.duckling_provider,
+            ExpansionMethod.HEIDELTIME: self.heideltime_provider,
+            ExpansionMethod.SUTIME: self.sutime_provider
         }
         
         # Method capabilities for intelligent selection
@@ -202,9 +219,21 @@ class ConceptExpander:
                 concept, media_context, field_name, max_concepts, start_time
             )
         elif method == ExpansionMethod.GENSIM:
-            # Placeholder for Stage 3.3 - Gensim similarity expansion  
-            logger.info(f"Gensim expansion not implemented yet (Stage 3.3)")
-            return None
+            return await self._expand_with_gensim(
+                concept, media_context, field_name, max_concepts, start_time
+            )
+        elif method == ExpansionMethod.DUCKLING:
+            return await self._expand_with_duckling(
+                concept, media_context, field_name, max_concepts, start_time
+            )
+        elif method == ExpansionMethod.HEIDELTIME:
+            return await self._expand_with_heideltime(
+                concept, media_context, field_name, max_concepts, start_time
+            )
+        elif method == ExpansionMethod.SUTIME:
+            return await self._expand_with_sutime(
+                concept, media_context, field_name, max_concepts, start_time
+            )
         elif method == ExpansionMethod.MULTI_SOURCE:
             # Placeholder for Stage 3.3 - Multi-source fusion
             logger.info(f"Multi-source expansion not implemented yet (Stage 3.3)")
@@ -298,12 +327,334 @@ class ConceptExpander:
             logger.error(f"LLM expansion failed: {e}")
             return None
     
+    async def _expand_with_gensim(
+        self,
+        concept: str,
+        media_context: str,
+        field_name: str,
+        max_concepts: int,
+        start_time: datetime
+    ) -> Optional[PluginResult]:
+        """
+        Expand concept using Gensim provider.
+        
+        Returns PluginResult in the standard format for caching.
+        """
+        try:
+            # Ensure provider is initialized
+            if not await self.gensim_provider._ensure_initialized():
+                logger.error("Gensim provider not available")
+                return None
+            
+            # Create expansion request
+            request = ExpansionRequest(
+                concept=concept,
+                media_context=media_context,
+                max_concepts=max_concepts,
+                field_name=field_name
+            )
+            
+            # Call Gensim provider
+            result = await self.gensim_provider.expand_concept(request)
+            
+            if result is None:
+                logger.warning(f"Gensim provider failed for concept: {concept}")
+                return None
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Gensim expansion failed: {e}")
+            return None
+    
+    async def _expand_with_duckling(
+        self,
+        concept: str,
+        media_context: str,
+        field_name: str,
+        max_concepts: int,
+        start_time: datetime
+    ) -> Optional[PluginResult]:
+        """
+        Expand concept using Duckling temporal parsing + procedural intelligence.
+        
+        Combines pure Duckling parsing with TemporalConceptGenerator intelligence.
+        """
+        try:
+            all_concepts = []
+            all_confidence_scores = {}
+            
+            # Try pure Duckling parsing first
+            if await self.duckling_provider._ensure_initialized():
+                request = ExpansionRequest(
+                    concept=concept,
+                    media_context=media_context,
+                    max_concepts=max_concepts // 2,  # Reserve half for intelligence
+                    field_name=field_name
+                )
+                
+                duckling_result = await self.duckling_provider.expand_concept(request)
+                if duckling_result and duckling_result.success:
+                    parsed_concepts = duckling_result.enhanced_data.get("expanded_concepts", [])
+                    parsed_scores = duckling_result.confidence_score.per_item
+                    all_concepts.extend(parsed_concepts)
+                    all_confidence_scores.update(parsed_scores)
+                    logger.debug(f"Duckling parsed {len(parsed_concepts)} temporal concepts")
+            
+            # Add procedural temporal intelligence
+            temporal_request = TemporalConceptRequest(
+                temporal_term=concept,
+                media_context=media_context,
+                max_concepts=max_concepts // 2 + (max_concepts - len(all_concepts))
+            )
+            
+            intelligence_result = await self.temporal_concept_generator.generate_temporal_concepts(temporal_request)
+            if intelligence_result and intelligence_result.success:
+                intelligent_concepts = intelligence_result.enhanced_data.get("temporal_concepts", [])
+                intelligent_scores = intelligence_result.confidence_score.per_item
+                all_concepts.extend(intelligent_concepts)
+                all_confidence_scores.update(intelligent_scores)
+                logger.debug(f"Generated {len(intelligent_concepts)} intelligent temporal concepts")
+            
+            if not all_concepts:
+                logger.warning(f"No temporal concepts found for: {concept}")
+                return None
+            
+            # Remove duplicates while preserving order
+            unique_concepts = []
+            seen = set()
+            for concept_item in all_concepts:
+                if concept_item not in seen:
+                    unique_concepts.append(concept_item)
+                    seen.add(concept_item)
+            
+            # Limit to max_concepts
+            final_concepts = unique_concepts[:max_concepts]
+            final_scores = {c: all_confidence_scores.get(c, 0.7) for c in final_concepts}
+            
+            # Calculate total execution time
+            total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+            
+            # Create combined result
+            return create_field_expansion_result(
+                field_name=field_name,
+                input_value=concept,
+                expansion_result={
+                    "expanded_concepts": final_concepts,
+                    "original_concept": concept,
+                    "expansion_method": "duckling_with_intelligence",
+                    "parsing_concepts": len([c for c in final_concepts if c in all_concepts[:len(all_concepts)//2]]),
+                    "intelligent_concepts": len([c for c in final_concepts if c in all_concepts[len(all_concepts)//2:]]),
+                    "provider_type": "temporal_hybrid"
+                },
+                confidence_scores=final_scores,
+                plugin_name="DucklingWithIntelligence",
+                plugin_version="1.0.0",
+                cache_type=CacheType.DUCKLING_TIME,
+                execution_time_ms=total_time_ms,
+                media_context=media_context,
+                plugin_type=PluginType.CONCEPT_EXPANSION,
+                api_endpoint="duckling_temporal_hybrid",
+                model_used="duckling+llm"
+            )
+            
+        except Exception as e:
+            logger.error(f"Duckling temporal expansion failed: {e}")
+            return None
+    
+    async def _expand_with_heideltime(
+        self,
+        concept: str,
+        media_context: str,
+        field_name: str,
+        max_concepts: int,
+        start_time: datetime
+    ) -> Optional[PluginResult]:
+        """
+        Expand concept using HeidelTime temporal extraction + procedural intelligence.
+        
+        Combines document-aware HeidelTime parsing with TemporalConceptGenerator intelligence.
+        """
+        try:
+            all_concepts = []
+            all_confidence_scores = {}
+            
+            # Try pure HeidelTime parsing first
+            if await self.heideltime_provider._ensure_initialized():
+                request = ExpansionRequest(
+                    concept=concept,
+                    media_context=media_context,
+                    max_concepts=max_concepts // 2,
+                    field_name=field_name
+                )
+                
+                heideltime_result = await self.heideltime_provider.expand_concept(request)
+                if heideltime_result and heideltime_result.success:
+                    parsed_concepts = heideltime_result.enhanced_data.get("expanded_concepts", [])
+                    parsed_scores = heideltime_result.confidence_score.per_item
+                    all_concepts.extend(parsed_concepts)
+                    all_confidence_scores.update(parsed_scores)
+                    logger.debug(f"HeidelTime extracted {len(parsed_concepts)} temporal concepts")
+            
+            # Add procedural temporal intelligence
+            temporal_request = TemporalConceptRequest(
+                temporal_term=concept,
+                media_context=media_context,
+                max_concepts=max_concepts // 2 + (max_concepts - len(all_concepts))
+            )
+            
+            intelligence_result = await self.temporal_concept_generator.generate_temporal_concepts(temporal_request)
+            if intelligence_result and intelligence_result.success:
+                intelligent_concepts = intelligence_result.enhanced_data.get("temporal_concepts", [])
+                intelligent_scores = intelligence_result.confidence_score.per_item
+                all_concepts.extend(intelligent_concepts)
+                all_confidence_scores.update(intelligent_scores)
+                logger.debug(f"Generated {len(intelligent_concepts)} intelligent temporal concepts")
+            
+            if not all_concepts:
+                logger.warning(f"No temporal concepts found for: {concept}")
+                return None
+            
+            # Remove duplicates and limit
+            unique_concepts = []
+            seen = set()
+            for concept_item in all_concepts:
+                if concept_item not in seen:
+                    unique_concepts.append(concept_item)
+                    seen.add(concept_item)
+            
+            final_concepts = unique_concepts[:max_concepts]
+            final_scores = {c: all_confidence_scores.get(c, 0.7) for c in final_concepts}
+            
+            # Calculate total execution time
+            total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+            
+            # Create combined result
+            return create_field_expansion_result(
+                field_name=field_name,
+                input_value=concept,
+                expansion_result={
+                    "expanded_concepts": final_concepts,
+                    "original_concept": concept,
+                    "expansion_method": "heideltime_with_intelligence",
+                    "provider_type": "temporal_hybrid"
+                },
+                confidence_scores=final_scores,
+                plugin_name="HeidelTimeWithIntelligence",
+                plugin_version="1.0.0",
+                cache_type=CacheType.HEIDELTIME,
+                execution_time_ms=total_time_ms,
+                media_context=media_context,
+                plugin_type=PluginType.CONCEPT_EXPANSION,
+                api_endpoint="heideltime_temporal_hybrid",
+                model_used="heideltime+llm"
+            )
+            
+        except Exception as e:
+            logger.error(f"HeidelTime temporal expansion failed: {e}")
+            return None
+    
+    async def _expand_with_sutime(
+        self,
+        concept: str,
+        media_context: str,
+        field_name: str,
+        max_concepts: int,
+        start_time: datetime
+    ) -> Optional[PluginResult]:
+        """
+        Expand concept using SUTime rule-based parsing + procedural intelligence.
+        
+        Combines precise SUTime parsing with TemporalConceptGenerator intelligence.
+        """
+        try:
+            all_concepts = []
+            all_confidence_scores = {}
+            
+            # Try pure SUTime parsing first
+            if await self.sutime_provider._ensure_initialized():
+                request = ExpansionRequest(
+                    concept=concept,
+                    media_context=media_context,
+                    max_concepts=max_concepts // 2,
+                    field_name=field_name
+                )
+                
+                sutime_result = await self.sutime_provider.expand_concept(request)
+                if sutime_result and sutime_result.success:
+                    parsed_concepts = sutime_result.enhanced_data.get("expanded_concepts", [])
+                    parsed_scores = sutime_result.confidence_score.per_item
+                    all_concepts.extend(parsed_concepts)
+                    all_confidence_scores.update(parsed_scores)
+                    logger.debug(f"SUTime parsed {len(parsed_concepts)} temporal concepts")
+            
+            # Add procedural temporal intelligence
+            temporal_request = TemporalConceptRequest(
+                temporal_term=concept,
+                media_context=media_context,
+                max_concepts=max_concepts // 2 + (max_concepts - len(all_concepts))
+            )
+            
+            intelligence_result = await self.temporal_concept_generator.generate_temporal_concepts(temporal_request)
+            if intelligence_result and intelligence_result.success:
+                intelligent_concepts = intelligence_result.enhanced_data.get("temporal_concepts", [])
+                intelligent_scores = intelligence_result.confidence_score.per_item
+                all_concepts.extend(intelligent_concepts)
+                all_confidence_scores.update(intelligent_scores)
+                logger.debug(f"Generated {len(intelligent_concepts)} intelligent temporal concepts")
+            
+            if not all_concepts:
+                logger.warning(f"No temporal concepts found for: {concept}")
+                return None
+            
+            # Remove duplicates and limit
+            unique_concepts = []
+            seen = set()
+            for concept_item in all_concepts:
+                if concept_item not in seen:
+                    unique_concepts.append(concept_item)
+                    seen.add(concept_item)
+            
+            final_concepts = unique_concepts[:max_concepts]
+            final_scores = {c: all_confidence_scores.get(c, 0.7) for c in final_concepts}
+            
+            # Calculate total execution time
+            total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+            
+            # Create combined result
+            return create_field_expansion_result(
+                field_name=field_name,
+                input_value=concept,
+                expansion_result={
+                    "expanded_concepts": final_concepts,
+                    "original_concept": concept,
+                    "expansion_method": "sutime_with_intelligence",
+                    "provider_type": "temporal_hybrid"
+                },
+                confidence_scores=final_scores,
+                plugin_name="SUTimeWithIntelligence",
+                plugin_version="1.0.0",
+                cache_type=CacheType.SUTIME,
+                execution_time_ms=total_time_ms,
+                media_context=media_context,
+                plugin_type=PluginType.CONCEPT_EXPANSION,
+                api_endpoint="sutime_temporal_hybrid",
+                model_used="sutime+llm"
+            )
+            
+        except Exception as e:
+            logger.error(f"SUTime temporal expansion failed: {e}")
+            return None
+    
     def _method_to_cache_type(self, method: ExpansionMethod) -> CacheType:
         """Convert expansion method to cache type."""
         mapping = {
             ExpansionMethod.CONCEPTNET: CacheType.CONCEPTNET,
             ExpansionMethod.LLM: CacheType.LLM_CONCEPT,
             ExpansionMethod.GENSIM: CacheType.GENSIM_SIMILARITY,
+            ExpansionMethod.DUCKLING: CacheType.DUCKLING_TIME,
+            ExpansionMethod.HEIDELTIME: CacheType.HEIDELTIME,
+            ExpansionMethod.SUTIME: CacheType.SUTIME,
             ExpansionMethod.MULTI_SOURCE: CacheType.CUSTOM,
             ExpansionMethod.AUTO: CacheType.CONCEPTNET  # Default for now
         }
@@ -391,6 +742,10 @@ class ConceptExpander:
         # Close all providers
         for provider in self.providers.values():
             await provider.close()
+        
+        # Close temporal concept generator
+        if self.temporal_concept_generator:
+            await self.temporal_concept_generator.close()
 
 
 # Global expander instance for reuse

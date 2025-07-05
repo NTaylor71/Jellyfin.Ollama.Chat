@@ -7,11 +7,11 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from src.concept_expansion.providers.base_provider import (
+from concept_expansion.providers.base_provider import (
     BaseProvider, ProviderMetadata, ExpansionRequest, ProviderError, ProviderNotAvailableError
 )
-from src.concept_expansion.providers.conceptnet_client import get_conceptnet_client, ConceptNetResponse
-from src.shared.plugin_contracts import (
+from concept_expansion.providers.conceptnet_client import get_conceptnet_client, ConceptNetResponse
+from shared.plugin_contracts import (
     PluginResult, CacheKey, CacheType, ConfidenceScore, PluginMetadata, PluginType,
     create_field_expansion_result
 )

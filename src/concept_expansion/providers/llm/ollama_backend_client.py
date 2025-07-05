@@ -11,13 +11,13 @@ import httpx
 from typing import Dict, Optional, List, Any
 from datetime import datetime
 
-from src.concept_expansion.providers.llm.base_llm_client import (
+from concept_expansion.providers.llm.base_llm_client import (
     BaseLLMClient, LLMRequest, LLMResponse,
     LLMClientError, LLMClientNotAvailableError, LLMClientTimeoutError,
     LLMClientConfigurationError
 )
-from src.shared.config import get_settings
-from src.shared.hardware_config import get_resource_limits
+from shared.config import get_settings
+from shared.hardware_config import get_resource_limits
 
 logger = logging.getLogger(__name__)
 

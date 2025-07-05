@@ -5,7 +5,7 @@ Provides a generic interface for different LLM backends (Ollama, OpenAI, etc.)
 with consistent concept expansion capabilities.
 """
 
-from src.concept_expansion.providers.llm.base_llm_client import BaseLLMClient, LLMResponse, LLMRequest
-from src.concept_expansion.providers.llm.llm_provider import LLMProvider
+from .base_llm_client import BaseLLMClient, LLMResponse, LLMRequest
+from .llm_provider import LLMProvider
 
 __all__ = ["BaseLLMClient", "LLMResponse", "LLMRequest", "LLMProvider"]
