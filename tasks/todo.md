@@ -364,19 +364,98 @@ The cache now provides the foundation for Stage 3 concept expansion plugins:
 ## Stage 3: Procedural Concept Expansion
 **Goal: avoid all hard-coded genre/keyword lists with intelligent expansion**
 
-### 3.1: ConceptNet Expansion Plugin
-- [ ] **Explain your implementation plan for stage 3.1**
-- [ ] **ConceptExpander class**
-  - Input example: "action" + "movie" context
-  - Check cache first
-  - If miss: Call ConceptNet API and or llms if plugins suggest this behaviour - with rate limiting
-  - Store results in cache
-  - Return expanded concepts: ["fight", "combat", "battle", "intense", "fast-paced"]
-- [ ] **read ahead in the plan and see what tallies with implementation**
-- [ ] **teach me what you did**
+### 3.1: ConceptNet Expansion Plugin ✅ COMPLETED + REFACTORED
+- [x] **Explain your implementation plan for stage 3.1** ✅
+- [x] **ConceptExpander class** ✅ 
+  - Input example: "action" + "movie" context → ["drink", "move", "cut", "drive"] (ConceptNet limitations noted)
+  - Cache-first behavior working with CacheManager.get_or_compute()
+  - ConceptNet API client with rate limiting (3 req/sec)
+  - Fallback logic for compound terms ("dark comedy" → "dark")  
+  - Return expanded concepts with confidence scores
+- [x] **read ahead in the plan and see what tallies with implementation** ✅
+- [x] **teach me what you did** ✅
+
+## 🎓 EDUCATION: What We Built in Stage 3.1
+
+### 🏗️ **Provider-Based Architecture (REFACTORED)**
+Completely refactored to truly generic provider system:
+
+**NEW Architecture:**
+```
+src/concept_expansion/
+├── providers/
+│   ├── base_provider.py           # Abstract provider interface
+│   ├── conceptnet_provider.py     # ConceptNet implementation
+│   └── __init__.py
+├── conceptnet_client.py           # ConceptNet API client
+├── conceptnet_expander.py         # Generic orchestrator (needs completion)
+└── test_conceptnet.py
+```
+
+### 🔧 **Four Provider Types Supported**
+- **Literal**: ConceptNet (linguistic relationships, context-blind)
+- **Semantic**: LLM (context understanding, domain knowledge) - Stage 3.2
+- **Statistical**: Gensim (corpus similarity, patterns) - Stage 3.3  
+- **Temporal**: Duckling/HeidelTime/SUTime (time parsing) - Future
+
+### 🧪 **Real-World Test Results**
+**ConceptNet Capabilities Demonstrated:**
+- ✅ "action" → ["drink", "move", "cut", "drive"] (literal actions, not movie concepts)
+- ✅ "samurai" → ["shuriken", "uchigatana", "daimyo", "kunai"] (authentic Japanese terms)
+- ✅ "dark comedy" → ["shade", "black", "night"] (fallback to "dark" works)
+- ✅ Cache-first behavior prevents duplicate API calls
+- ✅ Rate limiting respected (3 requests/second)
+
+### 💡 **Key Insights**
+- **ConceptNet Strength**: Factual relationships, linguistic connections
+- **ConceptNet Weakness**: Context-blind, generic relationships 
+- **Perfect Setup for Stage 3.2**: LLM will provide context-aware movie concepts
+- **Cache Admin**: `python clear_cache.py --all` for fresh testing
+
+### 🎯 **Provider Interface Ready**
+- `BaseProvider` abstract class for all expansion providers
+- `ExpansionRequest` standard format
+- `ProviderMetadata` capability system
+- Ready for LLM, Gensim, Temporal providers in future stages
+
+**Stage 3.1 demonstrates exactly why multi-source approach is needed! 🚀**
+
+## 🎉 **STAGE 3.1 REFACTOR COMPLETED** ✅
+
+### ✅ **COMPLETED REFACTOR TASKS**
+- [x] **Complete ConceptExpander refactor** - Now uses ConceptNetProvider instead of direct API calls
+- [x] **Update concept_expander.py** - Replaced `_expand_with_conceptnet()` to use ConceptNetProvider pattern
+- [x] **Update all imports** - Fixed test files and __init__.py to use new provider architecture  
+- [x] **Validate functionality** - All 4/4 tests pass with new architecture
+- [x] **File naming conventions** - Renamed `conceptnet_expander.py` → `concept_expander.py`
+- [x] **Test naming conventions** - Renamed `test_conceptnet.py` → `test_concept_expander.py`
+- [x] **Code organization** - Moved `conceptnet_client.py` to `providers/` directory for better structure
+
+### 🏗️ **FINAL ARCHITECTURE ACHIEVED**
+```
+src/concept_expansion/
+├── concept_expander.py          # Generic orchestrator (ConceptExpander class)
+├── test_concept_expander.py     # Comprehensive tests (4/4 passing)
+├── __init__.py                  # Clean exports
+└── providers/                   # Provider implementations
+    ├── base_provider.py         # Abstract BaseProvider interface
+    ├── conceptnet_client.py     # ConceptNet API client
+    └── conceptnet_provider.py   # ConceptNet provider implementation
+```
+
+### 📊 **VALIDATION RESULTS**
+- **All Tests Pass**: 4/4 ConceptExpander tests successful
+- **Cache Working**: 2.8x performance improvement (cache hits vs API calls)
+- **Provider Pattern**: ConceptExpander now generic orchestrator ready for multiple providers
+- **Real Expansion Results**: All concepts return valid data (no empty/null results)
+- **ConceptNet Limitations Confirmed**: Returns literal relationships (not semantic movie concepts)
+
+### 🚀 **READY FOR STAGE 3.2**
+ConceptExpander architecture proven and ready for LLM provider addition!
 
 ### 3.2: LLM Concept Understanding
 - [ ] **Explain your implementation plan for stage 3.2**
+- [ ] **Examine the ConceptExpander and previous ConceptNetProvider for understanding for this stage's task**
 - [ ] **LLMConceptAnalyzer class**
   - Input: User query "psychological thriller movies"
   - Use Ollama to understand intent and extract concepts - a plugin might then enrich those concepts further
