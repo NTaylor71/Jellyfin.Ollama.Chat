@@ -16,6 +16,7 @@ from datetime import datetime
 
 from src.concept_expansion.providers.base_provider import BaseProvider, ExpansionRequest
 from src.concept_expansion.providers.conceptnet_provider import ConceptNetProvider
+from src.concept_expansion.providers.llm.llm_provider import LLMProvider
 from src.data.cache_manager import get_cache_manager, CacheStrategy
 from src.shared.plugin_contracts import (
     PluginResult, CacheKey, CacheType, ConfidenceScore, PluginMetadata, PluginType,
@@ -33,7 +34,7 @@ class ExpansionMethod(Enum):
     DUCKLING = "duckling"          # Temporal parsing, time-aware
     HEIDELTIME = "heideltime"      # Temporal extraction, context-aware
     SUTIME = "sutime"              # Temporal understanding, rule-based
-    MULTI_SOURCE = "multi_source"   # Combined semantic + literal + temporal
+    MULTI_SOURCE = "multi_source"  # Combined semantic + literal + temporal
     AUTO = "auto"                  # Choose best method automatically
 
 
@@ -67,8 +68,10 @@ class ConceptExpander:
         
         # Initialize providers
         self.conceptnet_provider = ConceptNetProvider()
+        self.llm_provider = LLMProvider()
         self.providers = {
-            ExpansionMethod.CONCEPTNET: self.conceptnet_provider
+            ExpansionMethod.CONCEPTNET: self.conceptnet_provider,
+            ExpansionMethod.LLM: self.llm_provider
         }
         
         # Method capabilities for intelligent selection
@@ -195,9 +198,9 @@ class ConceptExpander:
                 concept, media_context, field_name, max_concepts, start_time
             )
         elif method == ExpansionMethod.LLM:
-            # Placeholder for Stage 3.2 - LLM concept expansion
-            logger.info(f"LLM expansion not implemented yet (Stage 3.2)")
-            return None
+            return await self._expand_with_llm(
+                concept, media_context, field_name, max_concepts, start_time
+            )
         elif method == ExpansionMethod.GENSIM:
             # Placeholder for Stage 3.3 - Gensim similarity expansion  
             logger.info(f"Gensim expansion not implemented yet (Stage 3.3)")
@@ -253,6 +256,46 @@ class ConceptExpander:
             
         except Exception as e:
             logger.error(f"ConceptNet expansion failed: {e}")
+            return None
+    
+    async def _expand_with_llm(
+        self,
+        concept: str,
+        media_context: str,
+        field_name: str,
+        max_concepts: int,
+        start_time: datetime
+    ) -> Optional[PluginResult]:
+        """
+        Expand concept using LLM provider.
+        
+        Returns PluginResult in the standard format for caching.
+        """
+        try:
+            # Ensure provider is initialized
+            if not await self.llm_provider._ensure_initialized():
+                logger.error("LLM provider not available")
+                return None
+            
+            # Create expansion request
+            request = ExpansionRequest(
+                concept=concept,
+                media_context=media_context,
+                max_concepts=max_concepts,
+                field_name=field_name
+            )
+            
+            # Call LLM provider
+            result = await self.llm_provider.expand_concept(request)
+            
+            if result is None:
+                logger.warning(f"LLM provider failed for concept: {concept}")
+                return None
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"LLM expansion failed: {e}")
             return None
     
     def _method_to_cache_type(self, method: ExpansionMethod) -> CacheType:

@@ -1,0 +1,10 @@
+{
+  "local_cpu_cores": 24,
+  "local_cpu_threads": 48,
+  "local_memory_gb": 125.26,
+  "local_storage_type": "ssd",
+  "cpu_endpoints": [],
+  "gpu_endpoints": [],
+  "memory_endpoints": [],
+  "is_auto_detected": true
+}
