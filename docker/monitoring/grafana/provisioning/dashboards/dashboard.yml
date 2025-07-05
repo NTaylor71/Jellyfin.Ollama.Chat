@@ -1,0 +1,36 @@
+# Grafana Dashboard Provisioning Configuration
+apiVersion: 1
+
+providers:
+  - name: 'RAG System Dashboards'
+    orgId: 1
+    folder: 'Production RAG'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+
+  - name: 'FastAPI Metrics'
+    orgId: 1
+    folder: 'API Monitoring'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/fastapi
+
+  - name: 'System Performance'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/system

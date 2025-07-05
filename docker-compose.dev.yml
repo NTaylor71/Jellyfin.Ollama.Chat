@@ -1,0 +1,265 @@
+# =============================================================================
+# Production RAG System - Development Environment (Updated for Redis)
+# =============================================================================
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  mongodb-data:
+    driver: local
+  faiss-data:
+    driver: local
+  logs-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+services:
+  # ===========================================================================
+  # DATABASE SERVICES
+  # ===========================================================================
+
+  mongodb:
+    image: mongo:7.0
+    container_name: rag-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=jellyfin_rag
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # REDIS QUEUE SYSTEM
+  # ===========================================================================
+
+  redis:
+    build:
+      context: .
+      dockerfile: docker/redis/Dockerfile
+    container_name: rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/etc/redis/redis.conf:ro
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # RAG SYSTEM SERVICES
+  # ===========================================================================
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: rag-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - ENABLE_METRICS=true
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LOG_LEVEL=DEBUG
+      - ENABLE_CORS=true
+      - ENABLE_API_DOCS=true
+      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: rag-worker
+    restart: unless-stopped
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - LOG_LEVEL=DEBUG
+      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from src.redis_worker.queue_manager import RedisQueueManager; RedisQueueManager().redis_client.ping()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # MONITORING STACK
+  # ===========================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rag-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rag-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_FEATURE_TOGGLES_ENABLE=publicDashboards
+    networks:
+      - rag-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # FUTURE SERVICES (Placeholder)
+  # ===========================================================================
+
+  faiss-service:
+    build:
+      context: .
+      dockerfile: docker/faiss/Dockerfile
+    container_name: rag-faiss-service
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - faiss-data:/app/data
+      - ./src:/app/src:ro
+      - ./logs:/app/logs
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - VECTORDB_URL=http://faiss-service:6333
+      - LOG_LEVEL=DEBUG
+      - FAISS_INDEX_PATH=/app/data/faiss_index
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - faiss  # Only start with --profile faiss
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

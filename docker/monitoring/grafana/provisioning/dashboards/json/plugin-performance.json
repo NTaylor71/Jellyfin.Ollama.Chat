@@ -1,0 +1,230 @@
+{
+  "id": null,
+  "title": "Plugin Performance Monitoring",
+  "description": "Comprehensive monitoring for plugin system performance and resource usage",
+  "tags": [
+    "plugins",
+    "performance",
+    "monitoring",
+    "prometheus"
+  ],
+  "style": "dark",
+  "timezone": "",
+  "editable": true,
+  "hideControls": false,
+  "graphTooltip": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "plugin_name",
+        "type": "query",
+        "query": "label_values(plugin_executions_total, plugin_name)",
+        "current": {
+          "value": "All",
+          "text": "All"
+        },
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "plugin_type",
+        "type": "query",
+        "query": "label_values(plugin_executions_total, plugin_type)",
+        "current": {
+          "value": "All",
+          "text": "All"
+        },
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Plugin Health Overview",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "plugins_total",
+          "legendFormat": "Total Plugins"
+        },
+        {
+          "expr": "plugins_enabled_total",
+          "legendFormat": "Enabled"
+        },
+        {
+          "expr": "plugins_healthy_total",
+          "legendFormat": "Healthy"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Plugin Execution Rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(plugin_executions_total{plugin_name=~\"$plugin_name\", plugin_type=~\"$plugin_type\", status=\"success\"}[5m])",
+          "legendFormat": "{{plugin_name}} ({{plugin_type}}) - Success"
+        },
+        {
+          "expr": "rate(plugin_executions_total{plugin_name=~\"$plugin_name\", plugin_type=~\"$plugin_type\", status=\"failure\"}[5m])",
+          "legendFormat": "{{plugin_name}} ({{plugin_type}}) - Failure"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5
+          },
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Plugin Memory Usage",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "plugin_memory_usage_bytes{plugin_name=~\"$plugin_name\", plugin_type=~\"$plugin_type\"}",
+          "legendFormat": "{{plugin_name}} ({{plugin_type}})"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "insertNulls": false,
+            "showPoints": "never",
+            "pointSize": 5
+          },
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Plugin Health Status",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "plugin_health_status{plugin_name=~\"$plugin_name\", plugin_type=~\"$plugin_type\"}",
+          "legendFormat": "{{plugin_name}} ({{plugin_type}})",
+          "format": "table"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "UNHEALTHY",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "HEALTHY",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 27,
+  "version": 1
+}
