@@ -1,6 +1,6 @@
 """
 FieldExpansionCache collection for Stage 2: Never call expansion plugins twice for same field input.
-Generic caching for all data ingestion field expansions: ConceptNet, Gensim, Duckling, etc.
+Generic caching for all data ingestion field expansions: ConceptNet, Gensim, SpaCy Temporal, etc.
 """
 
 import logging
@@ -38,7 +38,7 @@ class FieldExpansionCache:
     Examples of supported expansions:
     - ConceptNet: "conceptnet:tags:action:movie" 
     - Gensim: "gensim_similarity:genres:thriller:movie"
-    - Duckling: "duckling_time:release_date:next friday:movie"
+    - SpaCy Temporal: "spacy_temporal:release_date:next friday:movie"
     - Tag expansion: "tag_expansion:tags:sci-fi:movie"
     """
     

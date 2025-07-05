@@ -194,7 +194,7 @@ class CacheManager:
         Generate consistent cache key for field expansion operations.
         
         Args:
-            cache_type: Type of expansion (conceptnet, gensim, duckling, etc.)
+            cache_type: Type of expansion (conceptnet, gensim, spacy_temporal, etc.)
             field_name: Name of field being expanded (tags, genres, people, etc.)
             input_value: Value being processed
             media_context: Media context (movie, book, etc.)

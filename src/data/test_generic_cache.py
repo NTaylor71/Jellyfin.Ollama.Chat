@@ -112,7 +112,7 @@ async def create_spacy_temporal_parse(field_name: str, input_value: str) -> Plug
         confidence_scores={input_value: parsed["confidence"]},
         plugin_name="SpacyTemporalPlugin",
         plugin_version="1.0.0",
-        cache_type=CacheType.DUCKLING_TIME,
+        cache_type=CacheType.SPACY_TEMPORAL,
         execution_time_ms=45.0,
         plugin_type=PluginType.ENHANCEMENT,
         api_endpoint="http://localhost:8000/parse"
@@ -204,7 +204,7 @@ async def test_multiple_expansion_types():
         test_cases = [
             ("tags", "action", CacheType.CONCEPTNET, lambda: create_conceptnet_expansion("tags", "action")),
             ("genres", "thriller", CacheType.GENSIM_SIMILARITY, lambda: create_gensim_similarity("genres", "thriller")),
-            ("release_date", "next friday", CacheType.DUCKLING_TIME, lambda: create_spacy_temporal_parse("release_date", "next friday")),
+            ("release_date", "next friday", CacheType.SPACY_TEMPORAL, lambda: create_spacy_temporal_parse("release_date", "next friday")),
             ("tags", "sci-fi", CacheType.TAG_EXPANSION, lambda: create_tag_expansion("tags", "sci-fi")),
             ("overview", "Tom Cruise stars in this action movie", CacheType.SPACY_NER, lambda: create_spacy_ner("overview", "Tom Cruise stars in this action movie"))
         ]
@@ -258,7 +258,7 @@ async def test_cache_key_format():
         test_cases = [
             (CacheType.CONCEPTNET, "tags", "action", "movie", "conceptnet:tags:action:movie"),
             (CacheType.GENSIM_SIMILARITY, "genres", "thriller", "book", "gensim_similarity:genres:thriller:book"),
-            (CacheType.DUCKLING_TIME, "release_date", "tomorrow", "movie", "duckling_time:release_date:tomorrow:movie"),
+            (CacheType.SPACY_TEMPORAL, "release_date", "tomorrow", "movie", "spacy_temporal:release_date:tomorrow:movie"),
             (CacheType.TAG_EXPANSION, "categories", "sci-fi", "book", "tag_expansion:categories:sci_fi:book")  # Note: "sci-fi" becomes "sci_fi"
         ]
         

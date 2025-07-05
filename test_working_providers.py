@@ -69,7 +69,7 @@ def test_provider_availability():
         "ConceptNet": True,  # Always available (no external deps)
         "LLM": True,        # Should work with Ollama
         "Gensim": False,    # Would require large model download
-        "Duckling": False,  # Requires pip install duckling
+        "SpaCy Temporal": True,  # Using SpaCy for temporal parsing
         "HeidelTime": False, # Requires pip install py-heideltime  
         "SUTime": False     # Requires Java + SUTime setup
     }
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         asyncio.run(test_working_providers())
         
         print(f"\n🎉 Tests completed!")
-        print("Note: Gensim, Duckling, HeidelTime, SUTime need additional setup")
+        print("Note: Gensim, HeidelTime, SUTime need additional setup")
         
     except Exception as e:
         print(f"\n💥 Test failed: {e}")

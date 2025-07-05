@@ -55,7 +55,7 @@ class TemporalConceptGenerator:
         
         # No hardcoded bootstrap questions - generate dynamically via LLM
     
-    def classify_temporal_concept(self, concept: str) -> PluginResult:
+    async def classify_temporal_concept(self, concept: str) -> PluginResult:
         """
         Classify if a concept is temporal using LLM-based procedural intelligence.
         
@@ -94,10 +94,9 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 temperature=0.1
             )
             
-            # Synchronous call for classification
-            import asyncio
+            # Async call for classification
             try:
-                llm_response = asyncio.run(self.llm_provider.client.generate_completion(llm_request))
+                llm_response = await self.llm_provider.client.generate_completion(llm_request)
                 if llm_response.success:
                     response_text = llm_response.text.strip()
                     parts = response_text.split()
@@ -249,7 +248,7 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 return None
             
             # Generate confidence scores
-            confidence_scores = self._generate_confidence_scores(
+            confidence_scores = await self._generate_confidence_scores(
                 temporal_concepts,
                 request.temporal_term,
                 llm_response
@@ -353,11 +352,11 @@ Related temporal concepts:"""
             if text.lower().startswith(prefix.lower()):
                 text = text[len(prefix):].strip()
         
-        # Split by commas and clean each concept
+        # Split by commas while respecting quotes and clean each concept
         concepts = []
         
         if "," in text:
-            raw_concepts = text.split(",")
+            raw_concepts = self._smart_split_concepts(text)
         else:
             # Try newline separation as fallback
             raw_concepts = text.split("\n")
@@ -371,6 +370,34 @@ Related temporal concepts:"""
                     break
         
         return concepts[:max_concepts]
+    
+    def _smart_split_concepts(self, text: str) -> List[str]:
+        """
+        Smart split that respects quoted strings and extracts clean concepts.
+        
+        Examples:
+        - 'term1, term2, term3' → ['term1', 'term2', 'term3']
+        - 'text like "term1", "term2", "term3"' → ['term1', 'term2', 'term3']
+        - 'sentence with "quoted term", other term' → ['quoted term', 'other term']
+        """
+        import re
+        
+        concepts = []
+        
+        # First, try to extract quoted strings
+        quoted_pattern = r'"([^"]+)"'
+        quoted_matches = re.findall(quoted_pattern, text)
+        
+        if quoted_matches:
+            # If we found quoted terms, use those
+            concepts.extend(quoted_matches)
+        else:
+            # No quotes, split by commas normally
+            raw_concepts = text.split(",")
+            concepts.extend([concept.strip() for concept in raw_concepts])
+        
+        # Remove empty concepts and normalize
+        return [concept.strip() for concept in concepts if concept.strip()]
     
     def _clean_temporal_concept(self, concept: str) -> str:
         """
@@ -404,7 +431,7 @@ Related temporal concepts:"""
         
         return cleaned
     
-    def _generate_confidence_scores(
+    async def _generate_confidence_scores(
         self,
         concepts: List[str],
         original_term: str,
@@ -434,7 +461,7 @@ Related temporal concepts:"""
             specificity_factor = max(specificity_factor, 0.8)  # Minimum 80%
             
             # Temporal relevance bonus - use pattern-based calculation
-            temporal_relevance = self._calculate_temporal_relevance_patterns(concept, original_term)
+            temporal_relevance = await self._calculate_temporal_relevance_patterns(concept, original_term)
             
             final_confidence = base_confidence * position_factor * specificity_factor * temporal_relevance
             final_confidence = min(final_confidence, 0.95)  # Cap at 95%
@@ -519,7 +546,7 @@ Related temporal concepts:"""
             await self.llm_provider.close()
 
 
-    def _calculate_temporal_relevance_patterns(self, concept: str, original_term: str) -> float:
+    async def _calculate_temporal_relevance_patterns(self, concept: str, original_term: str) -> float:
         """
         Calculate temporal relevance using LLM-based procedural intelligence.
         
@@ -557,10 +584,9 @@ Respond with just the number (e.g., 1.3)"""
                 temperature=0.1
             )
             
-            # Synchronous call for pattern analysis
-            import asyncio
+            # Async call for pattern analysis
             try:
-                llm_response = asyncio.run(self.llm_provider.client.generate_completion(llm_request))
+                llm_response = await self.llm_provider.client.generate_completion(llm_request)
                 if llm_response.success:
                     relevance = float(llm_response.text.strip())
                     relevance = max(1.0, min(1.5, relevance))  # Clamp to valid range

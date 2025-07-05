@@ -28,7 +28,7 @@ class CacheType(Enum):
     WORDNET_SYNONYMS = "wordnet_synonyms"
     
     # Temporal extraction/parsing
-    DUCKLING_TIME = "duckling_time"
+    TEMPORAL_PARSING = "temporal_parsing"
     SPACY_TEMPORAL = "spacy_temporal"
     HEIDELTIME = "heideltime"
     SUTIME = "sutime"
@@ -101,7 +101,7 @@ class CacheKey:
     Examples:
     - "conceptnet:tags:action:movie" (ConceptNet expansion of "action" tag)
     - "gensim_similarity:genres:thriller:movie" (Gensim similarity for "thriller" genre)
-    - "duckling_time:release_date:next friday:movie" (Temporal parsing of "next friday")
+    - "spacy_temporal:release_date:next friday:movie" (Temporal parsing of "next friday")
     - "tag_expansion:tags:sci-fi:movie" (Tag similarity expansion)
     """
     cache_type: CacheType

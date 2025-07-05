@@ -20,11 +20,14 @@ logger = logging.getLogger(__name__)
 
 # HeidelTime imports with fallback
 try:
-    from py_heideltime import HeidelTime
+    from py_heideltime.py_heideltime import heideltime
     HEIDELTIME_AVAILABLE = True
 except ImportError:
     HEIDELTIME_AVAILABLE = False
     logger.warning("HeidelTime not available. Install with: pip install py-heideltime")
+except Exception as e:
+    HEIDELTIME_AVAILABLE = False
+    logger.warning(f"HeidelTime import error: {e}")
 
 
 class HeidelTimeProvider(BaseProvider):
@@ -38,7 +41,7 @@ class HeidelTimeProvider(BaseProvider):
     def __init__(self, language: str = "english"):
         super().__init__()
         self.language = language
-        self.heideltime: Optional[HeidelTime] = None
+        self.heideltime_function = heideltime if HEIDELTIME_AVAILABLE else None
         self._heideltime_initialized = False
         
         # Pure HeidelTime temporal parser - no hard-coded patterns
@@ -83,12 +86,9 @@ class HeidelTimeProvider(BaseProvider):
             if not self._heideltime_initialized:
                 logger.info("Initializing HeidelTime temporal extractor")
                 
-                # Initialize HeidelTime with language
-                self.heideltime = HeidelTime(language=self.language)
-                
-                # Test the initialization
+                # Test HeidelTime function
                 test_text = "The movie was released in 2020."
-                test_result = self.heideltime.parse(test_text)
+                test_result = heideltime(test_text, language=self.language, document_type='news')
                 
                 self._heideltime_initialized = True
                 logger.info(f"HeidelTime initialized successfully for language: {self.language}")
@@ -116,8 +116,8 @@ class HeidelTimeProvider(BaseProvider):
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("HeidelTime provider not available", "HeidelTime")
             
-            if not self.heideltime:
-                logger.error("HeidelTime not initialized")
+            if not self.heideltime_function:
+                logger.error("HeidelTime function not available")
                 return None
             
             concept = request.concept.strip()
@@ -220,19 +220,19 @@ class HeidelTimeProvider(BaseProvider):
         Returns:
             List of temporal concepts
         """
-        if not self.heideltime:
+        if not self.heideltime_function:
             return []
         
         try:
             # Parse the document context
-            temporal_data = self.heideltime.parse(document_context)
+            temporal_data = heideltime(document_context, language=self.language, document_type='news')
             
             temporal_concepts = []
             
             # Extract temporal expressions from HeidelTime output
             if temporal_data:
-                # Parse HeidelTime XML output
-                temporal_expressions = self._parse_heideltime_output(temporal_data)
+                # HeidelTime returns a list of dictionaries, not XML
+                temporal_expressions = temporal_data if isinstance(temporal_data, list) else []
                 
                 for expr in temporal_expressions:
                     # Convert to concept format
@@ -316,7 +316,7 @@ class HeidelTimeProvider(BaseProvider):
                     "error": "Not initialized"
                 }
             
-            if not self.heideltime:
+            if not self.heideltime_function:
                 return {
                     "status": "unhealthy",
                     "provider": "HeidelTime",
@@ -326,7 +326,7 @@ class HeidelTimeProvider(BaseProvider):
             # Try a simple test parse
             try:
                 test_text = "The movie was released last year."
-                test_result = self.heideltime.parse(test_text)
+                test_result = heideltime(test_text, language=self.language, document_type='news')
                 success = test_result is not None
                 
                 return {
@@ -380,9 +380,9 @@ class HeidelTimeProvider(BaseProvider):
     
     async def close(self) -> None:
         """Clean up HeidelTime provider resources."""
-        if self.heideltime:
+        if self.heideltime_function:
             # HeidelTime cleanup if needed
-            self.heideltime = None
+            self.heideltime_function = None
             self._heideltime_initialized = False
             logger.info("HeidelTime provider closed")
     

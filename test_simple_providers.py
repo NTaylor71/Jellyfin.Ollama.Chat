@@ -15,7 +15,7 @@ def test_provider_initialization():
         ExpansionMethod.CONCEPTNET,
         ExpansionMethod.LLM, 
         ExpansionMethod.GENSIM,
-        ExpansionMethod.DUCKLING,
+        ExpansionMethod.SPACY_TEMPORAL,
         ExpansionMethod.HEIDELTIME,
         ExpansionMethod.SUTIME
     ]
@@ -80,7 +80,7 @@ def test_provider_support():
         ExpansionMethod.CONCEPTNET,
         ExpansionMethod.LLM,
         ExpansionMethod.GENSIM,
-        ExpansionMethod.DUCKLING
+        ExpansionMethod.SPACY_TEMPORAL
     ]
     
     for concept, context in test_concepts:

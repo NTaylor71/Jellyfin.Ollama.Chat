@@ -90,7 +90,6 @@ else
         # Try the problematic packages with force/no-deps
         echo "🔄 Attempting problematic packages with --no-deps..."
         python -m pip install --no-deps heideltime || echo "⚠️ heideltime skipped"
-        python -m pip install --no-deps duckling || echo "⚠️ duckling skipped"
         python -m pip install --no-deps sutime || echo "⚠️ sutime skipped"
 
         echo "✅ Installation completed with some packages potentially skipped"

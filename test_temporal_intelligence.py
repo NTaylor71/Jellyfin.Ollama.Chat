@@ -67,10 +67,10 @@ async def test_hybrid_temporal_expansion():
     
     # Test temporal concepts that should trigger intelligence
     test_cases = [
-        ("recent movies", "movie", ExpansionMethod.DUCKLING),
+        ("recent movies", "movie", ExpansionMethod.SPACY_TEMPORAL),
         ("classic cinema", "movie", ExpansionMethod.HEIDELTIME), 
         ("90s films", "movie", ExpansionMethod.SUTIME),
-        ("modern books", "book", ExpansionMethod.DUCKLING)
+        ("modern books", "book", ExpansionMethod.SPACY_TEMPORAL)
     ]
     
     successful_tests = 0

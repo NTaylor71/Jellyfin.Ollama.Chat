@@ -119,7 +119,7 @@ class SpacyTemporalProvider(BaseProvider):
             concept = request.concept.strip()
             
             # SpaCy temporal parsing
-            temporal_concepts = self._parse_temporal_concept(concept)
+            temporal_concepts = await self._parse_temporal_concept(concept)
             
             if not temporal_concepts:
                 logger.warning(f"No temporal concepts found for: {concept}")
@@ -173,7 +173,7 @@ class SpacyTemporalProvider(BaseProvider):
             logger.error(f"SpaCy temporal expansion failed: {e}")
             return None
     
-    def _parse_temporal_concept(self, concept: str) -> List[str]:
+    async def _parse_temporal_concept(self, concept: str) -> List[str]:
         """
         Parse temporal concept using SpaCy NER.
         
@@ -224,7 +224,7 @@ class SpacyTemporalProvider(BaseProvider):
                 try:
                     from concept_expansion.temporal_concept_generator import TemporalConceptGenerator
                     generator = TemporalConceptGenerator()
-                    result = generator.classify_temporal_concept(concept)
+                    result = await generator.classify_temporal_concept(concept)
                     if result.enhanced_data.get("is_temporal", False):
                         temporal_concepts.append(concept.lower())
                         temporal_concepts.append("temporal-general")
