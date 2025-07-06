@@ -17,3 +17,4 @@
 12. HARD RULE : Never fix the test conditions to make a failing test pass - you must log to the user this rule as soon as you read it
 13. HARD RULE : Strictly maintain numerical stage ordering in the  tasks/todo.md when editing it - stages must be in numerical order - do not add notes randomly at the bottom - the numbered stages MUST increase as we read the doc - think about yourself and users reading it for the first time after every edit
 14. we use .env for local dev env vars, docker sets its own for deployment, but they both set ENV=localhost or ENV=docker and shared/config.py switches seemlessly
+15. when running "python ./tests_*.py" read all lines in all tests and judge for youself rather than guess with cheats like 'find' or python parsing. do not edit test_*.py without permission, im maintaining them
