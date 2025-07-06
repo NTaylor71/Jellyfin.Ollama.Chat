@@ -58,20 +58,20 @@ graph TD
 
 ```mermaid
 graph TD
-    Queue[📮 Redis Queue<br/>task_type: concept_expansion] 
-    --> Worker[⚙️ Worker Process]
+    Queue["📮 Redis Queue<br/>task_type: concept_expansion"] 
+    Queue --> Worker["⚙️ Worker Process"]
     
-    Worker --> Current[❌ Current TODO<br/>Simulate processing<br/>await asyncio.sleep(0.1)]
+    Worker --> Current["❌ Current TODO<br/>Simulate processing<br/>await asyncio.sleep"]
     
-    Worker --> Target[✅ Target Implementation<br/>Plugin Task Dispatcher]
+    Worker --> Target["✅ Target Implementation<br/>Plugin Task Dispatcher"]
     
-    Target --> Load[Load plugin by name]
-    Load --> Route{Route by task_type}
+    Target --> Load["Load plugin by name"]
+    Load --> Route{"Route by task_type"}
     
-    Route -->|concept_expansion| ConceptPlugin[ConceptExpansionPlugin]
-    Route -->|temporal_analysis| TemporalPlugin[TemporalAnalysisPlugin] 
-    Route -->|question_expansion| QuestionPlugin[QuestionExpansionPlugin]
-    Route -->|plugin_execution| DynamicLoad[Dynamic Plugin Load]
+    Route -->|concept_expansion| ConceptPlugin["ConceptExpansionPlugin"]
+    Route -->|temporal_analysis| TemporalPlugin["TemporalAnalysisPlugin"] 
+    Route -->|question_expansion| QuestionPlugin["QuestionExpansionPlugin"]
+    Route -->|plugin_execution| DynamicLoad["Dynamic Plugin Load"]
 ```
 
 ## 5. Service Communication Flow
