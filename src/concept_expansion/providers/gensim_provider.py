@@ -333,10 +333,25 @@ class GensimProvider(BaseProvider):
         - Proper nouns not in training data
         - Very new slang or terminology
         """
+        # If Gensim not available at all, can't support anything
+        if not GENSIM_AVAILABLE:
+            return False
+            
+        # If model not loaded yet, assume it can support basic English words
+        # This prevents chicken-and-egg problem during initialization testing
         if not self.model:
+            # Basic heuristic: support common English words
+            words = concept.lower().split()
+            # Very basic check - reject obviously unsupported patterns
+            for word in words:
+                # Skip very short words, numbers, special chars
+                if len(word) < 2 or word.isdigit() or not word.isalpha():
+                    continue
+                # If we have at least one reasonable word, assume we can support it
+                return True
             return False
         
-        # Check if concept or its words are in vocabulary
+        # Model is loaded - check vocabulary directly
         words = concept.lower().split()
         
         # At least one word should be in vocabulary

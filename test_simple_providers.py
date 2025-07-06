@@ -1,12 +1,14 @@
 """
 Simple test for Stage 3.2.5 providers - tests basic functionality without large downloads.
 """
-
+from tests_shared import logger
 from concept_expansion.concept_expander import ConceptExpander, ExpansionMethod
+from tests_shared import settings_to_console
+
 
 def test_provider_initialization():
     """Test that all providers can be initialized."""
-    print("🔍 Testing Provider Initialization")
+    logger.info("🔍 Testing Provider Initialization")
     
     expander = ConceptExpander()
     
@@ -20,33 +22,33 @@ def test_provider_initialization():
         ExpansionMethod.SUTIME
     ]
     
-    print(f"✅ ConceptExpander created with {len(expander.providers)} providers")
+    logger.info(f"✅ ConceptExpander created with {len(expander.providers)} providers")
     
     for method in expected_providers:
         if method in expander.providers:
             provider = expander.providers[method]
-            try:
-                metadata = provider.metadata
-                print(f"✅ {method.value}: {metadata.name} ({metadata.provider_type})")
-                print(f"   Context-aware: {metadata.context_aware}")
-                print(f"   Strengths: {', '.join(metadata.strengths[:2])}")
-            except Exception as e:
-                print(f"⚠️  {method.value}: Error getting metadata - {e}")
+            # NO FALLBACKS - if metadata is broken, test should fail hard
+            metadata = provider.metadata
+            if not metadata:
+                raise AssertionError(f"{method.value} provider returned no metadata - provider is broken")
+            logger.info(f"✅ {method.value}: {metadata.name} ({metadata.provider_type})")
+            logger.info(f"   Context-aware: {metadata.context_aware}")
+            logger.info(f"   Strengths: {', '.join(metadata.strengths[:2])}")
         else:
-            print(f"❌ {method.value}: Not found in providers")
+            logger.info(f"❌ {method.value}: Not found in providers")
     
     # Test method capabilities
-    print(f"\n🔧 Testing Method Capabilities")
+    logger.info(f"\n🔧 Testing Method Capabilities")
     
     for method in expected_providers:
-        try:
-            capabilities = expander.get_method_capabilities(method)
-            print(f"✅ {method.value}: {capabilities['type']} provider")
-        except Exception as e:
-            print(f"❌ {method.value}: {e}")
+        # NO FALLBACKS - if capabilities are broken, test should fail hard
+        capabilities = expander.get_method_capabilities(method)
+        if not capabilities or 'type' not in capabilities:
+            raise AssertionError(f"{method.value} get_method_capabilities returned invalid data - expander is broken")
+        logger.info(f"✅ {method.value}: {capabilities['type']} provider")
     
     # Test method recommendation
-    print(f"\n🎯 Testing Method Recommendation")
+    logger.info(f"\n🎯 Testing Method Recommendation")
     
     test_concepts = [
         ("action", "movie"),
@@ -56,15 +58,15 @@ def test_provider_initialization():
     ]
     
     for concept, context in test_concepts:
-        try:
-            recommended = expander.get_recommended_method(concept, context)
-            print(f"✅ '{concept}' ({context}) → {recommended.value}")
-        except Exception as e:
-            print(f"❌ '{concept}' ({context}): {e}")
+        # NO FALLBACKS - if method recommendation is broken, test should fail hard
+        recommended = expander.get_recommended_method(concept, context)
+        if not recommended:
+            raise AssertionError(f"get_recommended_method returned None for '{concept}' ({context}) - recommendation logic is broken")
+        logger.info(f"✅ '{concept}' ({context}) → {recommended.value}")
 
 def test_provider_support():
-    """Test provider support checking."""
-    print(f"\n📋 Testing Provider Support")
+    """Test provider support checking and show actual provider capabilities."""
+    logger.info(f"\n📋 Testing Provider Support & Capabilities")
     
     expander = ConceptExpander()
     
@@ -84,25 +86,36 @@ def test_provider_support():
     ]
     
     for concept, context in test_concepts:
-        print(f"\nConcept: '{concept}' ({context})")
+        logger.info(f"\nConcept: '{concept}' ({context})")
         for method in providers_to_test:
-            try:
-                provider = expander.providers[method]
-                supports = provider.supports_concept(concept, context)
-                print(f"  {method.value}: {'✅' if supports else '❌'}")
-            except Exception as e:
-                print(f"  {method.value}: ⚠️  Error - {e}")
+            # NO FALLBACKS - if provider support checking is broken, test should fail hard
+            if method not in expander.providers:
+                raise AssertionError(f"Provider {method.value} not found in expander.providers - provider system is broken")
+            provider = expander.providers[method]
+            supports = provider.supports_concept(concept, context)
+            if supports is None:
+                raise AssertionError(f"Provider {method.value} supports_concept returned None - provider logic is broken")
+            
+            # Show detailed provider info
+            status = "✅" if supports else "❌"
+            metadata = provider.metadata
+            strengths = ", ".join(metadata.strengths[:2]) if metadata.strengths else "unknown"
+            logger.info(f"  {method.value:15}: {status} - {metadata.provider_type} ({strengths})")
+            
+            # For supported providers, show what they would recommend
+            if supports:
+                try:
+                    params = provider.get_recommended_parameters(concept, context)
+                    max_concepts = params.get('max_concepts', 'default')
+                    logger.info(f"    └─ Recommends: max_concepts={max_concepts}")
+                except Exception as e:
+                    logger.info(f"    └─ Parameter recommendation failed: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Simple Provider Test - Stage 3.2.5")
-    print("=" * 50)
+    logger.info("🚀 Simple Provider Test - Stage 3.2.5")
+    logger.info("=" * 50)
     
-    try:
-        test_provider_initialization()
-        test_provider_support()
-        print(f"\n🎉 Basic provider tests completed!")
-        
-    except Exception as e:
-        print(f"\n💥 Test failed: {e}")
-        import traceback
-        traceback.print_exc()
+    # NO FALLBACKS - if any test fails, the whole test should fail hard
+    test_provider_initialization()
+    test_provider_support()
+    logger.info(f"\n🎉 All basic provider tests passed - system is working correctly!")

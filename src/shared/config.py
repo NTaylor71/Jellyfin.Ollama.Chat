@@ -98,26 +98,34 @@ class Settings(BaseSettings):
     # ==========================================================================
     
     # Chat service
-    OLLAMA_CHAT_BASE_URL: str = Field(default="http://localhost:12434")
+    OLLAMA_CHAT_BASE_URL: str = Field(default="http://localhost:11434")
     OLLAMA_CHAT_MODEL: str = Field(default="llama3.2:3b")
     OLLAMA_CHAT_TIMEOUT: int = Field(default=300)
+
+    DOCKER_CHAT_BASE_URL: str = Field(default="http://localhost:11434")
+    DOCKER_CHAT_MODEL: str = Field(default="llama3.2:3b")
+    DOCKER_CHAT_TIMEOUT: int = Field(default=300)
     
-    # Embedding service
-    OLLAMA_EMBED_BASE_URL: str = Field(default="http://localhost:12435")
+    # Embedding service (use same as chat for localhost)
+    OLLAMA_EMBED_BASE_URL: str = Field(default="http://localhost:11434")
     OLLAMA_EMBED_MODEL: str = Field(default="nomic-embed-text")
     OLLAMA_EMBED_TIMEOUT: int = Field(default=60)
-    
-    # Docker overrides
-    DOCKER_OLLAMA_CHAT_URL: str = Field(default="http://ollama-chat:11434")
-    DOCKER_OLLAMA_EMBED_URL: str = Field(default="http://ollama-embed:11434")
-    
+
+
     @property
     def ollama_chat_url(self) -> str:
         """Get Ollama chat URL based on environment."""
         if self.is_docker:
             return self.DOCKER_OLLAMA_CHAT_URL
         return self.OLLAMA_CHAT_BASE_URL
-    
+
+    @property
+    def ollama_chat_model(self) -> str:
+        """Get Ollama chat model based on environment."""
+        if self.is_docker:
+            return self.DOCKER_OLLAMA_CHAT_URL
+        return self.OLLAMA_CHAT_MODEL
+
     @property
     def ollama_embed_url(self) -> str:
         """Get Ollama embedding URL based on environment."""
@@ -263,6 +271,38 @@ class Settings(BaseSettings):
     def plugin_path(self) -> Path:
         """Get plugin directory as Path object."""
         return Path(self.PLUGIN_DIRECTORY)
+    
+    # ==========================================================================
+    # JAVA CONFIGURATION (for HeidelTime, SUTime, etc.)
+    # ==========================================================================
+    
+    JAVA_HOME: Optional[str] = Field(default=None)
+    
+    @property
+    def java_home(self) -> str:
+        """Get JAVA_HOME based on environment."""
+        if self.JAVA_HOME:
+            return self.JAVA_HOME
+        
+        # Environment-specific defaults
+        if self.is_docker:
+            # Docker typically has Java at this path
+            return "/usr/lib/jvm/java-11-openjdk-amd64"
+        else:
+            # Localhost - detect Java installation
+            import subprocess
+            try:
+                # Try to find Java home using readlink
+                java_path = subprocess.check_output(['readlink', '-f', '/usr/bin/java'], text=True).strip()
+                # Remove /jre/bin/java or /bin/java suffix to get JAVA_HOME
+                if '/jre/bin/java' in java_path:
+                    return java_path.replace('/jre/bin/java', '')
+                elif '/bin/java' in java_path:
+                    return java_path.replace('/bin/java', '')
+                return java_path
+            except:
+                # Fallback to common locations
+                return "/usr/lib/jvm/java-8-openjdk-amd64"
     
     # ==========================================================================
     # MONITORING & OBSERVABILITY

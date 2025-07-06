@@ -16,8 +16,10 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import httpx
+from .config import get_settings
 
 logger = logging.getLogger(__name__)
+
 
 
 class ModelStatus(Enum):
@@ -49,6 +51,9 @@ class ModelManager:
     """
     
     def __init__(self, models_base_path: str = "/app/models"):
+
+        self.settings = get_settings()
+
         self.models_base_path = Path(models_base_path)
         self.models_base_path.mkdir(parents=True, exist_ok=True)
         
@@ -66,7 +71,7 @@ class ModelManager:
         os.environ['GENSIM_DATA_DIR'] = str(self.gensim_data_path)
         
         self.models = self._define_required_models()
-        self.ollama_base_url = os.getenv('OLLAMA_CHAT_BASE_URL', 'http://localhost:11434')
+        self.ollama_base_url = self.settings.ollama_chat_url
     
     def _define_required_models(self) -> Dict[str, ModelInfo]:
         """Define all required models and their properties."""
@@ -166,10 +171,31 @@ class ModelManager:
             return ModelStatus.ERROR
     
     def _check_nltk_model(self, model_info: ModelInfo) -> ModelStatus:
-        """Check if NLTK model is available."""
-        if Path(model_info.storage_path).exists():
+        """Check if NLTK model is available by actually trying to use it."""
+        try:
+            import nltk
+            
+            # Set NLTK data path
+            nltk.data.path.clear()
+            nltk.data.path.append(str(self.nltk_data_path))
+            
+            # Try to find the resource using NLTK's own mechanism
+            if model_info.name == "punkt":
+                nltk.data.find('tokenizers/punkt')
+            elif model_info.name == "stopwords":
+                nltk.data.find('corpora/stopwords')
+            elif model_info.name == "wordnet":
+                nltk.data.find('corpora/wordnet')
+            else:
+                # Fallback to path check for unknown models
+                if Path(model_info.storage_path).exists():
+                    return ModelStatus.AVAILABLE
+                return ModelStatus.MISSING
+                
             return ModelStatus.AVAILABLE
-        return ModelStatus.MISSING
+            
+        except Exception:
+            return ModelStatus.MISSING
     
     def _check_gensim_model(self, model_info: ModelInfo) -> ModelStatus:
         """Check if Gensim model is available."""
@@ -203,11 +229,22 @@ class ModelManager:
                 models_data = response.json()
                 available_models = [model["name"] for model in models_data.get("models", [])]
                 
+                # Check for exact match first
                 if model_name in available_models:
                     return ModelStatus.AVAILABLE
-                else:
-                    logger.info(f"Ollama model '{model_name}' not found. Available: {available_models}")
-                    return ModelStatus.MISSING
+                
+                # Check for model with :latest tag
+                model_with_latest = f"{model_name}:latest"
+                if model_with_latest in available_models:
+                    return ModelStatus.AVAILABLE
+                
+                # Check if any available model starts with our model name
+                for available in available_models:
+                    if available.startswith(f"{model_name}:"):
+                        return ModelStatus.AVAILABLE
+                
+                logger.info(f"Ollama model '{model_name}' not found. Available: {available_models}")
+                return ModelStatus.MISSING
                     
         except Exception as e:
             logger.warning(f"Could not check Ollama model '{model_name}': {e}")
@@ -277,8 +314,35 @@ class ModelManager:
             nltk.data.path.clear()
             nltk.data.path.append(str(self.nltk_data_path))
             
-            # Download the model
+            # Download the model - this should extract automatically
             success = nltk.download(model_info.name, download_dir=str(self.nltk_data_path), quiet=False)
+            
+            if success:
+                # For wordnet, check if we need to manually extract the ZIP
+                if model_info.name == "wordnet":
+                    wordnet_zip = self.nltk_data_path / "corpora" / "wordnet.zip"
+                    wordnet_dir = self.nltk_data_path / "corpora" / "wordnet"
+                    
+                    if wordnet_zip.exists() and not wordnet_dir.exists():
+                        import zipfile
+                        logger.info(f"Extracting wordnet.zip to {wordnet_dir}")
+                        with zipfile.ZipFile(wordnet_zip, 'r') as zip_ref:
+                            zip_ref.extractall(self.nltk_data_path / "corpora")
+                
+                # Verify the model is properly extracted and accessible
+                try:
+                    if model_info.name == "punkt":
+                        nltk.data.find('tokenizers/punkt')
+                    elif model_info.name == "stopwords":
+                        nltk.data.find('corpora/stopwords')
+                    elif model_info.name == "wordnet":
+                        nltk.data.find('corpora/wordnet')
+                    logger.info(f"NLTK model {model_info.name} verified after download")
+                    return True
+                except Exception as verify_error:
+                    logger.error(f"NLTK model {model_info.name} downloaded but not accessible: {verify_error}")
+                    return False
+            
             return success
             
         except Exception as e:

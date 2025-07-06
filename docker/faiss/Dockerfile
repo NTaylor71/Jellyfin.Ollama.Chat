@@ -9,15 +9,13 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy project files
 COPY pyproject.toml ./
+COPY src/ ./src/
 
 # Install Python dependencies - ONLY FAISS dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e ".[faiss]"
-
-# Copy source code
-COPY src/ ./src/
 
 # Create directories for FAISS data
 RUN mkdir -p /app/data/faiss_index && \

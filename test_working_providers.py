@@ -2,14 +2,17 @@
 Test working providers for Stage 3.2.5 without large downloads.
 Tests ConceptNet and LLM providers that should work without additional downloads.
 """
+from tests_shared import logger
+from tests_shared import settings_to_console
 
 import asyncio
 from concept_expansion.concept_expander import ConceptExpander, ExpansionMethod
 
+
 async def test_working_providers():
     """Test providers that should work out of the box."""
-    print("🔍 Testing Working Providers (ConceptNet + LLM)")
-    print("=" * 50)
+    logger.info("🔍 Testing Working Providers (ConceptNet + LLM)")
+    logger.info("=" * 50)
     
     expander = ConceptExpander()
     
@@ -21,47 +24,41 @@ async def test_working_providers():
         ("recent movies", "movie", ExpansionMethod.LLM)
     ]
     
-    successful_tests = 0
-    total_tests = len(test_cases)
-    
     for concept, context, method in test_cases:
-        print(f"\n🎯 Testing: '{concept}' ({context}) with {method.value.upper()}")
+        logger.info(f"\n🎯 Testing: '{concept}' ({context}) with {method.value.upper()}")
         
-        try:
-            result = await expander.expand_concept(
-                concept=concept,
-                media_context=context,
-                method=method,
-                max_concepts=5
-            )
-            
-            if result and result.success:
-                expanded = result.enhanced_data.get("expanded_concepts", [])
-                confidence_scores = result.confidence_score.per_item
-                execution_time = result.plugin_metadata.execution_time_ms
-                
-                print(f"✅ Success! Found {len(expanded)} concepts in {execution_time:.1f}ms")
-                for i, concept_item in enumerate(expanded[:3]):  # Show top 3
-                    confidence = confidence_scores.get(concept_item, 0.0)
-                    print(f"   {i+1}. {concept_item} (confidence: {confidence:.3f})")
-                
-                successful_tests += 1
-            else:
-                print(f"❌ Failed: No valid result")
-                
-        except Exception as e:
-            print(f"💥 Error: {e}")
+        # NO FALLBACKS - if expansion fails, test should fail hard
+        result = await expander.expand_concept(
+            concept=concept,
+            media_context=context,
+            method=method,
+            max_concepts=5
+        )
+        
+        # Validate we got actual results, not empty fallback
+        if not result or not result.success:
+            raise AssertionError(f"Concept expansion failed for '{concept}' with {method.value} - provider may be down or broken")
+        
+        expanded = result.enhanced_data.get("expanded_concepts", [])
+        if not expanded:
+            raise AssertionError(f"Provider {method.value} returned no expanded concepts for '{concept}' - provider is broken")
+        
+        confidence_scores = result.confidence_score.per_item
+        execution_time = result.plugin_metadata.execution_time_ms
+        
+        logger.info(f"✅ Success! Found {len(expanded)} concepts in {execution_time:.1f}ms")
+        for i, concept_item in enumerate(expanded[:3]):  # Show top 3
+            confidence = confidence_scores.get(concept_item, 0.0)
+            logger.info(f"   {i+1}. {concept_item} (confidence: {confidence:.3f})")
     
-    print(f"\n📊 RESULTS")
-    print(f"✅ Successful: {successful_tests}/{total_tests}")
-    print(f"📈 Success rate: {successful_tests/total_tests*100:.1f}%")
+    logger.info(f"\n✅ All {len(test_cases)} provider tests passed successfully!")
     
     await expander.close()
 
 def test_provider_availability():
     """Test which providers are available without initialization."""
-    print("🔧 Provider Availability Check")
-    print("=" * 50)
+    logger.info("🔧 Provider Availability Check")
+    logger.info("=" * 50)
     
     expander = ConceptExpander()
     
@@ -80,29 +77,29 @@ def test_provider_availability():
             
         provider = expander.providers.get(method)
         if provider:
-            try:
-                metadata = provider.metadata
-                expected_available = availability.get(metadata.name, False)
-                status = "✅ Ready" if expected_available else "⚠️ Needs setup"
-                print(f"{metadata.name:12} ({metadata.provider_type:10}): {status}")
-                if not expected_available:
-                    print(f"             Requirements: {metadata.weaknesses[0] if metadata.weaknesses else 'External dependencies'}")
-            except Exception as e:
-                print(f"{method.value:12}: ❌ Error - {e}")
+            # NO FALLBACKS - if metadata is broken, test should fail hard
+            metadata = provider.metadata
+            if not metadata:
+                raise AssertionError(f"Provider {method.value} returned no metadata - provider is broken")
+            
+            expected_available = availability.get(metadata.name, False)
+            status = "✅ Ready" if expected_available else "⚠️ Needs setup"
+            logger.info(f"{metadata.name:12} ({metadata.provider_type:10}): {status}")
+            if not expected_available:
+                logger.info(f"             Requirements: {metadata.weaknesses[0] if metadata.weaknesses else 'External dependencies'}")
+        else:
+            raise AssertionError(f"Provider {method.value} not found in expander.providers - provider system is broken")
 
 if __name__ == "__main__":
-    print("🚀 Stage 3.2.5 Working Providers Test")
-    print("=" * 60)
+    logger.info("🚀 Stage 3.2.5 Working Providers Test")
+    logger.info("=" * 60)
+
+    settings_to_console()
     
-    try:
-        test_provider_availability()
-        print("\n")
-        asyncio.run(test_working_providers())
-        
-        print(f"\n🎉 Tests completed!")
-        print("Note: Gensim, HeidelTime, SUTime need additional setup")
-        
-    except Exception as e:
-        print(f"\n💥 Test failed: {e}")
-        import traceback
-        traceback.print_exc()
+    # NO FALLBACKS - if any test fails, the whole test should fail hard
+    test_provider_availability()
+    logger.info("\n")
+    asyncio.run(test_working_providers())
+    
+    logger.info(f"\n🎉 All working provider tests completed successfully!")
+    logger.info("Note: Gensim, HeidelTime, SUTime need additional setup")

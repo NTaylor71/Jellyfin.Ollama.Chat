@@ -34,7 +34,7 @@ class OllamaBackendClient(BaseLLMClient):
         super().__init__()
         self.settings = get_settings()
         self.base_url = self.settings.ollama_chat_url
-        self.model = self.settings.OLLAMA_CHAT_MODEL
+        self.model = self.settings.ollama_chat_model
         self.timeout = self.settings.OLLAMA_CHAT_TIMEOUT
         
         # HTTP client for API calls
