@@ -18,15 +18,10 @@ from shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# Gensim imports with fallback
-try:
-    from gensim.models import Word2Vec, KeyedVectors
-    from gensim.models.keyedvectors import KeyedVectors as KV
-    from gensim.downloader import load as gensim_load
-    GENSIM_AVAILABLE = True
-except ImportError:
-    GENSIM_AVAILABLE = False
-    logger.warning("Gensim not available. Install with: pip install gensim")
+# Gensim imports - fail fast if not available
+from gensim.models import Word2Vec, KeyedVectors
+from gensim.models.keyedvectors import KeyedVectors as KV
+from gensim.downloader import load as gensim_load
 
 
 class GensimProvider(BaseProvider):
@@ -80,9 +75,6 @@ class GensimProvider(BaseProvider):
     
     async def initialize(self) -> bool:
         """Initialize the Gensim provider by loading the word embedding model."""
-        if not GENSIM_AVAILABLE:
-            logger.error("Gensim not available - cannot initialize GensimProvider")
-            return False
         
         try:
             if not self._model_loaded:
@@ -259,12 +251,6 @@ class GensimProvider(BaseProvider):
     async def health_check(self) -> Dict[str, Any]:
         """Check Gensim provider health."""
         try:
-            if not GENSIM_AVAILABLE:
-                return {
-                    "status": "unhealthy",
-                    "provider": "Gensim",
-                    "error": "Gensim not available"
-                }
             
             if not self._model_loaded:
                 return {
@@ -333,9 +319,7 @@ class GensimProvider(BaseProvider):
         - Proper nouns not in training data
         - Very new slang or terminology
         """
-        # If Gensim not available at all, can't support anything
-        if not GENSIM_AVAILABLE:
-            return False
+        # Note: If Gensim not available, import would have failed at module load
             
         # If model not loaded yet, assume it can support basic English words
         # This prevents chicken-and-egg problem during initialization testing

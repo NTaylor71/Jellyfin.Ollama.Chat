@@ -135,7 +135,7 @@ async def test_heideltime_provider(expander):
     
     # Check if py-heideltime is installed
     try:
-        import heideltime
+        from py_heideltime.py_heideltime import heideltime
     except ImportError:
         raise AssertionError("py-heideltime not installed. Run: pip install py-heideltime")
     

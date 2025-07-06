@@ -586,7 +586,13 @@ class ConceptExpander:
                     parsed_scores = sutime_result.confidence_score.per_item
                     all_concepts.extend(parsed_concepts)
                     all_confidence_scores.update(parsed_scores)
-                    logger.debug(f"SUTime parsed {len(parsed_concepts)} temporal concepts")
+                    logger.info(f"🔍 SUTime parsed {len(parsed_concepts)} concepts: {parsed_concepts}")
+                    if parsed_concepts:
+                        for i, pc in enumerate(parsed_concepts):
+                            conf = parsed_scores.get(pc, 0.0)
+                            logger.info(f"      SUTime {i+1}. {pc} (confidence: {conf:.3f})")
+                else:
+                    logger.info("🔍 SUTime parsing failed or returned no results")
             
             # Add procedural temporal intelligence
             temporal_request = TemporalConceptRequest(
@@ -601,7 +607,13 @@ class ConceptExpander:
                 intelligent_scores = intelligence_result.confidence_score.per_item
                 all_concepts.extend(intelligent_concepts)
                 all_confidence_scores.update(intelligent_scores)
-                logger.debug(f"Generated {len(intelligent_concepts)} intelligent temporal concepts")
+                logger.info(f"🧠 LLM Intelligence generated {len(intelligent_concepts)} concepts: {intelligent_concepts}")
+                if intelligent_concepts:
+                    for i, ic in enumerate(intelligent_concepts):
+                        conf = intelligent_scores.get(ic, 0.0)
+                        logger.info(f"      LLM {i+1}. {ic} (confidence: {conf:.3f})")
+            else:
+                logger.info("🧠 LLM Intelligence failed or returned no results")
             
             if not all_concepts:
                 logger.warning(f"No temporal concepts found for: {concept}")

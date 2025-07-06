@@ -18,13 +18,8 @@ from shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# SpaCy imports with fallback
-try:
-    import spacy
-    SPACY_AVAILABLE = True
-except ImportError:
-    SPACY_AVAILABLE = False
-    logger.warning("SpaCy not available. Install with: pip install spacy")
+# SpaCy imports - fail fast if not available
+import spacy
 
 
 class SpacyTemporalProvider(BaseProvider):
@@ -72,9 +67,6 @@ class SpacyTemporalProvider(BaseProvider):
     
     async def initialize(self) -> bool:
         """Initialize the SpaCy temporal provider."""
-        if not SPACY_AVAILABLE:
-            logger.error("SpaCy not available - cannot initialize SpacyTemporalProvider")
-            return False
         
         try:
             if not self._spacy_initialized:
@@ -271,12 +263,6 @@ class SpacyTemporalProvider(BaseProvider):
     async def health_check(self) -> Dict[str, Any]:
         """Check SpaCy temporal provider health."""
         try:
-            if not SPACY_AVAILABLE:
-                return {
-                    "status": "unhealthy",
-                    "provider": "SpacyTemporal",
-                    "error": "SpaCy not available"
-                }
             
             if not self._spacy_initialized:
                 return {

@@ -55,40 +55,6 @@ async def test_working_providers():
     
     await expander.close()
 
-def test_provider_availability():
-    """Test which providers are available without initialization."""
-    logger.info("🔧 Provider Availability Check")
-    logger.info("=" * 50)
-    
-    expander = ConceptExpander()
-    
-    availability = {
-        "ConceptNet": True,  # Always available (no external deps)
-        "LLM": True,        # Should work with Ollama
-        "Gensim": False,    # Would require large model download
-        "SpaCy Temporal": True,  # Using SpaCy for temporal parsing
-        "HeidelTime": False, # Requires pip install py-heideltime  
-        "SUTime": False     # Requires Java + SUTime setup
-    }
-    
-    for method in ExpansionMethod:
-        if method == ExpansionMethod.MULTI_SOURCE or method == ExpansionMethod.AUTO:
-            continue
-            
-        provider = expander.providers.get(method)
-        if provider:
-            # NO FALLBACKS - if metadata is broken, test should fail hard
-            metadata = provider.metadata
-            if not metadata:
-                raise AssertionError(f"Provider {method.value} returned no metadata - provider is broken")
-            
-            expected_available = availability.get(metadata.name, False)
-            status = "✅ Ready" if expected_available else "⚠️ Needs setup"
-            logger.info(f"{metadata.name:12} ({metadata.provider_type:10}): {status}")
-            if not expected_available:
-                logger.info(f"             Requirements: {metadata.weaknesses[0] if metadata.weaknesses else 'External dependencies'}")
-        else:
-            raise AssertionError(f"Provider {method.value} not found in expander.providers - provider system is broken")
 
 if __name__ == "__main__":
     logger.info("🚀 Stage 3.2.5 Working Providers Test")
@@ -97,9 +63,6 @@ if __name__ == "__main__":
     settings_to_console()
     
     # NO FALLBACKS - if any test fails, the whole test should fail hard
-    test_provider_availability()
-    logger.info("\n")
     asyncio.run(test_working_providers())
     
     logger.info(f"\n🎉 All working provider tests completed successfully!")
-    logger.info("Note: Gensim, HeidelTime, SUTime need additional setup")

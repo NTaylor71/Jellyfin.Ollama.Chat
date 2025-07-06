@@ -230,8 +230,10 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 system_prompt=self._build_temporal_system_prompt(request.media_context)
             )
             
-            # Call LLM
+            # Call LLM for temporal concept generation
+            logger.info(f"🤖 LLM Request: Generating temporal concepts for '{request.temporal_term}' in {request.media_context} context")
             llm_response = await self.llm_provider.client.generate_completion(llm_request)
+            logger.info(f"🤖 LLM Response: {len(llm_response.text)} characters received")
             
             if not llm_response.success:
                 logger.warning(f"LLM failed for temporal concept generation: {llm_response.error_message}")
@@ -412,7 +414,17 @@ Related temporal concepts:"""
         import re
         
         # Basic cleaning
+        original = concept
         cleaned = concept.strip()
+        
+        # Remove quotes first
+        cleaned = cleaned.strip('"\'')
+        
+        # Remove unwanted single-letter prefixes followed by slash (s/, a/, etc.) - BEFORE lowercasing
+        before_slash_removal = cleaned
+        cleaned = re.sub(r'^[a-zA-Z]/', '', cleaned)
+        if before_slash_removal != cleaned:
+            logger.info(f"🧹 Removed single-letter prefix: '{before_slash_removal}' → '{cleaned}'")
         
         # Remove numbering (1., 2., etc.)
         cleaned = re.sub(r'^\d+\.?\s*', '', cleaned)
@@ -420,14 +432,14 @@ Related temporal concepts:"""
         # Remove bullet points
         cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
         
-        # Remove quotes
-        cleaned = cleaned.strip('"\'')
-        
         # Remove extra whitespace
         cleaned = re.sub(r'\s+', ' ', cleaned)
         
-        # Lowercase and strip
+        # Lowercase and strip at the end
         cleaned = cleaned.lower().strip()
+        
+        if original != cleaned:
+            logger.info(f"🧹 Concept cleaning: '{original}' → '{cleaned}'")
         
         return cleaned
     
@@ -586,14 +598,18 @@ Respond with just the number (e.g., 1.3)"""
             
             # Async call for pattern analysis
             try:
+                logger.info(f"🔍 LLM Relevance Check: '{concept}' vs '{original_term}'")
                 llm_response = await self.llm_provider.client.generate_completion(llm_request)
                 if llm_response.success:
                     relevance = float(llm_response.text.strip())
                     relevance = max(1.0, min(1.5, relevance))  # Clamp to valid range
+                    logger.info(f"📊 Relevance score: {relevance} for '{concept}' (response: '{llm_response.text.strip()}')")
                 else:
                     relevance = 1.0
-            except:
+                    logger.info(f"❌ LLM relevance check failed for '{concept}', using default: {relevance}")
+            except Exception as e:
                 relevance = 1.0
+                logger.info(f"⚠️ LLM relevance check error for '{concept}': {e}, using default: {relevance}")
                 
         except Exception as e:
             logger.debug(f"LLM relevance calculation failed: {e}")
@@ -604,6 +620,50 @@ Respond with just the number (e.g., 1.3)"""
                 relevance = 1.0
         
         return relevance
+
+    def _calculate_temporal_relevance_simple(self, concept: str, original_term: str) -> float:
+        """
+        Calculate temporal relevance using simple pattern matching.
+        
+        Much faster than LLM-based calculation and avoids excessive API calls.
+        
+        Args:
+            concept: Generated concept
+            original_term: Original temporal term
+            
+        Returns:
+            Temporal relevance multiplier (1.0-1.5)
+        """
+        concept_lower = concept.lower()
+        original_lower = original_term.lower()
+        
+        # Direct match gets highest score
+        if original_lower in concept_lower or concept_lower in original_lower:
+            return 1.5
+        
+        # Temporal keywords
+        temporal_keywords = {
+            'recent': ['new', 'current', 'contemporary', 'modern', 'latest', 'fresh'],
+            'classic': ['old', 'vintage', 'retro', 'traditional', 'golden', 'timeless'], 
+            '90s': ['nineties', 'decade', 'era', 'period', 'grunge', 'alternative'],
+            'vintage': ['old', 'classic', 'retro', 'antique', 'aged', 'traditional'],
+            'modern': ['new', 'current', 'contemporary', 'recent', 'latest', 'today']
+        }
+        
+        # Check if concept contains keywords related to original term
+        for term, keywords in temporal_keywords.items():
+            if term in original_lower:
+                for keyword in keywords:
+                    if keyword in concept_lower:
+                        return 1.3
+        
+        # Generic temporal indicators
+        time_indicators = ['year', 'decade', 'era', 'period', 'time', 'age', 'season']
+        if any(indicator in concept_lower for indicator in time_indicators):
+            return 1.2
+        
+        # Default relevance
+        return 1.0
 
     async def _generate_temporal_terms_via_llm(
         self,

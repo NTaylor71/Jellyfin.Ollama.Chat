@@ -18,16 +18,8 @@ from shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# HeidelTime imports with fallback
-try:
-    from py_heideltime.py_heideltime import heideltime
-    HEIDELTIME_AVAILABLE = True
-except ImportError:
-    HEIDELTIME_AVAILABLE = False
-    logger.warning("HeidelTime not available. Install with: pip install py-heideltime")
-except Exception as e:
-    HEIDELTIME_AVAILABLE = False
-    logger.warning(f"HeidelTime import error: {e}")
+# HeidelTime imports - fail fast if not available
+from py_heideltime.py_heideltime import heideltime
 
 
 class HeidelTimeProvider(BaseProvider):
@@ -41,7 +33,7 @@ class HeidelTimeProvider(BaseProvider):
     def __init__(self, language: str = "english"):
         super().__init__()
         self.language = language
-        self.heideltime_function = heideltime if HEIDELTIME_AVAILABLE else None
+        self.heideltime_function = heideltime
         self._heideltime_initialized = False
         
         # Pure HeidelTime temporal parser - no hard-coded patterns
@@ -78,9 +70,6 @@ class HeidelTimeProvider(BaseProvider):
     
     async def initialize(self) -> bool:
         """Initialize the HeidelTime provider."""
-        if not HEIDELTIME_AVAILABLE:
-            logger.error("HeidelTime not available - cannot initialize HeidelTimeProvider")
-            return False
         
         try:
             if not self._heideltime_initialized:
@@ -302,12 +291,6 @@ class HeidelTimeProvider(BaseProvider):
     async def health_check(self) -> Dict[str, Any]:
         """Check HeidelTime provider health."""
         try:
-            if not HEIDELTIME_AVAILABLE:
-                return {
-                    "status": "unhealthy",
-                    "provider": "HeidelTime",
-                    "error": "HeidelTime not available"
-                }
             
             if not self._heideltime_initialized:
                 return {

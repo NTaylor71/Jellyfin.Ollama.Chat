@@ -19,13 +19,8 @@ from shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# SUTime imports with fallback
-try:
-    from sutime import SUTime
-    SUTIME_AVAILABLE = True
-except ImportError:
-    SUTIME_AVAILABLE = False
-    logger.warning("SUTime not available. Install with: pip install sutime")
+# SUTime imports - fail fast if not available
+from sutime import SUTime
 
 
 class SUTimeProvider(BaseProvider):
@@ -75,9 +70,6 @@ class SUTimeProvider(BaseProvider):
     
     async def initialize(self) -> bool:
         """Initialize the SUTime provider."""
-        if not SUTIME_AVAILABLE:
-            logger.error("SUTime not available - cannot initialize SUTimeProvider")
-            return False
         
         try:
             if not self._sutime_initialized:
@@ -266,12 +258,6 @@ class SUTimeProvider(BaseProvider):
     async def health_check(self) -> Dict[str, Any]:
         """Check SUTime provider health."""
         try:
-            if not SUTIME_AVAILABLE:
-                return {
-                    "status": "unhealthy",
-                    "provider": "SUTime",
-                    "error": "SUTime not available"
-                }
             
             if not self._sutime_initialized:
                 return {

@@ -6,12 +6,12 @@ logger = logging.getLogger(__name__)
 
 def settings_to_console():
     """Display current environment settings to console for debugging."""
-    logger.info("🧠 .env Settings :")
+    logger.info("----------------------------------------")
     
     settings = get_settings()
     
     # Core environment
-    logger.info(f"✅ ENV: {settings.ENV}")
+    logger.info(f"✅ Environ Switch: {settings.ENV}")
     logger.info(f"🔗 Redis: {settings.redis_url}")
     logger.info(f"🤖 Ollama Chat: {settings.OLLAMA_CHAT_BASE_URL}")
     logger.info(f"🔤 Ollama Embed: {settings.OLLAMA_EMBED_BASE_URL}")
@@ -30,5 +30,5 @@ def settings_to_console():
     
     # Plugin configuration
     logger.info(f"🔌 Plugin Dir: {settings.PLUGIN_DIRECTORY}")
-    
-    logger.info("<<<---- Settings loaded from .env")
+
+    logger.info("----------------------------------------")
