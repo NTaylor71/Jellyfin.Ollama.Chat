@@ -41,9 +41,17 @@ services:
     environment:
       - OLLAMA_KEEP_ALIVE=10m
       - OLLAMA_HOST=0.0.0.0:11434
-    # Note: Ollama may need root for GPU access, but directory should be pre-created with correct permissions
+      - CUDA_VISIBLE_DEVICES=all
     networks:
       - rag-network
+    # GPU support - will fail hard if NVIDIA runtime not available
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
@@ -283,16 +291,16 @@ services:
       - LOG_LEVEL=DEBUG
       - ENABLE_CORS=true
       - ENABLE_API_DOCS=true
-      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
       - CONTAINER_TYPE=api
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - rag-network
     depends_on:
       redis:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -326,20 +334,20 @@ services:
       - REDIS_HOST=redis
       - MONGODB_HOST=mongodb
       - LOG_LEVEL=DEBUG
-      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
       - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
       - NLTK_DATA=/app/models/nltk_data
       - GENSIM_DATA_DIR=/app/models/gensim_data
       - CONTAINER_TYPE=worker
       - ROUTER_SERVICE_URL=http://router-service:8003
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - rag-network
     depends_on:
       redis:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
       router-service:
         condition: service_healthy

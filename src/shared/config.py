@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     OLLAMA_CHAT_MODEL: str = Field(default="llama3.2:3b")
     OLLAMA_CHAT_TIMEOUT: int = Field(default=300)
 
-    DOCKER_CHAT_BASE_URL: str = Field(default="http://localhost:11434")
+    DOCKER_CHAT_BASE_URL: str = Field(default="http://ollama:11434")
     DOCKER_CHAT_MODEL: str = Field(default="llama3.2:3b")
     DOCKER_CHAT_TIMEOUT: int = Field(default=300)
     

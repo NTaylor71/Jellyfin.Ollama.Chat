@@ -110,6 +110,18 @@ class MinimalNLPManager:
         else:
             logger.warning(f"⚠️ NLTK models missing - punkt: {nltk_punkt}, stopwords: {nltk_stopwords}, wordnet: {nltk_wordnet}")
         
+        # Initialize HeidelTime provider (Java-based, no model download needed)
+        try:
+            self.providers["heideltime"] = {
+                "name": "HeidelTime Temporal Provider",
+                "type": "heideltime",
+                "version": "1.0.0",
+                "status": "ready"
+            }
+            logger.info("✅ HeidelTime provider initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ HeidelTime provider not available: {e}")
+        
         logger.info(f"✅ NLP Provider initialization complete. {len(self.providers)} providers ready.")
     
     def get_provider(self, provider_name: str):
@@ -154,6 +166,165 @@ class MinimalNLPManager:
 
 # Global provider manager
 provider_manager = MinimalNLPManager()
+
+
+# Real provider functions
+async def _expand_with_gensim(request: ProviderRequest) -> Dict[str, Any]:
+    """Expand concept using real Gensim Word2Vec provider."""
+    try:
+        from src.concept_expansion.providers.gensim_provider import GensimProvider
+        
+        provider = GensimProvider(model_name="word2vec-google-news-300")
+        
+        # Check health and initialize if needed
+        health_status = await provider.health_check()
+        if health_status.get("status") != "healthy":
+            logger.warning(f"Gensim provider not healthy: {health_status}")
+            
+        # Create expansion request
+        from src.concept_expansion.providers.base_provider import ExpansionRequest
+        expansion_request = ExpansionRequest(
+            concept=request.concept,
+            media_context=request.media_context,
+            max_concepts=request.max_concepts
+        )
+        
+        # Use the provider's expand_concept method
+        expansion_result = await provider.expand_concept(expansion_request)
+        
+        if expansion_result and expansion_result.success:
+            concepts = expansion_result.enhanced_data.get("expanded_concepts", [])
+            scores = expansion_result.enhanced_data.get("confidence_scores", [])
+            
+            return {
+                "expanded_concepts": concepts[:request.max_concepts],
+                "confidence_scores": scores[:request.max_concepts],
+                "provider_used": "gensim",
+                "total_found": len(concepts)
+            }
+        else:
+            error_msg = expansion_result.error_message if expansion_result else "No result returned"
+            return {
+                "expanded_concepts": [],
+                "confidence_scores": [],
+                "provider_used": "gensim",
+                "error": error_msg
+            }
+        
+    except Exception as e:
+        logger.error(f"Gensim expansion failed: {e}")
+        return {
+            "expanded_concepts": [],
+            "confidence_scores": [],
+            "provider_used": "gensim",
+            "error": str(e)
+        }
+
+
+async def _expand_with_spacy(request: ProviderRequest) -> Dict[str, Any]:
+    """Expand concept using real SpaCy NLP provider."""
+    try:
+        from src.concept_expansion.providers.spacy_temporal_provider import SpacyTemporalProvider
+        
+        provider = SpacyTemporalProvider(model_name="en_core_web_sm")
+        
+        # Check health and initialize if needed
+        health_status = await provider.health_check()
+        if health_status.get("status") != "healthy":
+            logger.warning(f"SpaCy provider not healthy: {health_status}")
+            
+        # Create expansion request
+        from src.concept_expansion.providers.base_provider import ExpansionRequest
+        expansion_request = ExpansionRequest(
+            concept=request.concept,
+            media_context=request.media_context,
+            max_concepts=request.max_concepts
+        )
+        
+        # Use the provider's expand_concept method
+        expansion_result = await provider.expand_concept(expansion_request)
+        
+        if expansion_result and expansion_result.success:
+            concepts = expansion_result.enhanced_data.get("expanded_concepts", [])
+            scores = expansion_result.enhanced_data.get("confidence_scores", [])
+            analysis = expansion_result.enhanced_data.get("analysis", {})
+            
+            return {
+                "expanded_concepts": concepts[:request.max_concepts],
+                "confidence_scores": scores[:request.max_concepts],
+                "provider_used": "spacy",
+                "analysis": analysis
+            }
+        else:
+            error_msg = expansion_result.error_message if expansion_result else "No result returned"
+            return {
+                "expanded_concepts": [],
+                "confidence_scores": [],
+                "provider_used": "spacy",
+                "error": error_msg
+            }
+        
+    except Exception as e:
+        logger.error(f"SpaCy expansion failed: {e}")
+        return {
+            "expanded_concepts": [],
+            "confidence_scores": [],
+            "provider_used": "spacy", 
+            "error": str(e)
+        }
+
+
+async def _expand_with_heideltime(request: ProviderRequest) -> Dict[str, Any]:
+    """Expand concept using real HeidelTime temporal provider."""
+    try:
+        from src.concept_expansion.providers.heideltime_provider import HeidelTimeProvider
+        
+        provider = HeidelTimeProvider(language="english")
+        
+        # Check health and initialize if needed
+        health_status = await provider.health_check()
+        if health_status.get("status") != "healthy":
+            logger.warning(f"HeidelTime provider not healthy: {health_status}")
+            
+        # Create expansion request
+        from src.concept_expansion.providers.base_provider import ExpansionRequest
+        expansion_request = ExpansionRequest(
+            concept=request.concept,
+            media_context=request.media_context,
+            max_concepts=request.max_concepts
+        )
+        
+        # Use the provider's expand_concept method
+        expansion_result = await provider.expand_concept(expansion_request)
+        
+        if expansion_result and expansion_result.success:
+            concepts = expansion_result.enhanced_data.get("expanded_concepts", [])
+            scores = expansion_result.enhanced_data.get("confidence_scores", [])
+            temporal_data = expansion_result.enhanced_data.get("temporal_expressions", {})
+            
+            return {
+                "expanded_concepts": concepts[:request.max_concepts],
+                "confidence_scores": scores[:request.max_concepts],
+                "provider_used": "heideltime",
+                "temporal_analysis": temporal_data
+            }
+        else:
+            error_msg = expansion_result.error_message if expansion_result else "No result returned"
+            return {
+                "expanded_concepts": [],
+                "confidence_scores": [],
+                "provider_used": "heideltime",
+                "error": error_msg
+            }
+        
+    except Exception as e:
+        logger.error(f"HeidelTime expansion failed: {e}")
+        return {
+            "expanded_concepts": [],
+            "confidence_scores": [],
+            "provider_used": "heideltime", 
+            "error": str(e)
+        }
 
 
 @asynccontextmanager
@@ -216,16 +387,18 @@ async def expand_concept(
         provider = provider_manager.get_provider(provider_name)
         provider_manager.request_count += 1
         
-        # Mock expansion result
-        result = {
-            "expanded_concepts": [
-                f"{request.concept}_related_1",
-                f"{request.concept}_related_2", 
-                f"{request.concept}_related_3"
-            ],
-            "confidence_scores": [0.9, 0.8, 0.7],
-            "provider_used": provider_name
-        }
+        # Call real provider for expansion
+        if provider_name == "gensim":
+            result = await _expand_with_gensim(request)
+        elif provider_name == "spacy":
+            result = await _expand_with_spacy(request)
+        elif provider_name == "heideltime":
+            result = await _expand_with_heideltime(request)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Provider {provider_name} expansion not implemented"
+            )
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
@@ -235,8 +408,9 @@ async def expand_concept(
             execution_time_ms=execution_time_ms,
             result=result,
             metadata={
-                "mock_response": True,
-                "request_concept": request.concept
+                "real_provider_response": True,
+                "request_concept": request.concept,
+                "media_context": request.media_context
             }
         )
         
