@@ -112,6 +112,117 @@ services:
         max-file: "3"
 
   # ===========================================================================
+  # MICROSERVICES ARCHITECTURE
+  # ===========================================================================
+
+  nlp-service:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.nlp
+    image: jelly-nlp-service
+    container_name: rag-nlp-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+      - model-data:/app/models  # Unified model storage
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - LOG_LEVEL=DEBUG
+      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      - NLTK_DATA=/app/models/nltk_data
+      - GENSIM_DATA_DIR=/app/models/gensim_data
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  llm-service:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.llm
+    image: jelly-llm-service
+    container_name: rag-llm-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - LOG_LEVEL=DEBUG
+      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  router-service:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.router
+    image: jelly-router-service
+    container_name: rag-router-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - LOG_LEVEL=DEBUG
+      - NLP_SERVICE_URL=http://nlp-service:8001
+      - LLM_SERVICE_URL=http://llm-service:8002
+    networks:
+      - rag-network
+    depends_on:
+      - nlp-service
+      - llm-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
   # RAG SYSTEM SERVICES
   # ===========================================================================
 
@@ -183,12 +294,15 @@ services:
       - NLTK_DATA=/app/models/nltk_data
       - GENSIM_DATA_DIR=/app/models/gensim_data
       - CONTAINER_TYPE=worker
+      - ROUTER_SERVICE_URL=http://router-service:8003
     networks:
       - rag-network
     depends_on:
       redis:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      router-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "from src.redis_worker.queue_manager import RedisQueueManager; RedisQueueManager().redis_client.ping()"]

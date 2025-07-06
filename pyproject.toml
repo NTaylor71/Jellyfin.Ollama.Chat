@@ -90,6 +90,15 @@ mongodb = [
     "pymongo>=4.6.0"
 ]
 
+# Microservice-specific dependency groups
+llm = [
+    "production-rag-system[api,ollama,monitoring]"
+]
+
+router = [
+    "production-rag-system[api,monitoring]"
+]
+
 # Local development - everything for local work
 local = [
     "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb,nlp]"

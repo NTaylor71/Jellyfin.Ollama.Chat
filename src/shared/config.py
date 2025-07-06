@@ -260,6 +260,48 @@ class Settings(BaseSettings):
     CORS_HEADERS: List[str] = Field(default=["*"])
     
     # ==========================================================================
+    # MICROSERVICES CONFIGURATION  
+    # ==========================================================================
+    
+    # NLP Provider Service
+    NLP_SERVICE_URL: str = Field(default="http://localhost:8001")
+    NLP_SERVICE_PORT: int = Field(default=8001)
+    
+    # LLM Provider Service
+    LLM_SERVICE_URL: str = Field(default="http://localhost:8002")
+    LLM_SERVICE_PORT: int = Field(default=8002)
+    
+    # Plugin Router Service
+    ROUTER_SERVICE_URL: str = Field(default="http://localhost:8003")
+    ROUTER_SERVICE_PORT: int = Field(default=8003)
+    
+    # Docker overrides
+    DOCKER_NLP_SERVICE_URL: str = Field(default="http://nlp-service:8001")
+    DOCKER_LLM_SERVICE_URL: str = Field(default="http://llm-service:8002")
+    DOCKER_ROUTER_SERVICE_URL: str = Field(default="http://router-service:8003")
+    
+    @property
+    def nlp_service_url(self) -> str:
+        """Get NLP service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_NLP_SERVICE_URL
+        return self.NLP_SERVICE_URL
+    
+    @property
+    def llm_service_url(self) -> str:
+        """Get LLM service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_LLM_SERVICE_URL
+        return self.LLM_SERVICE_URL
+    
+    @property
+    def router_service_url(self) -> str:
+        """Get Router service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_ROUTER_SERVICE_URL
+        return self.ROUTER_SERVICE_URL
+    
+    # ==========================================================================
     # PLUGIN SYSTEM
     # ==========================================================================
     

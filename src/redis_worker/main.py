@@ -6,10 +6,18 @@ Processes tasks from Redis queue system.
 import asyncio
 import signal
 import sys
+import logging
 from typing import Dict, Any
+from datetime import datetime
 
 from src.shared.config import get_settings
 from src.redis_worker.queue_manager import RedisQueueManager
+from src.redis_worker.plugin_loader import PluginLoader
+from src.redis_worker.health_monitor import HealthMonitor
+from src.plugins.base import PluginExecutionContext
+
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerService:
@@ -18,17 +26,22 @@ class WorkerService:
     def __init__(self):
         self.settings = get_settings()
         self.queue_manager = RedisQueueManager()
+        self.plugin_loader = PluginLoader()
+        self.health_monitor = None  # Will be initialized after plugin_loader
         self.running = False
         self.stats = {
             "tasks_processed": 0,
             "tasks_failed": 0,
-            "uptime_start": None
+            "uptime_start": None,
+            "plugin_executions": 0,
+            "service_calls": 0,
+            "health_checks": 0
         }
     
     def setup_signal_handlers(self):
         """Setup graceful shutdown signal handlers."""
         def signal_handler(signum, frame):
-            print(f"\n🔄 Received signal {signum}, shutting down gracefully...")
+            logger.info(f"\n🔄 Received signal {signum}, shutting down gracefully...")
             self.running = False
         
         signal.signal(signal.SIGINT, signal_handler)
@@ -36,7 +49,7 @@ class WorkerService:
     
     async def process_task(self, task_data: Dict[str, Any]) -> None:
         """
-        Process a single task from the queue.
+        Process a single task from the queue using plugin-based routing.
         
         Args:
             task_data: Task data from queue
@@ -44,42 +57,90 @@ class WorkerService:
         task_id = task_data.get("task_id")
         task_type = task_data.get("task_type")
         
-        print(f"🔄 Processing task {task_id} of type {task_type}")
+        logger.info(f"🔄 Processing task {task_id} of type {task_type}")
         
         try:
-            # TODO: Implement plugin-based task processing
-            # For now, just simulate processing
-            result = {
-                "task_id": task_id,
-                "task_type": task_type,
-                "processed_at": "simulation",
-                "message": f"Task {task_type} processed successfully"
-            }
+            # Route task to appropriate plugin
+            plugin_result = await self.plugin_loader.route_task_to_plugin(task_type, task_data)
             
-            # Simulate processing time
-            await asyncio.sleep(0.1)
-            
-            # Mark as completed
-            self.queue_manager.complete_task(task_id, result)
-            self.stats["tasks_processed"] += 1
-            
-            print(f"✅ Completed task {task_id}")
+            if plugin_result.success:
+                # Prepare successful result
+                result = {
+                    "task_id": task_id,
+                    "task_type": task_type,
+                    "success": True,
+                    "data": plugin_result.data,
+                    "execution_time_ms": plugin_result.execution_time_ms,
+                    "metadata": plugin_result.metadata,
+                    "processed_at": datetime.utcnow().isoformat(),
+                    "worker_id": f"worker_{id(self)}"
+                }
+                
+                # Mark as completed
+                self.queue_manager.complete_task(task_id, result)
+                self.stats["tasks_processed"] += 1
+                
+                # Update stats based on execution type
+                if plugin_result.metadata and plugin_result.metadata.get("via_service"):
+                    self.stats["service_calls"] += 1
+                else:
+                    self.stats["plugin_executions"] += 1
+                
+                logger.info(f"✅ Completed task {task_id} in {plugin_result.execution_time_ms:.1f}ms")
+                
+            else:
+                # Handle plugin execution failure
+                error_result = {
+                    "task_id": task_id,
+                    "task_type": task_type,
+                    "success": False,
+                    "error": plugin_result.error_message,
+                    "execution_time_ms": plugin_result.execution_time_ms,
+                    "processed_at": datetime.utcnow().isoformat(),
+                    "worker_id": f"worker_{id(self)}"
+                }
+                
+                self.queue_manager.fail_task(task_data, plugin_result.error_message)
+                self.stats["tasks_failed"] += 1
+                
+                logger.error(f"❌ Task {task_id} failed: {plugin_result.error_message}")
             
         except Exception as e:
-            print(f"❌ Task {task_id} failed: {e}")
+            logger.error(f"❌ Task {task_id} processing error: {e}")
+            
+            error_result = {
+                "task_id": task_id,
+                "task_type": task_type,
+                "success": False,
+                "error": str(e),
+                "processed_at": datetime.utcnow().isoformat(),
+                "worker_id": f"worker_{id(self)}"
+            }
+            
             self.queue_manager.fail_task(task_data, str(e))
             self.stats["tasks_failed"] += 1
     
     async def worker_loop(self):
         """Main worker processing loop."""
-        print(f"🚀 Worker started on {self.settings.ENV} environment")
-        print(f"📊 Worker stats: {self.stats}")
+        logger.info(f"🚀 Worker started on {self.settings.ENV} environment")
+        logger.info(f"📊 Worker stats: {self.stats}")
+        
+        # Initialize plugin loader
+        if not await self.plugin_loader.initialize():
+            logger.error("❌ Failed to initialize plugin loader")
+            return
+        
+        # Initialize health monitor
+        self.health_monitor = HealthMonitor(self.plugin_loader)
+        await self.health_monitor.start_monitoring()
+        
+        self.stats["uptime_start"] = datetime.utcnow()
         
         while self.running:
             try:
                 # Check Redis health
                 if not self.queue_manager.health_check():
-                    print("⚠️ Redis connection unhealthy, retrying...")
+                    logger.warning("⚠️ Redis connection unhealthy, retrying...")
                     await asyncio.sleep(5)
                     continue
                 
@@ -92,8 +153,13 @@ class WorkerService:
                     # No tasks available, brief pause
                     await asyncio.sleep(1)
                     
+                    # Periodic stats and health logging
+                    if self.stats["tasks_processed"] > 0 and self.stats["tasks_processed"] % 10 == 0:
+                        health_summary = self.health_monitor.get_health_summary() if self.health_monitor else {"overall_status": "unknown"}
+                        logger.info(f"📊 Processed: {self.stats['tasks_processed']}, Failed: {self.stats['tasks_failed']}, Plugin: {self.stats['plugin_executions']}, Service: {self.stats['service_calls']}, Health: {health_summary['overall_status']}")
+                    
             except Exception as e:
-                print(f"❌ Worker loop error: {e}")
+                logger.error(f"❌ Worker loop error: {e}")
                 await asyncio.sleep(5)
     
     async def start(self):
@@ -101,14 +167,42 @@ class WorkerService:
         self.running = True
         self.setup_signal_handlers()
         
-        # Start worker loop
-        await self.worker_loop()
+        try:
+            # Start worker loop
+            await self.worker_loop()
+        finally:
+            # Cleanup
+            await self.cleanup()
         
-        print("🔄 Worker service stopped")
+        logger.info("🔄 Worker service stopped")
+    
+    async def cleanup(self):
+        """Cleanup worker resources."""
+        logger.info("🧹 Cleaning up worker resources...")
+        
+        # Stop health monitoring
+        if self.health_monitor:
+            await self.health_monitor.stop_monitoring()
+        
+        # Cleanup plugin loader
+        if hasattr(self, 'plugin_loader'):
+            await self.plugin_loader.cleanup()
+        
+        # Final stats
+        uptime = (datetime.utcnow() - self.stats.get("uptime_start", datetime.utcnow())).total_seconds()
+        logger.info(f"📊 Final stats - Processed: {self.stats['tasks_processed']}, Failed: {self.stats['tasks_failed']}, Uptime: {uptime:.1f}s")
+        
+        logger.info("✅ Worker cleanup complete")
 
 
 async def main():
     """Main entry point for the worker service."""
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    
     worker = WorkerService()
     await worker.start()
 
@@ -117,8 +211,8 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n🔄 Worker interrupted by user")
+        logger.info("\n🔄 Worker interrupted by user")
         sys.exit(0)
     except Exception as e:
-        print(f"❌ Worker failed to start: {e}")
+        logger.error(f"❌ Worker failed to start: {e}")
         sys.exit(1)
