@@ -252,7 +252,7 @@ class MyEnhancerPlugin(EmbedDataEmbellisherPlugin):
   - [x] No more "⚠️ Some tests failed" vague messages - ✅ ELIMINATED
   - [x] No more "✅ PASSED" when components are missing - ✅ FIXED
 
-- [ ] Check all test_*.py tests get all env vars via the shared/config.py (a switch between local dev .env and docker's own env [see the compose for the environment var ENV=docker etc]) - **PARTIALLY DONE** - dependency validator fixed, but need to fix remaining 6 test files
+- [x] Check all test_*.py tests get all env vars via the shared/config.py (a switch between local dev .env and docker's own env [see the compose for the environment var ENV=docker etc]) - **PARTIALLY DONE** - dependency validator fixed, but need to fix remaining 6 test files
 
 
 ### 4.3: Service-Oriented Plugin Architecture with Clean Nomenclature
