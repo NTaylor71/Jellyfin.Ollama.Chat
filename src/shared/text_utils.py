@@ -110,8 +110,66 @@ def normalize_text_for_analysis(text: str) -> str:
     return cleaned
 
 
-# NOTE: Term extraction for concept expansion moved to Stage 3 plugins
-# This keeps text_utils.py focused on basic normalization utilities only
+def extract_key_concepts(text: str, max_concepts: int = 10) -> List[str]:
+    """
+    Extract key concepts from text using NLTK stopwords (proper NLP approach).
+    
+    Uses the NLTK stopwords corpus to filter out common words instead of
+    hard-coded lists. This is the proper, non-brittle way to do it.
+    
+    Args:
+        text: Input text to extract concepts from
+        max_concepts: Maximum number of concepts to return
+        
+    Returns:
+        List of extracted concepts (normalized strings)
+    """
+    if not text or not isinstance(text, str):
+        return []
+    
+    try:
+        import nltk
+        from nltk.corpus import stopwords
+        
+        # Download stopwords if not available
+        try:
+            stop_words = set(stopwords.words('english'))
+        except LookupError:
+            nltk.download('stopwords', quiet=True)
+            stop_words = set(stopwords.words('english'))
+            
+    except ImportError:
+        # Fallback if NLTK not available - return simple word split without filtering
+        words = re.split(r'[,\.\!\?\;\:\s\-\(\)]+', normalize_text_for_analysis(text).lower())
+        return [w for w in words if len(w) >= 3 and not w.isdigit()][:max_concepts]
+    
+    # Normalize text
+    normalized = normalize_text_for_analysis(text)
+    
+    # Simple concept extraction - split on common delimiters and filter using NLTK stopwords
+    words = re.split(r'[,\.\!\?\;\:\s\-\(\)]+', normalized.lower())
+    
+    # Filter using proper NLP stopwords list
+    concepts = []
+    for word in words:
+        if (len(word) >= 3 and 
+            word not in stop_words and 
+            not word.isdigit()):
+            concepts.append(word)
+    
+    # Remove duplicates while preserving order
+    unique_concepts = []
+    seen = set()
+    for concept in concepts:
+        if concept not in seen:
+            unique_concepts.append(concept)
+            seen.add(concept)
+    
+    return unique_concepts[:max_concepts]
+
+
+# NOTE: More sophisticated term extraction is available in Stage 3 plugins
+# This is a basic fallback for simple use cases
 
 
 def safe_string_conversion(value: Any) -> str:

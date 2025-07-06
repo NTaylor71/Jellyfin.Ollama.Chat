@@ -217,6 +217,7 @@ class HardwareDetector:
         cores, threads = cls.detect_cpu()
         memory_gb = cls.detect_memory()
         storage_type = cls.detect_storage_type()
+        gpu_count, gpu_memory_gb, gpu_model = cls.detect_gpu()
         
         profile = HardwareProfile(
             local_cpu_cores=cores,
@@ -225,6 +226,18 @@ class HardwareDetector:
             local_storage_type=storage_type,
             is_auto_detected=True
         )
+        
+        # Add local GPU as an endpoint if detected
+        if gpu_count > 0:
+            gpu_endpoint = ResourceEndpoint(
+                resource_type=ResourceType.GPU,
+                endpoint_url=None,  # Local resource
+                capacity=gpu_memory_gb,
+                model=gpu_model,
+                is_available=True
+            )
+            profile.gpu_endpoints.append(gpu_endpoint)
+            logger.info(f"Detected local GPU: {gpu_model} ({gpu_memory_gb}GB VRAM)")
         
         logger.info(f"Detected local hardware: {cores}C/{threads}T, {memory_gb}GB RAM, {storage_type} storage")
         

@@ -21,6 +21,9 @@ volumes:
     driver: local
   nlp-models:
     driver: local
+  # Unified model storage for all NLP models
+  model-data:
+    driver: local
 
 services:
   # ===========================================================================
@@ -86,6 +89,7 @@ services:
     build:
       context: .
       dockerfile: docker/redis/Dockerfile
+    image: jelly-redis
     container_name: rag-redis
     restart: unless-stopped
     ports:
@@ -115,6 +119,7 @@ services:
     build:
       context: .
       dockerfile: docker/api/Dockerfile
+    image: jelly-api
     container_name: rag-api
     restart: unless-stopped
     ports:
@@ -123,6 +128,7 @@ services:
       - ./src:/app/src:ro  # Hot reload
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
+      - model-data:/app/models  # Persistent model storage
     environment:
       - ENV=docker
       - ENABLE_METRICS=true
@@ -134,6 +140,7 @@ services:
       - ENABLE_CORS=true
       - ENABLE_API_DOCS=true
       - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+      - CONTAINER_TYPE=api
     networks:
       - rag-network
     depends_on:
@@ -157,21 +164,25 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
+    image: jelly-worker
     container_name: rag-worker
     restart: unless-stopped
     volumes:
       - ./src:/app/src:ro  # Hot reload
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
-      - nlp-models:/app/nlp_models  # Persistent NLP models
+      - nlp-models:/app/nlp_models  # Legacy NLP models (for compatibility)
+      - model-data:/app/models  # Unified model storage
     environment:
       - ENV=docker
       - REDIS_HOST=redis
       - MONGODB_HOST=mongodb
       - LOG_LEVEL=DEBUG
       - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
-      - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-      - NLTK_DATA=/app/nlp_models
+      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      - NLTK_DATA=/app/models/nltk_data
+      - GENSIM_DATA_DIR=/app/models/gensim_data
+      - CONTAINER_TYPE=worker
     networks:
       - rag-network
     depends_on:
@@ -263,6 +274,7 @@ services:
     build:
       context: .
       dockerfile: docker/faiss/Dockerfile
+    image: jelly-faiss
     container_name: rag-faiss-service
     restart: unless-stopped
     ports:

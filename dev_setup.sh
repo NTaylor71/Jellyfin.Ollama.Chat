@@ -69,34 +69,17 @@ echo "✅ Virtual environment activated: $VIRTUAL_ENV"
 echo "⬆️ Upgrading pip..."
 python -m pip install --upgrade pip
 
-# Install dependencies with better error handling
+# Install dependencies with controlled approach (match Docker)
 echo "📚 Installing dependencies..."
 
-# Try full installation first
-echo "🔄 Attempting full installation with all extras..."
-if python -m pip install -e ".[local]"; then
-    echo "✅ Full installation successful"
+# NO FALLBACKS - Install specific package groups with --no-cache-dir like Docker
+echo "🔄 Installing with controlled dependencies (matching Docker approach)..."
+if python -m pip install --no-cache-dir -e ".[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb,nlp]"; then
+    echo "✅ Controlled installation successful"
 else
-    echo "⚠️ Full installation failed, trying without problematic NLP packages..."
-
-    # Install core packages first
-    if python -m pip install -e ".[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb]"; then
-        echo "✅ Core packages installed"
-
-        # Try to install basic NLP packages
-        echo "🔄 Installing basic NLP packages..."
-        python -m pip install spacy transformers torch || echo "⚠️ Some basic NLP packages failed"
-
-        # Try the problematic packages with force/no-deps
-        echo "🔄 Attempting problematic packages with --no-deps..."
-        python -m pip install --no-deps heideltime || echo "⚠️ heideltime skipped"
-        python -m pip install --no-deps sutime || echo "⚠️ sutime skipped"
-
-        echo "✅ Installation completed with some packages potentially skipped"
-    else
-        echo "❌ Failed to install core dependencies"
-        exit 1
-    fi
+    echo "❌ Controlled installation failed - NO FALLBACKS"
+    echo "❌ This means there are real dependency conflicts that need to be fixed"
+    exit 1
 fi
 
 echo "✅ Installation process complete"
@@ -130,47 +113,55 @@ if [ ! -f ".env" ]; then
     fi
 fi
 
-# Test everything works
-echo "🧪 Testing installation..."
+# Test everything works - ACTUAL VENV PACKAGES (NO CHEATING)
+echo "🧪 Testing installation with REAL venv-specific packages..."
 
-# Test 1: Basic config
-if python -c "from src.shared.config import get_settings; print('✅ Config loaded successfully')" 2>/dev/null; then
-    echo "✅ Config test passed"
+# Test 1: NLP packages that should ONLY be in venv
+if python -c "import ollama; print('✅ Ollama available in venv')" 2>/dev/null; then
+    echo "✅ Ollama venv test passed"
 else
-    echo "❌ Config test failed"
+    echo "❌ Ollama not available - venv installation failed"
     exit 1
 fi
 
-# Test 2: FastAPI imports
-if python -c "import fastapi, uvicorn, rich; print('✅ FastAPI imports successful')" 2>/dev/null; then
-    echo "✅ FastAPI imports passed"
+# Test 2: Gensim (large ML package, definitely venv-only)
+if python -c "import gensim; print('✅ Gensim available in venv')" 2>/dev/null; then
+    echo "✅ Gensim venv test passed"
 else
-    echo "❌ FastAPI import failed"
+    echo "❌ Gensim not available - venv installation failed"
     exit 1
 fi
 
-# Test 3: Plugin system imports
-if python -c "from src.api.plugin_registry import plugin_registry; from src.plugins.base import BasePlugin; print('✅ Plugin system imports successful')" 2>/dev/null; then
-    echo "✅ Plugin system imports passed"
+# Test 3: FastAPI (should be venv-only in most systems)
+if python -c "import fastapi, uvicorn; print('✅ FastAPI available in venv')" 2>/dev/null; then
+    echo "✅ FastAPI venv test passed"
 else
-    echo "⚠️ Plugin system imports failed (some dependencies might be missing)"
+    echo "❌ FastAPI not available - venv installation failed"
+    exit 1
 fi
 
-# Test 4: Run basic tests if available
-if [ -f "src/tests/test_config.py" ]; then
-    if python -m pytest src/tests/test_config.py -v 2>/dev/null; then
-        echo "✅ Basic tests passed"
-    else
-        echo "⚠️ Some tests failed, but setup is functional"
-    fi
+# Test 4: SpaCy (NLP package, definitely venv-only)
+if python -c "import spacy; print('✅ SpaCy available in venv')" 2>/dev/null; then
+    echo "✅ SpaCy venv test passed"
+else
+    echo "❌ SpaCy not available - venv installation failed"
+    exit 1
 fi
 
-# Show what's installed
+# Test 5: Our actual project imports (FAIL FAST if broken)
+if python -c "from src.shared.config import get_settings; get_settings(); print('✅ Project config working')" 2>/dev/null; then
+    echo "✅ Project imports test passed"
+else
+    echo "❌ Project imports failed - installation broken"
+    exit 1
+fi
+
+# Show what's installed - ACTUAL IMPORTANT PACKAGES
 echo ""
-echo "📋 Key installed packages:"
+echo "📋 Key NLP and project packages installed in venv:"
 python -c "
 import pkg_resources
-packages = ['fastapi', 'uvicorn', 'pydantic', 'rich', 'watchdog', 'prometheus-fastapi-instrumentator']
+packages = ['ollama', 'gensim', 'spacy', 'transformers', 'torch', 'fastapi', 'redis', 'pymongo']
 for pkg in packages:
     try:
         version = pkg_resources.get_distribution(pkg).version
@@ -182,11 +173,16 @@ for pkg in packages:
 echo ""
 echo "🎉 Setup complete!"
 echo ""
-echo "Next steps:"
-echo "  1. Activate environment: source .venv/bin/activate"
+echo "⚠️  IMPORTANT: You must activate the virtual environment manually:"
+echo ""
+echo "    source .venv/bin/activate"
+echo ""
+echo "Next steps after activation:"
 echo "  2. Test plugin system: python -c \"from src.api.main import create_app; print('App created successfully')\""
 echo "  3. Test API: python -m src.api.main"
 echo "  4. Run tests: python test_api.py"
 echo ""
 echo "💡 Tip: Always run ./dev_setup.sh after changing pyproject.toml"
 echo "💡 Your virtual environment is ready at: $(pwd)/.venv"
+echo ""
+echo "🚀 Quick activation command: source .venv/bin/activate"
