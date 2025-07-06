@@ -9,6 +9,9 @@ import sys
 import logging
 from typing import Dict, Any
 from datetime import datetime
+import threading
+import time
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 from src.shared.config import get_settings
 from src.redis_worker.queue_manager import RedisQueueManager
@@ -18,6 +21,14 @@ from src.plugins.base import PluginExecutionContext
 
 
 logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+TASKS_PROCESSED = Counter('worker_tasks_processed_total', 'Total number of tasks processed')
+TASKS_FAILED = Counter('worker_tasks_failed_total', 'Total number of tasks that failed')
+TASK_DURATION = Histogram('worker_task_duration_seconds', 'Time spent processing tasks')
+WORKER_UPTIME = Gauge('worker_uptime_seconds', 'Worker uptime in seconds')
+PLUGIN_EXECUTIONS = Counter('worker_plugin_executions_total', 'Total number of plugin executions')
+SERVICE_CALLS = Counter('worker_service_calls_total', 'Total number of service calls')
 
 
 class WorkerService:
@@ -29,6 +40,7 @@ class WorkerService:
         self.plugin_loader = PluginLoader()
         self.health_monitor = None  # Will be initialized after plugin_loader
         self.running = False
+        self.metrics_server = None
         self.stats = {
             "tasks_processed": 0,
             "tasks_failed": 0,
@@ -59,9 +71,15 @@ class WorkerService:
         
         logger.info(f"🔄 Processing task {task_id} of type {task_type}")
         
+        start_time = time.time()
+        
         try:
             # Route task to appropriate plugin
             plugin_result = await self.plugin_loader.route_task_to_plugin(task_type, task_data)
+            
+            # Record task duration
+            duration = time.time() - start_time
+            TASK_DURATION.observe(duration)
             
             if plugin_result.success:
                 # Prepare successful result
@@ -79,12 +97,15 @@ class WorkerService:
                 # Mark as completed
                 self.queue_manager.complete_task(task_id, result)
                 self.stats["tasks_processed"] += 1
+                TASKS_PROCESSED.inc()
                 
                 # Update stats based on execution type
                 if plugin_result.metadata and plugin_result.metadata.get("via_service"):
                     self.stats["service_calls"] += 1
+                    SERVICE_CALLS.inc()
                 else:
                     self.stats["plugin_executions"] += 1
+                    PLUGIN_EXECUTIONS.inc()
                 
                 logger.info(f"✅ Completed task {task_id} in {plugin_result.execution_time_ms:.1f}ms")
                 
@@ -102,6 +123,7 @@ class WorkerService:
                 
                 self.queue_manager.fail_task(task_data, plugin_result.error_message)
                 self.stats["tasks_failed"] += 1
+                TASKS_FAILED.inc()
                 
                 logger.error(f"❌ Task {task_id} failed: {plugin_result.error_message}")
             
@@ -119,6 +141,7 @@ class WorkerService:
             
             self.queue_manager.fail_task(task_data, str(e))
             self.stats["tasks_failed"] += 1
+            TASKS_FAILED.inc()
     
     async def worker_loop(self):
         """Main worker processing loop."""
@@ -136,7 +159,18 @@ class WorkerService:
         
         self.stats["uptime_start"] = datetime.utcnow()
         
+        # Start metrics server on a different port for worker
+        try:
+            start_http_server(8004)  # Worker metrics on port 8004
+            logger.info("📊 Prometheus metrics server started on port 8004")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to start metrics server: {e}")
+        
         while self.running:
+            # Update uptime metric
+            if self.stats["uptime_start"]:
+                uptime = (datetime.utcnow() - self.stats["uptime_start"]).total_seconds()
+                WORKER_UPTIME.set(uptime)
             try:
                 # Check Redis health
                 if not self.queue_manager.health_check():

@@ -94,6 +94,8 @@ for dir in "${dirs[@]}"; do
     fi
 done
 
+# Note: Ollama now uses shared model-data volume, no separate directory needed
+
 # Create missing __init__.py files
 init_files=("src/api/routes/__init__.py")
 for file in "${init_files[@]}"; do

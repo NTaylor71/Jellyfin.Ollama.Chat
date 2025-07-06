@@ -33,7 +33,7 @@ COPY manage_models.py ./
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e ".[worker,mongodb,plugins,ollama,nlp]"
+    pip install --no-cache-dir -e ".[worker,mongodb,plugins,ollama,api]"
 
 # =============================================================================
 # STAGE 2: RUNTIME - Copy only necessary files from builder
@@ -66,11 +66,7 @@ COPY --from=builder /app/pyproject.toml ./
 # Create directories for models and data
 RUN mkdir -p /app/logs /app/data /app/nlp_models /app/models
 
-# Copy entrypoint script
-COPY docker/scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# Set model environment variables (will be set by entrypoint)
+# Set model environment variables
 ENV NLTK_DATA=/app/models/nltk_data
 ENV GENSIM_DATA_DIR=/app/models/gensim_data
 
@@ -88,9 +84,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-
-# Use entrypoint for model management
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Start the worker
 CMD ["python", "-m", "src.redis_worker.main"]

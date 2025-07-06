@@ -14,6 +14,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 
@@ -332,6 +333,10 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
+# Prometheus metrics (creates /metrics endpoint)
+if settings.ENABLE_METRICS:
+    Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/health", response_model=RouterHealth)
 async def health_check():
@@ -392,6 +397,6 @@ if __name__ == "__main__":
         "src.services.plugin_router_service:app",
         host="0.0.0.0",
         port=8003,
-        reload=settings.is_development,
+        reload=False,  # Disable reload for testing
         log_level=settings.LOG_LEVEL.lower()
     )

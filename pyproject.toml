@@ -68,8 +68,6 @@ monitoring = [
 # Plugin system - hot-reload and plugin management
 plugins = [
     "watchdog>=3.0.0",
-    "gensim>=4.3.0",
-    "nltk>=3.8.0",
     "scikit-learn>=1.3.0",
     "python-dateutil>=2.8.0",
     "arrow>=1.3.0"
@@ -81,7 +79,9 @@ nlp = [
     "transformers>=4.30.0",
     "torch>=2.0.0",
     "py-heideltime",
-    "sutime>=1.0.0"
+    "sutime>=1.0.0",
+    "nltk>=3.8.0",
+    "gensim>=4.3.0"
 ]
 
 # MongoDB - document storage and data pipeline

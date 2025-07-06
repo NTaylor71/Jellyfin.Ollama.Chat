@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.shared.config import get_settings
+from src.concept_expansion.providers.llm.llm_provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +353,6 @@ if __name__ == "__main__":
         "src.services.llm_provider_service:app",
         host="0.0.0.0",
         port=8002,
-        reload=settings.is_development,
+        reload=False,  # Disable reload for testing
         log_level=settings.LOG_LEVEL.lower()
     )

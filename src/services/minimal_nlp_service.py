@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 
@@ -54,25 +55,62 @@ class MinimalNLPManager:
         self.start_time = asyncio.get_event_loop().time()
     
     async def initialize_providers(self):
-        """Initialize demo providers."""
-        logger.info("Initializing minimal NLP providers...")
+        """Initialize NLP providers - download models if needed during startup."""
+        logger.info("Initializing NLP providers...")
         
-        # Add mock providers for demonstration
-        self.providers["mock_gensim"] = {
-            "name": "Mock Gensim Provider",
-            "type": "gensim", 
-            "version": "1.0.0",
-            "status": "ready"
-        }
+        # Download models as needed during service startup
+        from src.shared.model_manager import ModelManager, ModelStatus
+        from pathlib import Path
         
-        self.providers["mock_spacy"] = {
-            "name": "Mock SpaCy Provider",
-            "type": "spacy",
-            "version": "1.0.0", 
-            "status": "ready"
-        }
+        models_path = Path("/app/models")
+        model_manager = ModelManager(models_base_path=models_path)
         
-        logger.info(f"NLP Provider initialization complete. {len(self.providers)} providers available.")
+        logger.info("Ensuring all required models are available...")
+        model_success = await model_manager.ensure_all_models()
+        
+        if not model_success:
+            logger.error("❌ Failed to download required models")
+            # Don't raise exception - let service start but report unhealthy
+        
+        # Check which models are available and initialize accordingly
+        model_status = await model_manager.check_all_models()
+        
+        # Initialize providers based on what's actually available
+        gensim_status = model_status.get("gensim_word2vec", ModelStatus.MISSING)
+        if gensim_status == ModelStatus.AVAILABLE:
+            self.providers["gensim"] = {
+                "name": "Gensim Word2Vec Provider",
+                "type": "gensim", 
+                "version": "1.0.0",
+                "status": "ready"
+            }
+            logger.info("✅ Gensim provider initialized")
+        else:
+            logger.warning(f"⚠️ Gensim provider not available: {gensim_status}")
+        
+        spacy_status = model_status.get("spacy_en_core", ModelStatus.MISSING)
+        if spacy_status == ModelStatus.AVAILABLE:
+            self.providers["spacy"] = {
+                "name": "SpaCy NLP Provider",
+                "type": "spacy",
+                "version": "1.0.0", 
+                "status": "ready"
+            }
+            logger.info("✅ SpaCy provider initialized")
+        else:
+            logger.warning(f"⚠️ SpaCy provider not available: {spacy_status}")
+        
+        # Check NLTK models too (they don't need a provider but should be available)
+        nltk_punkt = model_status.get("nltk_punkt", ModelStatus.MISSING)
+        nltk_stopwords = model_status.get("nltk_stopwords", ModelStatus.MISSING) 
+        nltk_wordnet = model_status.get("nltk_wordnet", ModelStatus.MISSING)
+        
+        if all(status == ModelStatus.AVAILABLE for status in [nltk_punkt, nltk_stopwords, nltk_wordnet]):
+            logger.info("✅ NLTK models available")
+        else:
+            logger.warning(f"⚠️ NLTK models missing - punkt: {nltk_punkt}, stopwords: {nltk_stopwords}, wordnet: {nltk_wordnet}")
+        
+        logger.info(f"✅ NLP Provider initialization complete. {len(self.providers)} providers ready.")
     
     def get_provider(self, provider_name: str):
         """Get a provider by name."""
@@ -97,8 +135,16 @@ class MinimalNLPManager:
                 "initialized": True
             }
         
+        # Service is healthy only if we have ALL required providers ready
+        # This ensures nlp-service is only healthy when all models are downloaded
+        expected_providers = ["gensim", "spacy"]  # NLTK models don't need a provider, just availability
+        available_providers = list(self.providers.keys())
+        all_providers_ready = all(provider in available_providers for provider in expected_providers)
+        
+        service_status = "healthy" if all_providers_ready else "unhealthy"
+        
         return ServiceHealth(
-            status="healthy" if self.providers else "degraded",
+            status=service_status,
             uptime_seconds=uptime,
             providers=provider_statuses,
             total_requests=self.request_count,
@@ -137,6 +183,10 @@ if settings.ENABLE_CORS:
         allow_methods=settings.CORS_METHODS,
         allow_headers=settings.CORS_HEADERS,
     )
+
+# Prometheus metrics (creates /metrics endpoint)
+if settings.ENABLE_METRICS:
+    Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health", response_model=ServiceHealth)

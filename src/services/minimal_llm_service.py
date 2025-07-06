@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 
@@ -139,6 +140,10 @@ if settings.ENABLE_CORS:
         allow_methods=settings.CORS_METHODS,
         allow_headers=settings.CORS_HEADERS,
     )
+
+# Prometheus metrics (creates /metrics endpoint)
+if settings.ENABLE_METRICS:
+    Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health", response_model=LLMServiceHealth)

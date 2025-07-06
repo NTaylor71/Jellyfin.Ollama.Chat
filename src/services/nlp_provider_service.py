@@ -55,11 +55,12 @@ class NLPProviderManager:
         self.initialization_errors: Dict[str, str] = {}
         self.request_count = 0
         self.error_count = 0
-        self.start_time = asyncio.get_event_loop().time()
+        self.start_time = None  # Will be set during initialization
     
     async def initialize_providers(self):
         """Initialize all NLP providers."""
         logger.info("Initializing NLP providers...")
+        self.start_time = asyncio.get_event_loop().time()
         
         # Initialize Gensim Provider
         try:
@@ -351,6 +352,6 @@ if __name__ == "__main__":
         "src.services.nlp_provider_service:app",
         host="0.0.0.0",
         port=8001,
-        reload=settings.is_development,
+        reload=False,  # Disable reload for testing
         log_level=settings.LOG_LEVEL.lower()
     )

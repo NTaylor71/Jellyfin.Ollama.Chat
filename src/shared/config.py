@@ -116,21 +116,21 @@ class Settings(BaseSettings):
     def ollama_chat_url(self) -> str:
         """Get Ollama chat URL based on environment."""
         if self.is_docker:
-            return self.DOCKER_OLLAMA_CHAT_URL
+            return self.DOCKER_CHAT_BASE_URL
         return self.OLLAMA_CHAT_BASE_URL
 
     @property
     def ollama_chat_model(self) -> str:
         """Get Ollama chat model based on environment."""
         if self.is_docker:
-            return self.DOCKER_OLLAMA_CHAT_URL
+            return self.DOCKER_CHAT_MODEL
         return self.OLLAMA_CHAT_MODEL
 
     @property
     def ollama_embed_url(self) -> str:
         """Get Ollama embedding URL based on environment."""
         if self.is_docker:
-            return self.DOCKER_OLLAMA_EMBED_URL
+            return self.DOCKER_CHAT_BASE_URL  # Use same URL for embeddings
         return self.OLLAMA_EMBED_BASE_URL
     
     # ==========================================================================

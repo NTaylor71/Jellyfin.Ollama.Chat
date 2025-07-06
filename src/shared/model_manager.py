@@ -182,19 +182,25 @@ class ModelManager:
             # Try to find the resource using NLTK's own mechanism
             if model_info.name == "punkt":
                 nltk.data.find('tokenizers/punkt')
+                logger.debug(f"✅ NLTK model '{model_info.name}' found at tokenizers/punkt")
             elif model_info.name == "stopwords":
                 nltk.data.find('corpora/stopwords')
+                logger.debug(f"✅ NLTK model '{model_info.name}' found at corpora/stopwords")
             elif model_info.name == "wordnet":
                 nltk.data.find('corpora/wordnet')
+                logger.debug(f"✅ NLTK model '{model_info.name}' found at corpora/wordnet")
             else:
                 # Fallback to path check for unknown models
                 if Path(model_info.storage_path).exists():
+                    logger.debug(f"✅ NLTK model '{model_info.name}' found at {model_info.storage_path}")
                     return ModelStatus.AVAILABLE
+                logger.debug(f"❌ NLTK model '{model_info.name}' not found at {model_info.storage_path}")
                 return ModelStatus.MISSING
                 
             return ModelStatus.AVAILABLE
             
-        except Exception:
+        except Exception as e:
+            logger.debug(f"❌ NLTK model '{model_info.name}' not available: {e}")
             return ModelStatus.MISSING
     
     def _check_gensim_model(self, model_info: ModelInfo) -> ModelStatus:
@@ -219,11 +225,11 @@ class ModelManager:
     async def _check_ollama_model(self, model_name: str) -> ModelStatus:
         """Check if Ollama model is available."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(f"{self.ollama_base_url}/api/tags")
                 
                 if response.status_code != 200:
-                    logger.warning(f"Ollama service not available: {response.status_code}")
+                    logger.debug(f"Ollama service not reachable (HTTP {response.status_code}) - this is expected if Ollama is on host")
                     return ModelStatus.ERROR
                 
                 models_data = response.json()
@@ -231,23 +237,29 @@ class ModelManager:
                 
                 # Check for exact match first
                 if model_name in available_models:
+                    logger.debug(f"✅ Ollama model '{model_name}' found and available")
                     return ModelStatus.AVAILABLE
                 
                 # Check for model with :latest tag
                 model_with_latest = f"{model_name}:latest"
                 if model_with_latest in available_models:
+                    logger.debug(f"✅ Ollama model '{model_name}' found as '{model_with_latest}'")
                     return ModelStatus.AVAILABLE
                 
                 # Check if any available model starts with our model name
                 for available in available_models:
                     if available.startswith(f"{model_name}:"):
+                        logger.debug(f"✅ Ollama model '{model_name}' found as '{available}'")
                         return ModelStatus.AVAILABLE
                 
                 logger.info(f"Ollama model '{model_name}' not found. Available: {available_models}")
                 return ModelStatus.MISSING
                     
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            logger.debug(f"Ollama connection failed for '{model_name}' - this is normal if Ollama runs on host: {type(e).__name__}")
+            return ModelStatus.ERROR
         except Exception as e:
-            logger.warning(f"Could not check Ollama model '{model_name}': {e}")
+            logger.warning(f"Unexpected error checking Ollama model '{model_name}': {e}")
             return ModelStatus.ERROR
     
     async def download_missing_models(self, force_download: bool = False) -> bool:
@@ -267,8 +279,12 @@ class ModelManager:
             if model_info.package == "ollama":
                 # Don't download Ollama models, just report status
                 status = await self._check_ollama_model(model_info.name)
-                if status != ModelStatus.AVAILABLE:
-                    logger.warning(f"Ollama model '{model_info.name}' not available. Use: ollama pull {model_info.name}")
+                if status == ModelStatus.AVAILABLE:
+                    logger.debug(f"✅ Ollama model '{model_info.name}' is available")
+                elif status == ModelStatus.MISSING:
+                    logger.info(f"⚠️ Ollama model '{model_info.name}' not found. Use: ollama pull {model_info.name}")
+                else:
+                    logger.debug(f"🔌 Cannot connect to Ollama to check '{model_info.name}' (normal if Ollama runs on host)")
                 continue
             
             if force_download or model_info.status == ModelStatus.MISSING:
@@ -314,6 +330,13 @@ class ModelManager:
             nltk.data.path.clear()
             nltk.data.path.append(str(self.nltk_data_path))
             
+            # Check if model already exists before downloading
+            existing_status = self._check_nltk_model(model_info)
+            if existing_status == ModelStatus.AVAILABLE:
+                logger.info(f"📁 NLTK model '{model_info.name}' already exists and is accessible, skipping download")
+                return True
+            
+            logger.info(f"📥 Downloading NLTK model '{model_info.name}' to {self.nltk_data_path}")
             # Download the model - this should extract automatically
             success = nltk.download(model_info.name, download_dir=str(self.nltk_data_path), quiet=False)
             

@@ -27,6 +27,36 @@ volumes:
 
 services:
   # ===========================================================================
+  # LLM SERVICES
+  # ===========================================================================
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rag-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - model-data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_HOST=0.0.0.0:11434
+    # Note: Ollama may need root for GPU access, but directory should be pre-created with correct permissions
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
   # DATABASE SERVICES
   # ===========================================================================
 
@@ -137,6 +167,7 @@ services:
       - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
       - NLTK_DATA=/app/models/nltk_data
       - GENSIM_DATA_DIR=/app/models/gensim_data
+      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
     networks:
       - rag-network
     depends_on:
@@ -172,7 +203,7 @@ services:
     environment:
       - ENV=docker
       - LOG_LEVEL=DEBUG
-      - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
     networks:
       - rag-network
     healthcheck:
@@ -208,8 +239,10 @@ services:
     networks:
       - rag-network
     depends_on:
-      - nlp-service
-      - llm-service
+      nlp-service:
+        condition: service_healthy
+      llm-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
       interval: 30s
@@ -252,6 +285,8 @@ services:
       - ENABLE_API_DOCS=true
       - OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434
       - CONTAINER_TYPE=api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - rag-network
     depends_on:
@@ -278,6 +313,8 @@ services:
     image: jelly-worker
     container_name: rag-worker
     restart: unless-stopped
+    ports:
+      - "8004:8004"  # Metrics endpoint
     volumes:
       - ./src:/app/src:ro  # Hot reload
       - ./logs:/app/logs
@@ -295,6 +332,8 @@ services:
       - GENSIM_DATA_DIR=/app/models/gensim_data
       - CONTAINER_TYPE=worker
       - ROUTER_SERVICE_URL=http://router-service:8003
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - rag-network
     depends_on:

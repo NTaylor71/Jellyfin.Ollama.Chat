@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 
@@ -49,6 +50,10 @@ def create_app() -> FastAPI:
             allow_headers=settings.CORS_HEADERS,
         )
     
+    # Prometheus metrics (creates /metrics endpoint)
+    if settings.ENABLE_METRICS:
+        Instrumentator().instrument(app).expose(app)
+    
     # Health check endpoint
     @app.get("/health")
     async def health_check():
@@ -86,7 +91,7 @@ if __name__ == "__main__":
         "src.api.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
-        reload=settings.API_RELOAD and settings.is_development,
+        reload=settings.API_RELOAD and settings.is_localhost,
         workers=settings.API_WORKERS if not settings.is_development else 1,
         log_level=settings.LOG_LEVEL.lower()
     )

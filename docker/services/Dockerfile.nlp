@@ -1,8 +1,47 @@
 # =============================================================================
-# NLP Provider Service - Heavy NLP Dependencies (SpaCy, HeidelTime, Gensim)
+# NLP Provider Service - Multi-stage build to reduce image size
 # =============================================================================
 
-FROM python:3.12-slim
+# =============================================================================
+# STAGE 1: BUILDER - Install all dependencies and build tools
+# =============================================================================
+FROM python:3.12-slim as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies including Java JDK for HeidelTime
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    curl \
+    openjdk-17-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Java environment for building
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Create app directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml ./
+COPY src/ ./src/
+
+# Install all Python dependencies to /opt/venv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -e .[nlp,api,mongodb,monitoring]
+
+# =============================================================================
+# STAGE 2: RUNTIME - Copy only necessary files from builder
+# =============================================================================
+FROM python:3.12-slim as runtime
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -11,29 +50,43 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     NLTK_DATA=/app/models/nltk_data \
     GENSIM_DATA_DIR=/app/models/gensim_data
 
-# Install system dependencies including Java for HeidelTime
+# Install only runtime dependencies (JRE, not JDK)
 RUN apt-get update && apt-get install -y \
-    build-essential \
     curl \
-    openjdk-17-jdk \
+    gosu \
+    openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Java environment
+# Set Java environment for runtime
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 # Create app directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
-COPY pyproject.toml ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir -e .[nlp,api,mongodb,monitoring]
+# Copy Python virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy models directory
-COPY models/ ./models/
+# Copy project files from builder
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/pyproject.toml ./
+
+# Models will be mounted via volume - no need to copy
+
+# No complex entrypoint needed - service handles model downloads
 
 # Create directories
 RUN mkdir -p logs models/nltk_data models/gensim_data models/spacy_data
+
+# Create non-root user and fix permissions
+RUN groupadd -r nlp && useradd -r -g nlp nlp && \
+    chown -R nlp:nlp /app && \
+    chown -R nlp:nlp /opt/venv
+
+# Environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 8001
@@ -42,5 +95,8 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Run minimal NLP provider service for testing
+# Switch to nlp user and run the service directly
+USER nlp
+
+# Run minimal NLP provider service
 CMD ["python", "-m", "src.services.minimal_nlp_service"]

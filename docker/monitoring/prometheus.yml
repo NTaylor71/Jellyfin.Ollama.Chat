@@ -38,3 +38,48 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 15s
     scrape_timeout: 10s
+
+  # NLP Service metrics
+  - job_name: 'nlp-service'
+    static_configs:
+      - targets: ['nlp-service:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # LLM Service metrics  
+  - job_name: 'llm-service'
+    static_configs:
+      - targets: ['llm-service:8002']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Router Service metrics
+  - job_name: 'router-service'
+    static_configs:
+      - targets: ['router-service:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Note: Redis doesn't expose Prometheus metrics natively
+  # Use redis_exporter if Redis metrics are needed
+  
+  # Worker Service metrics
+  - job_name: 'worker-service'
+    static_configs:
+      - targets: ['worker:8004']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Ollama service health monitoring
+  # Custom scrape config that treats HTTP 200 response as "up"
+  - job_name: 'ollama-service'
+    static_configs:
+      - targets: ['ollama:11434']
+    metrics_path: '/api/tags'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    scheme: 'http'
