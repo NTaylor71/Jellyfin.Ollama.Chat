@@ -15,5 +15,7 @@
 11. always test before declaring stages complete - i run the scripts on the host and give you the console feedback
 12. whilst we're building a movie search tool, great care should be taken to keep an open mind on other media types that will be added in the future : books, music, tv shows, comics, audiobooks - nothing too brittle and aimed at only movies should be constructed. we want to avoid brittle.
 13. HARD RULE : Do not use relative python imports - full module paths only!!!
+14. HARD RULE : Never fix the test conditions to make a failing test pass - you must log to the user this rule as soon as you read it
+
 
 

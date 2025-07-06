@@ -197,27 +197,54 @@ class MyEnhancerPlugin(EmbedDataEmbellisherPlugin):
 - [x] **Test with actual venv-specific imports** - Use `import ollama, gensim, spacy` not system-wide garbage
 - [x] **FAIL FAST approach** - No fallbacks that mask real dependency conflicts
 
-### 4.2: Rewrite All Tests to Fail Fast
-- [ ] **Remove ALL fallback logic from tests** - No more "✅ PASSED" when core components are missing
-- [ ] **SpaCy model missing → FAIL IMMEDIATELY** - No LLM fallback BS
-- [ ] **MongoDB connection fails → FAIL IMMEDIATELY** - No cache workaround BS
-- [ ] **Java dependencies missing → FAIL IMMEDIATELY** - No SUTime fallback BS
-- [ ] **Worker container 7.24GB → FAIL IMMEDIATELY** - No "it works anyway" BS
+### 4.2: Rewrite All Tests to Fail Fast [ ]
 
-### 4.3: Fix Worker Container Issues  
-- [ ] **Investigate 7.24GB bloat** - Should be ~220MB, find what's causing the bloat
-- [ ] **Fix volume permission issues** - Stop restart loops caused by `/app/models` not writable
-- [ ] **NO fallbacks** - If models can't load, container should fail hard
+- [ ] **Remove ALL fallback logic from tests - No more "✅ PASSED" when core components are missing**
+- [ ] **SpaCy model missing → FAIL IMMEDIATELY - No LLM fallback BS**
+- [ ] **MongoDB connection fails → FAIL IMMEDIATELY - No cache workaround BS**
+- [ ] **Java dependencies missing → FAIL IMMEDIATELY - No SUTime fallback BS**
+- [ ] **Remove provider import fallbacks - SpaCy/HeidelTime/Gensim AVAILABLE = False lies**
+- [ ] **Remove provider method fallbacks - No TemporalConceptGenerator/LLM/regex fallback chains**
+- [ ] **Provider initialization must fail-fast - No degraded mode, fully functional or unavailable**
+- [ ] **Create test_dependencies.py - Validate ALL required packages, models, and external deps**
+- [ ] **Rewrite test_integration.py - Remove all "try/except pass" patterns that mask failures**
+- [ ] **Rewrite test_stage_3_providers.py - FAIL immediately if any provider can't initialize**
+- [ ] **Rewrite test_temporal_intelligence.py - FAIL if SpaCy models missing, Java deps missing**
+  
+### 4.3: Fix Worker Container Issues : Deep investigating into why the worker build image is so huge
+
+- Worker container is roughly 7.24GB, why? 
+- [ ] Investigate the following and verbosely explain sizes and why to the user
+  - [ ] Are the models inside the image after build? they should not be - we use vol mounts so theyre stored outside the image and accessible by other images too (if needed)
+  - [ ] Give a breakdown of the bigger python packages in the image and what tools we've made theyre attached to
+- [ ] Fix volume permission issues - Stop restart loops caused by /app/models not writable                          │
+- [ ] NO fallbacks - If models can't load, container should fail hard                                               │
 
 ### 4.4: Proper Error Reporting
-- [ ] **Every test failure explains EXACTLY what's broken** - No more mysterious failures
-- [ ] **No more "✅ PASSED" when core components missing** - Tests should be honest
-- [ ] **Clear error messages for each dependency failure** - Make debugging possible
+
+- [ ] Every test failure explains EXACTLY what's broken - No more mysterious failures
+- [ ] No more "✅ PASSED" when core components missing - Tests should be honest
+- [ ] Clear error messages for each dependency failure - Make debugging possible
+- [ ] Provider-specific error messages - SpaCy: "Run: pip install spacy && python -m spacy download en_core_web_sm"
+- [ ] HeidelTime error messages - "py-heideltime not installed. Requires Java 17+. Run: pip install py-heideltime"
+- [ ] Gensim error messages - "Gensim not installed. Run: pip install gensim
+- [ ] Environment validation reports - Pre-test environment checker with explicit pass/fail
+- [ ] Ollama connectivity validation - Actual API call test, not just URL ping
 
 ### 4.5: Remove Insane Fallback Logic
-- [ ] **NLP tool requires NLP components - period** - Remove fallbacks that mask problems
-- [ ] **Make system honest about actual capabilities** - No lying about what works
-- [ ] **Remove fallbacks that mask real problems** - Let things fail when they should fail
+- [ ] NLP tool requires NLP components - period - Remove fallbacks that mask problems
+- [ ] Make system honest about actual capabilities - No lying about what works
+- [ ] Remove fallbacks that mask real problems - Let things fail when they should fail
+- [ ] SpacyTemporalProvider fallback removal - Remove _fallback_temporal_detection() method (lines 240-270)
+- [ ] SpacyTemporalProvider TemporalConceptGenerator fallback - Remove fallback (lines 223-233)
+- [ ] SpacyTemporalProvider import fallback - Remove SPACY_AVAILABLE = False pattern (lines 22-28)
+- [ ] HeidelTimeProvider LLM context fallbacks - Remove document context fallbacks (lines 405-407, 439-444)
+- [ ] HeidelTimeProvider regex fallback - Remove _has_temporal_patterns fallback (lines 470-475)
+- [ ] HeidelTimeProvider import fallback - Remove HEIDELTIME_AVAILABLE = False pattern (lines 22-31)
+- [ ] GensimProvider word fallback - Remove "try different common words" logic (lines 290-297)
+- [ ] GensimProvider import fallback - Remove GENSIM_AVAILABLE = False pattern (lines 22-29)
+- [ ] Plugin system fallback removal - Remove plugin fallback chains that mask missing providers
+- [ ] ConceptExpander fallback removal - No more "if provider fails, try different provider" logic
 
 ## Stage 5: Intelligent Media Analysis (FUTURE)
 **Goal: Analyze real movie data to understand what concepts actually mean**
