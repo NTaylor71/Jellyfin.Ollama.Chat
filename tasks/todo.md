@@ -255,14 +255,48 @@ class MyEnhancerPlugin(EmbedDataEmbellisherPlugin):
 - [ ] Check all test_*.py tests get all env vars via the shared/config.py (a switch between local dev .env and docker's own env [see the compose for the environment var ENV=docker etc]) - **PARTIALLY DONE** - dependency validator fixed, but need to fix remaining 6 test files
 
 
-### 4.3: Fix Worker Container Issues : Deep investigating into why the worker build image is so huge
+### 4.3: Service-Oriented Plugin Architecture with Clean Nomenclature
 
-- Worker container is roughly 7.24GB, why? 
-- [ ] Investigate the following and verbosely explain sizes and why to the user
-  - [ ] Are the models inside the image after build? they should not be - we use vol mounts so theyre stored outside the image and accessible by other images too (if needed)
-  - [ ] Give a breakdown of the bigger python packages in the image and what tools we've made theyre attached to
-- [ ] Fix volume permission issues - Stop restart loops caused by /app/models not writable                          │
-- [ ] NO fallbacks - If models can't load, container should fail hard                                               │
+**Goal**: Transform monolithic worker into lightweight orchestrator + specialized services while maintaining clean plugin patterns
+
+#### 4.3.1: Create Provider Service Architecture
+- [ ] **NLPProviderService** - FastAPI service hosting SpaCy, HeidelTime, Gensim providers
+- [ ] **LLMProviderService** - Dedicated service for Ollama/LLM operations  
+- [ ] **PluginRouterService** - Routes plugin requests to appropriate services
+- [ ] **ServiceRegistryPlugin** - New plugin type for service discovery
+
+#### 4.3.2: Implement Plugin Task Dispatcher  
+- [ ] **Complete worker/main.py TODO** - Route task_types to plugins:
+  - `plugin_execution` → Load plugin by name and execute
+  - `concept_expansion` → ConceptExpansionPlugin
+  - `temporal_analysis` → TemporalAnalysisPlugin
+  - `question_expansion` → QuestionExpansionPlugin
+- [ ] **Add PluginLoader** - Dynamic plugin loading from task data
+- [ ] **Implement plugin health checks** - Verify plugins can reach their services
+
+#### 4.3.3: Create Service Client Plugins
+- [ ] **HTTPProviderPlugin** - Base class for plugins that call HTTP services
+- [ ] **RemoteConceptExpansionPlugin** - Extends ConceptExpansionPlugin to use services
+- [ ] **RemoteTemporalAnalysisPlugin** - Temporal analysis via HTTP
+- [ ] **ServiceHealthMonitorPlugin** - Monitor service availability
+
+#### 4.3.4: Expand Plugin Types
+- [ ] **Add SERVICE_PROVIDER to PluginType enum** - New type for service-backed plugins
+- [ ] **Create ServiceProviderPlugin base class** - Common HTTP client functionality
+- [ ] **Add service discovery to PluginExecutionContext** - Available services info
+- [ ] **Implement circuit breaker pattern** - Graceful degradation when services down
+
+#### 4.3.5: Test Microservices Architecture
+- [ ] **Lightweight worker verification** - Confirm <500MB without NLP deps
+- [ ] **Plugin routing test** - Queue → Worker → Plugin → Service → Result
+- [ ] **Service scaling test** - 3 workers + 1 NLP service configuration
+- [ ] **Performance benchmarks** - Compare monolithic vs service latency
+
+**Clean Nomenclature Maintained**:
+- Plugins remain `*Plugin` (execution logic)
+- Services become `*Service` (HTTP endpoints)  
+- Providers stay `*Provider` (concept expansion logic)
+- Clear separation: Plugin orchestrates, Service provides, Provider implements
 
 ### 4.4: Proper Error Reporting
 
