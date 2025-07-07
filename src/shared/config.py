@@ -97,41 +97,9 @@ class Settings(BaseSettings):
     # OLLAMA CONFIGURATION
     # ==========================================================================
     
-    # Chat service
     OLLAMA_CHAT_BASE_URL: str = Field(default="http://localhost:11434")
     OLLAMA_CHAT_MODEL: str = Field(default="llama3.2:3b")
     OLLAMA_CHAT_TIMEOUT: int = Field(default=300)
-
-    DOCKER_CHAT_BASE_URL: str = Field(default="http://ollama:11434")
-    DOCKER_CHAT_MODEL: str = Field(default="llama3.2:3b")
-    DOCKER_CHAT_TIMEOUT: int = Field(default=300)
-    
-    # Embedding service (use same as chat for localhost)
-    OLLAMA_EMBED_BASE_URL: str = Field(default="http://localhost:11434")
-    OLLAMA_EMBED_MODEL: str = Field(default="nomic-embed-text")
-    OLLAMA_EMBED_TIMEOUT: int = Field(default=60)
-
-
-    @property
-    def ollama_chat_url(self) -> str:
-        """Get Ollama chat URL based on environment."""
-        if self.is_docker:
-            return self.DOCKER_CHAT_BASE_URL
-        return self.OLLAMA_CHAT_BASE_URL
-
-    @property
-    def ollama_chat_model(self) -> str:
-        """Get Ollama chat model based on environment."""
-        if self.is_docker:
-            return self.DOCKER_CHAT_MODEL
-        return self.OLLAMA_CHAT_MODEL
-
-    @property
-    def ollama_embed_url(self) -> str:
-        """Get Ollama embedding URL based on environment."""
-        if self.is_docker:
-            return self.DOCKER_CHAT_BASE_URL  # Use same URL for embeddings
-        return self.OLLAMA_EMBED_BASE_URL
     
     # ==========================================================================
     # VECTOR DATABASE (FAISS) CONFIGURATION
@@ -469,12 +437,12 @@ class Settings(BaseSettings):
         try:
             # Test chat service
             with httpx.Client(timeout=5.0) as client:
-                response = client.get(f"{self.ollama_chat_url}/api/tags")
+                response = client.get(f"{self.OLLAMA_CHAT_BASE_URL}/api/tags")
                 if response.status_code != 200:
                     return False
                 
                 # Test embed service
-                response = client.get(f"{self.ollama_embed_url}/api/tags")
+                response = client.get(f"{self.OLLAMA_CHAT_BASE_URL}/api/tags")
                 return response.status_code == 200
                 
         except Exception:
@@ -526,8 +494,8 @@ class Settings(BaseSettings):
         return {
             "api": self.api_url,
             "vectordb": self.vectordb_url,
-            "ollama_chat": self.ollama_chat_url,
-            "ollama_embed": self.ollama_embed_url,
+            "ollama_chat": self.OLLAMA_CHAT_BASE_URL,
+            "ollama_embed": self.OLLAMA_CHAT_BASE_URL,
             "redis": self.redis_url,
             "prometheus": f"http://localhost:{self.PROMETHEUS_PORT}" if self.PROMETHEUS_ENABLED else None
         }

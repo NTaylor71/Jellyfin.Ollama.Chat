@@ -71,7 +71,7 @@ class ModelManager:
         os.environ['GENSIM_DATA_DIR'] = str(self.gensim_data_path)
         
         self.models = self._define_required_models()
-        self.ollama_base_url = self.settings.ollama_chat_url
+        self.ollama_base_url = self.settings.OLLAMA_CHAT_BASE_URL
     
     def _define_required_models(self) -> Dict[str, ModelInfo]:
         """Define all required models and their properties."""

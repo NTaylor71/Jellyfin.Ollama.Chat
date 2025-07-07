@@ -41,7 +41,6 @@ services:
     environment:
       - OLLAMA_KEEP_ALIVE=10m
       - OLLAMA_HOST=0.0.0.0:11434
-      - CUDA_VISIBLE_DEVICES=all
     networks:
       - rag-network
     # GPU support - will fail hard if NVIDIA runtime not available
@@ -49,9 +48,7 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+            - capabilities: ["gpu"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s

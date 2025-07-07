@@ -55,8 +55,8 @@ class MinimalLLMManager:
         self.error_count = 0
         self.start_time = asyncio.get_event_loop().time()
         self.settings = get_settings()
-        self.ollama_url = self.settings.ollama_chat_url
-        self.model = self.settings.ollama_chat_model
+        self.ollama_url = self.settings.OLLAMA_CHAT_BASE_URL
+        self.model = self.settings.OLLAMA_CHAT_MODEL
         logger.info(f"Initialized LLM manager with Ollama URL: {self.ollama_url}, model: {self.model}")
     
     async def initialize_provider(self):
