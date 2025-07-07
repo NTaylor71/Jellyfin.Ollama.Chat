@@ -122,6 +122,13 @@ class HeidelTimeProvider(BaseProvider):
             extracted_temporals = self._extract_temporal_expressions(
                 document_context, concept, request.media_context
             )
+            
+            # Also try direct extraction from the concept itself
+            if not extracted_temporals:
+                direct_temporals = self._extract_temporal_expressions(
+                    concept, concept, request.media_context
+                )
+                extracted_temporals.extend(direct_temporals)
             if extracted_temporals:
                 temporal_concepts.extend(extracted_temporals)
             
@@ -216,16 +223,22 @@ class HeidelTimeProvider(BaseProvider):
             # Parse the document context
             temporal_data = heideltime(document_context, language=self.language, document_type='news')
             
+            # Debug logging
+            logger.info(f"HeidelTime input: {document_context}")
+            logger.info(f"HeidelTime output: {temporal_data}")
+            
             temporal_concepts = []
             
             # Extract temporal expressions from HeidelTime output
             if temporal_data:
                 # HeidelTime returns a list of dictionaries, not XML
                 temporal_expressions = temporal_data if isinstance(temporal_data, list) else []
+                logger.info(f"Temporal expressions found: {len(temporal_expressions)}")
                 
                 for expr in temporal_expressions:
                     # Convert to concept format
                     concept_forms = self._temporal_to_concepts(expr, media_context)
+                    logger.info(f"Generated concepts from {expr}: {concept_forms}")
                     temporal_concepts.extend(concept_forms)
             
             return temporal_concepts
@@ -281,6 +294,10 @@ class HeidelTimeProvider(BaseProvider):
         timex_type = temporal_expr.get("type", "")
         value = temporal_expr.get("value", "")
         text = temporal_expr.get("text", "")
+        
+        # Add the original temporal text as a concept
+        if text:
+            concepts.append(text)
         
         # Generate concepts procedurally based on temporal expression structure
         concepts.extend(self._generate_concepts_from_temporal_expression(timex_type, value, text))

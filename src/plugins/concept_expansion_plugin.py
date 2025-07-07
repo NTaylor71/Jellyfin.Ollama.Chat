@@ -22,6 +22,7 @@ from src.concept_expansion.providers.base_provider import ExpansionRequest
 from src.shared.plugin_contracts import PluginResult, CacheType
 from src.shared.text_utils import extract_key_concepts
 from src.data.cache_manager import CacheStrategy
+from src.shared.media_field_config import get_media_field_config, detect_media_type_from_data
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class ConceptExpansionPlugin(BaseConceptPlugin):
             strategy = self._select_processing_strategy(context)
             
             # Extract concepts from data
-            concepts = self._extract_concepts_from_data(data)
+            concepts = await self._extract_concepts_from_data(data)
             if not concepts:
                 self._logger.debug("No concepts found to expand")
                 return data
@@ -135,33 +136,48 @@ class ConceptExpansionPlugin(BaseConceptPlugin):
             self._logger.error(f"Concept expansion failed: {e}")
             return data  # Return original data on error
     
-    def _extract_concepts_from_data(self, data: Dict[str, Any]) -> List[str]:
-        """Extract key concepts from various data fields."""
+    async def _extract_concepts_from_data(self, data: Dict[str, Any]) -> List[str]:
+        """Extract key concepts from data using media-type-aware configuration."""
+        try:
+            # Detect media type from data
+            media_type = detect_media_type_from_data(data)
+            
+            # Get field configuration manager
+            config_manager = await get_media_field_config()
+            
+            # Extract concepts using configured rules
+            concepts = config_manager.extract_concepts_from_data(data, media_type)
+            
+            self._logger.debug(f"Extracted {len(concepts)} concepts for {media_type.value}")
+            return concepts
+            
+        except Exception as e:
+            self._logger.error(f"Failed to extract concepts using media config: {e}")
+            # Fallback to basic extraction
+            return self._fallback_concept_extraction(data)
+    
+    def _fallback_concept_extraction(self, data: Dict[str, Any]) -> List[str]:
+        """Fallback concept extraction when config system fails."""
         concepts = set()
         
-        # Extract from common text fields
-        text_fields = [
-            "Name", "OriginalTitle", "Overview", "Taglines",
-            "description", "summary", "plot", "content"
-        ]
-        
-        for field in text_fields:
-            if field in data and isinstance(data[field], str):
-                field_concepts = extract_key_concepts(data[field])
-                concepts.update(field_concepts[:5])  # Limit per field
-        
-        # Extract from list fields
-        list_fields = ["Genres", "Tags", "genres", "tags", "keywords"]
-        for field in list_fields:
-            if field in data and isinstance(data[field], list):
-                for item in data[field][:10]:  # Limit items
+        # Generic text fields that might exist in any media type
+        for key, value in data.items():
+            if isinstance(value, str) and len(value.strip()) > 0:
+                if key.lower() in ['name', 'title', 'description', 'overview', 'summary']:
+                    field_concepts = extract_key_concepts(value)
+                    concepts.update(field_concepts[:3])
+            elif isinstance(value, list):
+                for item in value[:5]:
                     if isinstance(item, str):
-                        concepts.add(item.lower())
-                    elif isinstance(item, dict) and "Name" in item:
-                        concepts.add(item["Name"].lower())
+                        concepts.add(item.lower().strip())
+                    elif isinstance(item, dict):
+                        # Try common name fields in dictionaries
+                        for name_field in ['Name', 'name', 'title', 'Title', 'label', 'Label']:
+                            if name_field in item and isinstance(item[name_field], str):
+                                concepts.add(item[name_field].lower().strip())
+                                break
         
-        # Convert to list and limit total
-        return list(concepts)[:15]
+        return list(concepts)[:10]
     
     async def _high_resource_expansion(
         self, 

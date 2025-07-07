@@ -120,37 +120,11 @@ class PluginLoader:
         """Discover available plugins and categorize them."""
         logger.info("Discovering available plugins...")
         
-        plugin_dir = Path("src/plugins")
-        if not plugin_dir.exists():
-            logger.warning("Plugin directory not found")
-            return
-        
-        for plugin_file in plugin_dir.glob("*_plugin.py"):
-            if plugin_file.name.startswith("_"):
-                continue
-            
-            try:
-                # Import module to get plugin class
-                module_name = f"src.plugins.{plugin_file.stem}"
-                module = importlib.import_module(module_name)
-                
-                # Find plugin classes
-                for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if (issubclass(obj, BasePlugin) and 
-                        obj != BasePlugin and 
-                        name.endswith("Plugin")):
-                        
-                        # Categorize plugin
-                        if name in self.local_plugins:
-                            logger.debug(f"Found local plugin: {name}")
-                        elif name in self.service_plugins:
-                            logger.debug(f"Found service plugin: {name}")
-                            self.plugin_service_mapping[name] = self._get_service_for_plugin(name)
-                        else:
-                            logger.debug(f"Found unknown plugin: {name}")
-                        
-            except Exception as e:
-                logger.warning(f"Failed to inspect plugin {plugin_file}: {e}")
+        # Use static mapping for service plugins to avoid import issues
+        # This avoids importing heavy NLP dependencies in the lightweight worker
+        for plugin_name in self.service_plugins:
+            self.plugin_service_mapping[plugin_name] = self._get_service_for_plugin(plugin_name)
+            logger.debug(f"Mapped service plugin: {plugin_name} -> {self.plugin_service_mapping[plugin_name]}")
         
         logger.info(f"Plugin discovery complete. Found {len(self.plugin_service_mapping)} service plugins.")
     
@@ -269,9 +243,12 @@ class PluginLoader:
                     "session_id": context.session_id,
                     "request_id": context.request_id,
                     "execution_timeout": context.execution_timeout,
-                    "priority": context.priority.value
+                    "priority": context.priority.value if hasattr(context.priority, 'value') else str(context.priority)
                 }
             }
+            
+            # Debug logging
+            logger.info(f"🔍 Sending request to router: {request_data}")
             
             # Execute via router
             response = await self.http_client.post(
@@ -387,24 +364,33 @@ class PluginLoader:
                 error_message=f"Task validation failed: {error_message}"
             )
         
-        # Get plugin name from task definition
-        plugin_name = get_plugin_for_task(task_type, task_data.get("data", {}))
+        # Extract plugin info from nested task data structure
+        inner_data = task_data.get("data", {})
+        plugin_name = inner_data.get("plugin_name")
+        plugin_type = inner_data.get("plugin_type")
+        
         if not plugin_name:
             return PluginExecutionResult(
                 success=False,
-                error_message=f"No plugin mapped for task type: {task_type}"
+                error_message=f"No plugin_name provided in task data"
+            )
+        
+        if not plugin_type:
+            return PluginExecutionResult(
+                success=False,
+                error_message=f"No plugin_type provided in task data"
             )
         
         # Get task definition for timeout and other settings
         task_definition = get_task_definition(task_type)
         default_timeout = task_definition.execution_timeout if task_definition else 30.0
         
-        # Create execution context
+        # Create execution context from inner data
         context = PluginExecutionContext(
-            user_id=task_data.get("user_id"),
-            session_id=task_data.get("session_id"),
-            request_id=task_data.get("task_id"),
-            execution_timeout=task_data.get("timeout", default_timeout),
+            user_id=inner_data.get("user_id"),
+            session_id=inner_data.get("session_id"),
+            request_id=inner_data.get("task_id"),
+            execution_timeout=inner_data.get("timeout", default_timeout),
             metadata={
                 "task_type": task_type,
                 "requires_service": task_definition.requires_service if task_definition else False,
@@ -412,10 +398,10 @@ class PluginLoader:
             }
         )
         
-        # Execute plugin
+        # Execute plugin with the actual plugin data
         return await self.execute_plugin(
             plugin_name=plugin_name,
-            plugin_type=task_type,
-            data=task_data.get("data", {}),
+            plugin_type=plugin_type,  # Use actual plugin type, not task type
+            data=inner_data.get("data", {}),  # Get the actual plugin data
             context=context
         )

@@ -1,0 +1,62 @@
+media_type: music
+name: Music
+description: Configuration for music media type
+
+field_extraction_rules:
+  - field_name: Name
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 2.0
+  
+  - field_name: TrackName
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 2.0
+  
+  - field_name: Artist
+    field_type: text
+    extraction_method: direct_values
+    max_concepts: 3
+    weight: 2.5
+  
+  - field_name: Album
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 3
+    weight: 1.5
+  
+  - field_name: Genre
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 8
+    weight: 2.0
+  
+  - field_name: Mood
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 5
+    weight: 1.5
+  
+  - field_name: Tags
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 10
+    weight: 1.0
+  
+  - field_name: Composer
+    field_type: text
+    extraction_method: direct_values
+    max_concepts: 2
+    weight: 1.0
+
+plugins_to_run:
+  - ConceptExpansionPlugin
+
+priority_order:
+  - Genre
+  - Artist
+  - Album
+  - Name
+  - TrackName

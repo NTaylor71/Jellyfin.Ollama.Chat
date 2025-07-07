@@ -1,0 +1,50 @@
+media_type: movie
+name: Movie
+description: Configuration for movie media type
+
+field_extraction_rules:
+  - field_name: Name
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 2.0
+  
+  - field_name: OriginalTitle
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 2.0
+  
+  - field_name: Overview
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 10
+    weight: 1.5
+  
+  - field_name: Taglines
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 1.0
+  
+  - field_name: Genres
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 10
+    weight: 2.0
+  
+  - field_name: Tags
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 10
+    weight: 1.5
+
+plugins_to_run:
+  - ConceptExpansionPlugin
+  - TemporalAnalysisPlugin
+
+priority_order:
+  - Genres
+  - Name
+  - OriginalTitle
+  - Overview

@@ -1,0 +1,62 @@
+media_type: tv_show
+name: TV Show
+description: Configuration for TV show media type
+
+field_extraction_rules:
+  - field_name: SeriesName
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 2.0
+  
+  - field_name: Name
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 5
+    weight: 1.5
+  
+  - field_name: Overview
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 10
+    weight: 1.5
+  
+  - field_name: EpisodeName
+    field_type: text
+    extraction_method: key_concepts
+    max_concepts: 3
+    weight: 1.0
+  
+  - field_name: Genres
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 10
+    weight: 2.0
+  
+  - field_name: Tags
+    field_type: list
+    extraction_method: direct_values
+    max_concepts: 10
+    weight: 1.5
+  
+  - field_name: SeasonNumber
+    field_type: numeric
+    extraction_method: direct_values
+    max_concepts: 1
+    weight: 0.5
+  
+  - field_name: EpisodeNumber
+    field_type: numeric
+    extraction_method: direct_values
+    max_concepts: 1
+    weight: 0.5
+
+plugins_to_run:
+  - ConceptExpansionPlugin
+  - TemporalAnalysisPlugin
+
+priority_order:
+  - Genres
+  - SeriesName
+  - Name
+  - Overview

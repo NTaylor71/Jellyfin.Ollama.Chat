@@ -281,7 +281,18 @@ async def _expand_with_heideltime(request: ProviderRequest) -> Dict[str, Any]:
         
         provider = HeidelTimeProvider(language="english")
         
-        # Check health and initialize if needed
+        # Initialize provider first
+        initialized = await provider.initialize()
+        if not initialized:
+            logger.error("Failed to initialize HeidelTime provider")
+            return {
+                "expanded_concepts": [],
+                "confidence_scores": [],
+                "provider_used": "heideltime",
+                "error": "Provider initialization failed"
+            }
+        
+        # Check health after initialization
         health_status = await provider.health_check()
         if health_status.get("status") != "healthy":
             logger.warning(f"HeidelTime provider not healthy: {health_status}")
