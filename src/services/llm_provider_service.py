@@ -345,6 +345,114 @@ async def load_model(model_name: str):
         }
 
 
+# ============================================================================
+# NEW ENDPOINTS FOR HTTP-ONLY PLUGIN ARCHITECTURE
+# ============================================================================
+
+class KeywordExpansionRequest(BaseModel):
+    """Request for LLM keyword expansion."""
+    keywords: List[str] = Field(..., min_items=1, max_items=10)
+    context: str = Field(default="")
+    field_name: str = Field(default="keywords")
+    max_concepts: int = Field(default=15, ge=1, le=50)
+    expansion_style: str = Field(default="semantic_related")
+    prompt_template: str = Field(default="")
+    temperature: float = Field(default=0.3, ge=0.0, le=1.0)
+    smart_retry_until: str = Field(default="list")
+
+
+class KeywordExpansionResponse(BaseModel):
+    """Response from LLM keyword expansion."""
+    concepts: List[str]
+    metadata: Dict[str, Any]
+
+
+@app.post("/keywords/expand", response_model=KeywordExpansionResponse)
+async def expand_keywords(request: KeywordExpansionRequest):
+    """Expand keywords using LLM semantic understanding."""
+    try:
+        provider = provider_manager.get_provider()
+        provider_manager.request_count += 1
+        
+        start_time = asyncio.get_event_loop().time()
+        
+        # Build prompt for keyword expansion
+        if request.prompt_template:
+            # Use custom prompt template
+            keywords_text = ", ".join(request.keywords)
+            if request.context:
+                prompt = request.prompt_template.format(value=f"{keywords_text} (Context: {request.context})")
+            else:
+                prompt = request.prompt_template.format(value=keywords_text)
+        else:
+            # Default prompt based on field name and expansion style
+            keywords_text = ", ".join(request.keywords)
+            if request.expansion_style == "semantic_related":
+                prompt = f"Given these keywords: {keywords_text}, provide {request.max_concepts} semantically related concepts, themes, and terms that would help categorize and find similar content. Return as a simple list."
+            elif request.expansion_style == "genre_expansion":
+                prompt = f"Given these genres/categories: {keywords_text}, provide {request.max_concepts} related genres, subgenres, and thematic categories. Return as a simple list."
+            else:
+                prompt = f"Expand these keywords: {keywords_text} with {request.max_concepts} related concepts. Return as a simple list."
+            
+            if request.context:
+                prompt += f" Context: {request.context}"
+        
+        # Create expansion request for provider
+        from src.concept_expansion.providers.base_provider import ExpansionRequest
+        expansion_request = ExpansionRequest(
+            concept=prompt,
+            media_context=request.field_name,
+            max_concepts=request.max_concepts,
+            field_name=request.field_name
+        )
+        
+        # Call LLM provider
+        result = await provider.expand_concept(expansion_request)
+        
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        # Extract concepts from result
+        if isinstance(result, dict) and "concepts" in result:
+            concepts = result["concepts"]
+        elif isinstance(result, list):
+            concepts = result
+        else:
+            # Fallback: try to parse as text
+            concepts = str(result).split("\n") if result else []
+        
+        # Clean up concepts
+        cleaned_concepts = []
+        for concept in concepts:
+            if isinstance(concept, str):
+                clean = concept.strip().strip("-").strip("*").strip()
+                if clean and len(clean) > 1:
+                    cleaned_concepts.append(clean)
+            elif isinstance(concept, dict) and "concept" in concept:
+                clean = str(concept["concept"]).strip()
+                if clean and len(clean) > 1:
+                    cleaned_concepts.append(clean)
+        
+        # Limit results
+        cleaned_concepts = cleaned_concepts[:request.max_concepts]
+        
+        return KeywordExpansionResponse(
+            concepts=cleaned_concepts,
+            metadata={
+                "execution_time_ms": execution_time_ms,
+                "expansion_style": request.expansion_style,
+                "input_keywords": request.keywords,
+                "result_count": len(cleaned_concepts),
+                "field_name": request.field_name,
+                "temperature": request.temperature
+            }
+        )
+        
+    except Exception as e:
+        provider_manager.error_count += 1
+        logger.error(f"LLM keyword expansion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     

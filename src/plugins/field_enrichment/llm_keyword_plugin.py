@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any, List
 
 from src.plugins.http_base import HTTPBasePlugin
-from src.plugins.base import PluginMetadata, PluginType, ExecutionPriority
+from src.plugins.base import PluginMetadata, PluginResourceRequirements, PluginType, ExecutionPriority
 from src.shared.text_utils import extract_key_concepts
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,20 @@ class LLMKeywordPlugin(HTTPBasePlugin):
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["keyword", "expansion", "llm", "semantic", "ai"],
             execution_priority=ExecutionPriority.HIGH  # LLM is expensive, prioritize
+        )
+    
+    @property
+    def resource_requirements(self) -> PluginResourceRequirements:
+        """LLM plugins have higher resource requirements due to model inference."""
+        return PluginResourceRequirements(
+            min_cpu_cores=1.0,
+            preferred_cpu_cores=2.0,
+            min_memory_mb=512.0,
+            preferred_memory_mb=2048.0,
+            requires_gpu=True,  # LLM inference benefits significantly from GPU
+            min_gpu_memory_mb=2048.0,
+            preferred_gpu_memory_mb=8192.0,
+            max_execution_time_seconds=60.0  # LLM calls can take longer
         )
     
     async def enrich_field(

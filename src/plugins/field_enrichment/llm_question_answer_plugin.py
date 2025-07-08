@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any, List
 
 from src.plugins.http_base import HTTPBasePlugin
-from src.plugins.base import PluginMetadata, PluginType, ExecutionPriority
+from src.plugins.base import PluginMetadata, PluginResourceRequirements, PluginType, ExecutionPriority
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,20 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["qa", "question", "answer", "llm", "ai", "reasoning"],
             execution_priority=ExecutionPriority.HIGH  # LLM is expensive, prioritize
+        )
+    
+    @property
+    def resource_requirements(self) -> PluginResourceRequirements:
+        """LLM Q&A plugins have higher resource requirements due to model inference."""
+        return PluginResourceRequirements(
+            min_cpu_cores=1.0,
+            preferred_cpu_cores=2.0,
+            min_memory_mb=512.0,
+            preferred_memory_mb=2048.0,
+            requires_gpu=True,  # LLM inference benefits significantly from GPU
+            min_gpu_memory_mb=2048.0,
+            preferred_gpu_memory_mb=8192.0,
+            max_execution_time_seconds=90.0  # Q&A can take longer due to reasoning
         )
     
     async def enrich_field(

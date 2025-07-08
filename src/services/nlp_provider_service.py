@@ -344,6 +344,144 @@ async def check_provider_health(provider_name: str):
         }
 
 
+# ============================================================================
+# NEW ENDPOINTS FOR HTTP-ONLY PLUGIN ARCHITECTURE
+# ============================================================================
+
+class GensimSimilarityRequest(BaseModel):
+    """Request for Gensim similarity search."""
+    keywords: List[str] = Field(..., min_items=1, max_items=10)
+    similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    max_similar: int = Field(default=8, ge=1, le=20)
+    model_type: str = Field(default="word2vec")
+    include_scores: bool = Field(default=True)
+    filter_duplicates: bool = Field(default=True)
+
+
+class GensimSimilarityResponse(BaseModel):
+    """Response from Gensim similarity search."""
+    similar_terms: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+
+class GensimCompareRequest(BaseModel):
+    """Request to compare similarity between two terms."""
+    term1: str = Field(..., min_length=1)
+    term2: str = Field(..., min_length=1)
+    model_type: str = Field(default="word2vec")
+
+
+@app.post("/gensim/similarity", response_model=GensimSimilarityResponse)
+async def gensim_similarity_search(request: GensimSimilarityRequest):
+    """Find similar terms using Gensim word vectors."""
+    try:
+        provider = provider_manager.get_provider("gensim")
+        provider_manager.request_count += 1
+        
+        start_time = asyncio.get_event_loop().time()
+        
+        # Convert to similarity search format
+        similar_terms = []
+        for keyword in request.keywords:
+            # Call provider's similarity method
+            if hasattr(provider, 'find_similar_terms'):
+                similar = await provider.find_similar_terms(
+                    keyword, 
+                    threshold=request.similarity_threshold,
+                    max_results=request.max_similar
+                )
+                
+                if request.include_scores:
+                    # Keep score information
+                    for term_data in similar:
+                        if isinstance(term_data, dict):
+                            similar_terms.append(term_data)
+                        else:
+                            similar_terms.append({"term": str(term_data), "score": 1.0})
+                else:
+                    # Extract just terms
+                    for term_data in similar:
+                        if isinstance(term_data, dict):
+                            similar_terms.append({"term": term_data.get("term", str(term_data))})
+                        else:
+                            similar_terms.append({"term": str(term_data)})
+        
+        # Remove duplicates if requested
+        if request.filter_duplicates:
+            seen_terms = set()
+            filtered_terms = []
+            for term_data in similar_terms:
+                term = term_data.get("term", "")
+                if term and term not in seen_terms:
+                    seen_terms.add(term)
+                    filtered_terms.append(term_data)
+            similar_terms = filtered_terms
+        
+        # Limit results
+        similar_terms = similar_terms[:request.max_similar]
+        
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        return GensimSimilarityResponse(
+            similar_terms=similar_terms,
+            metadata={
+                "execution_time_ms": execution_time_ms,
+                "model_type": request.model_type,
+                "threshold": request.similarity_threshold,
+                "input_keywords": request.keywords,
+                "result_count": len(similar_terms)
+            }
+        )
+        
+    except Exception as e:
+        provider_manager.error_count += 1
+        logger.error(f"Gensim similarity search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/gensim/compare")
+async def gensim_compare_similarity(request: GensimCompareRequest):
+    """Compare similarity between two specific terms."""
+    try:
+        provider = provider_manager.get_provider("gensim")
+        provider_manager.request_count += 1
+        
+        start_time = asyncio.get_event_loop().time()
+        
+        # Call provider's compare method
+        if hasattr(provider, 'compare_similarity'):
+            similarity_score = await provider.compare_similarity(request.term1, request.term2)
+        else:
+            # Fallback: use similarity search
+            similar_terms = await provider.find_similar_terms(request.term1, max_results=100)
+            similarity_score = 0.0
+            for term_data in similar_terms:
+                if isinstance(term_data, dict):
+                    if term_data.get("term", "").lower() == request.term2.lower():
+                        similarity_score = term_data.get("score", 0.0)
+                        break
+                elif str(term_data).lower() == request.term2.lower():
+                    similarity_score = 0.8  # Default score for exact match
+                    break
+        
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        return {
+            "similarity": similarity_score,
+            "metadata": {
+                "execution_time_ms": execution_time_ms,
+                "model_type": request.model_type,
+                "term1": request.term1,
+                "term2": request.term2
+            }
+        }
+        
+    except Exception as e:
+        provider_manager.error_count += 1
+        logger.error(f"Gensim similarity comparison failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     
