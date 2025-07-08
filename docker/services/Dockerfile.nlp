@@ -38,6 +38,19 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e .[nlp,api,mongodb,monitoring]
 
+# Download Stanford CoreNLP dependencies for SUTime
+RUN mkdir -p /tmp/stanford_jars && \
+    cd /tmp/stanford_jars && \
+    curl -s -L -O "https://repo1.maven.org/maven2/edu/stanford/nlp/stanford-corenlp/4.0.0/stanford-corenlp-4.0.0.jar" && \
+    curl -s -L -O "https://repo1.maven.org/maven2/edu/stanford/nlp/stanford-corenlp/4.0.0/stanford-corenlp-4.0.0-models.jar" && \
+    curl -s -L -O "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.8.6/gson-2.8.6.jar" && \
+    curl -s -L -O "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/1.7.30/slf4j-simple-1.7.30.jar" && \
+    curl -s -L -O "https://repo1.maven.org/maven2/joda-time/joda-time/2.10.5/joda-time-2.10.5.jar" && \
+    ls -la && \
+    cp *.jar /opt/venv/lib/python3.12/site-packages/sutime/jars/ && \
+    ls -la /opt/venv/lib/python3.12/site-packages/sutime/jars/ && \
+    rm -rf /tmp/stanford_jars
+
 # =============================================================================
 # STAGE 2: RUNTIME - Copy only necessary files from builder
 # =============================================================================
@@ -79,8 +92,8 @@ COPY --from=builder /app/pyproject.toml ./
 # Create directories
 RUN mkdir -p logs models/nltk_data models/gensim_data models/spacy_data
 
-# Create non-root user and fix permissions
-RUN groupadd -r nlp && useradd -r -g nlp nlp && \
+# Create non-root user with standard UID/GID
+RUN groupadd -g 1000 nlp && useradd -u 1000 -g 1000 -m nlp && \
     chown -R nlp:nlp /app && \
     chown -R nlp:nlp /opt/venv
 
@@ -98,5 +111,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Switch to nlp user and run the service directly
 USER nlp
 
-# Run minimal NLP provider service
-CMD ["python", "-m", "src.services.minimal_nlp_service"]
+# Run full NLP provider service (includes ConceptNet and SUTime)
+CMD ["python", "-m", "src.services.provider_services.nlp_provider_service"]

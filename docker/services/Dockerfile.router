@@ -25,6 +25,7 @@ WORKDIR /app
 # Copy project files
 COPY pyproject.toml ./
 COPY src/ ./src/
+COPY config/ ./config/
 
 # Install Python dependencies to /opt/venv
 RUN python -m venv /opt/venv
@@ -56,6 +57,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy project files from builder
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/config ./config
 COPY --from=builder /app/pyproject.toml ./
 
 # Create directories
@@ -69,4 +71,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8003/health || exit 1
 
 # Run plugin router service
-CMD ["python", "-m", "src.services.plugin_router_service"]
+CMD ["python", "-m", "src.services.orchestration.plugin_router_service"]

@@ -18,10 +18,11 @@ from src.plugins.base import (
     EmbedDataEmbellisherPlugin, PluginResourceRequirements, 
     PluginExecutionContext, PluginMetadata, ExecutionPriority
 )
-from src.redis_worker.queue_manager import RedisQueueManager
+from src.worker.resource_queue_manager import ResourceAwareQueueManager
+from src.worker.resource_manager import create_resource_pool_from_config
 from src.shared.hardware_config import get_resource_limits
-from src.concept_expansion.providers.base_provider import BaseProvider, ExpansionRequest
-from src.data.cache_manager import get_cache_manager
+from src.providers.nlp.base_provider import BaseProvider, ExpansionRequest
+from src.storage.cache_manager import get_cache_manager
 from src.shared.plugin_contracts import PluginResult, create_field_expansion_result
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class BaseConceptPlugin(EmbedDataEmbellisherPlugin):
     def __init__(self):
         super().__init__()
         self.providers: Dict[str, BaseProvider] = {}
-        self.queue_manager: Optional[RedisQueueManager] = None
+        self.queue_manager: Optional[ResourceAwareQueueManager] = None
         self.cache_manager = get_cache_manager()
         self._processing_strategy: Optional[ProcessingStrategy] = None
         self._hardware_limits: Optional[Dict[str, Any]] = None
@@ -81,8 +82,15 @@ class BaseConceptPlugin(EmbedDataEmbellisherPlugin):
     async def _initialize_queue(self) -> None:
         """Initialize Redis queue manager for distributed processing."""
         try:
-            self.queue_manager = RedisQueueManager()
-            if self.queue_manager.health_check():
+            # Create a minimal resource pool for plugins
+            resource_config = {
+                "cpu_cores": 1,
+                "gpu_count": 0,
+                "memory_mb": 512
+            }
+            resource_pool = create_resource_pool_from_config(resource_config, worker_id="plugin")
+            self.queue_manager = ResourceAwareQueueManager(resource_pool)
+            if await self.queue_manager.health_check():
                 self._logger.info("Queue manager initialized and healthy")
             else:
                 self._logger.warning("Queue manager not available - will use direct processing")
@@ -173,7 +181,7 @@ class BaseConceptPlugin(EmbedDataEmbellisherPlugin):
             ExecutionPriority.CRITICAL: 2
         }
         
-        task_id = self.queue_manager.enqueue_task(
+        task_id = await self.queue_manager.enqueue_task(
             task_type=f"plugin_{task_type}",
             data=task_data,
             priority=priority_map.get(priority, 0)

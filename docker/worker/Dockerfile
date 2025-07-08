@@ -27,7 +27,6 @@ WORKDIR /app
 # Copy project files (needed for setup.py/pyproject.toml)
 COPY pyproject.toml ./
 COPY src/ ./src/
-COPY manage_models.py ./
 
 # Install all Python dependencies to /opt/venv
 RUN python -m venv /opt/venv
@@ -60,15 +59,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy project files
 COPY --from=builder /app/src ./src
-COPY --from=builder /app/manage_models.py ./
 COPY --from=builder /app/pyproject.toml ./
 
-# Create directories for models and data
-RUN mkdir -p /app/logs /app/data /app/nlp_models /app/models
-
-# Set model environment variables
-ENV NLTK_DATA=/app/models/nltk_data
-ENV GENSIM_DATA_DIR=/app/models/gensim_data
+# Create directories for data
+RUN mkdir -p /app/logs /app/data
 
 # Create non-root user
 RUN groupadd -r worker && useradd -r -g worker worker && \
@@ -79,11 +73,11 @@ USER worker
 
 # Health check - test Redis connection
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "from src.redis_worker.queue_manager import RedisQueueManager; RedisQueueManager().redis_client.ping()" || exit 1
+    CMD python -c "from src.worker.resource_queue_manager import ResourceAwareQueueManager; from src.worker.resource_manager import create_resource_pool_from_config; import asyncio; pool = create_resource_pool_from_config({'cpu_cores': 1, 'gpu_count': 0, 'memory_mb': 512}, 'health'); asyncio.run(ResourceAwareQueueManager(pool).health_check())" || exit 1
 
 # Environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Start the worker
-CMD ["python", "-m", "src.redis_worker.main"]
+CMD ["python", "-m", "src.worker.main"]

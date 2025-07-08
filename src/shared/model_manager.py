@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import httpx
-from .config import get_settings
+from src.shared.config import get_settings
 
 logger = logging.getLogger(__name__)
 

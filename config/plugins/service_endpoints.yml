@@ -5,15 +5,16 @@
 nlp_endpoints:
   conceptnet: "providers/conceptnet/expand"
   gensim: "providers/gensim/expand"  # Use generic provider endpoint instead of specialized similarity
-  spacy_temporal: "providers/spacy/expand"  # Use 'spacy' provider name, not 'spacy_temporal'
+  spacy_temporal: "providers/spacy_temporal/expand"  # Matches actual provider name
   heideltime: "providers/heideltime/expand"
   sutime: "providers/sutime/expand"
   # Add more NLP endpoints as needed
 
 # LLM Service Endpoints (llm-service:8002)
+# Standardized to match NLP pattern
 llm_endpoints:
-  keywords: "expand"  # Use general expand endpoint, not specialized keywords/expand
-  general: "expand"
+  keywords: "providers/llm/keywords/expand"  # Standardized LLM keyword expansion
+  general: "providers/llm/expand"           # Standardized LLM concept expansion
   # Add more LLM endpoints as needed
 
 # Plugin to Service Mapping Rules

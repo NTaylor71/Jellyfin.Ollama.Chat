@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "production-rag-system"
+name = "universal-media-framework"
 version = "2.0.0"
-description = "Production-ready FAISS RAG system"
+description = "Universal media ingestion and enrichment framework with AI-powered processing"
 requires-python = ">=3.12"
 
 # SHARED dependencies - used by ALL services
@@ -99,9 +99,15 @@ router = [
     "production-rag-system[api,monitoring]"
 ]
 
+# GUI application - PyQt6 monitoring app
+gui = [
+    "PyQt6>=6.4.0",
+    "GPUtil>=1.4.0"
+]
+
 # Local development - everything for local work
 local = [
-    "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb,nlp]"
+    "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb,nlp,gui]"
 ]
 
 [tool.setuptools.packages.find]

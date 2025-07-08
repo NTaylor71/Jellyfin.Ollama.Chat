@@ -347,6 +347,38 @@ class Settings(BaseSettings):
     WORKER_MAX_RETRIES: int = Field(default=3)
     WORKER_RETRY_DELAY: int = Field(default=5)  # seconds
     
+    # Worker resource limits (for resource-aware scheduling)
+    WORKER_CPU_CORES: int = Field(default=3)    # Max CPU cores for home setup
+    WORKER_GPU_COUNT: int = Field(default=1)    # Max GPUs for home setup  
+    WORKER_MEMORY_MB: int = Field(default=8192) # Max memory in MB
+    
+    # Redis configuration
+    REDIS_HOST: str = Field(default="localhost")
+    REDIS_PORT: int = Field(default=6379)
+    REDIS_PASSWORD: Optional[str] = Field(default=None)
+    REDIS_DB: int = Field(default=0)
+    REDIS_QUEUE: str = Field(default="rag:queue")
+    REDIS_DEAD_LETTER_QUEUE: str = Field(default="rag:dead_letter")
+    
+    @property
+    def redis_host(self) -> str:
+        """Get Redis host based on environment."""
+        if self.is_docker:
+            return "redis"  # Docker service name
+        return self.REDIS_HOST
+        
+    @property
+    def redis_url(self) -> str:
+        """Get Redis connection URL."""
+        host = self.redis_host
+        port = self.REDIS_PORT
+        db = self.REDIS_DB
+        
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{host}:{port}/{db}"
+        else:
+            return f"redis://{host}:{port}/{db}"
+    
     # FAISS performance
     FAISS_NPROBE: int = Field(default=32)
     FAISS_USE_GPU: bool = Field(default=False)

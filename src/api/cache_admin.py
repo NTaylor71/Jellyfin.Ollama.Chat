@@ -8,8 +8,8 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from src.data.field_expansion_cache import get_field_expansion_cache
-from src.data.cache_manager import get_cache_manager
+from src.storage.field_expansion_cache import get_field_expansion_cache
+from src.storage.cache_manager import get_cache_manager
 
 logger = logging.getLogger(__name__)
 

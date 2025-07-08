@@ -60,7 +60,7 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/pyproject.toml ./
 
 # Create directories
-RUN mkdir -p /app/logs /app/data /app/models
+RUN mkdir -p /app/logs /app/data
 
 # Create non-root user with specific UID/GID to match host
 RUN groupadd -r api && useradd -r -g api api && \

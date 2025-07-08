@@ -180,7 +180,7 @@ class PluginConfigManager:
         """Load configuration from MongoDB."""
         try:
             # Import here to avoid circular imports
-            from ..plugins.mongo_manager import get_plugin_manager
+            from src.plugins.mongo_manager import get_plugin_manager
             
             plugin_manager = await get_plugin_manager()
             plugin_doc = await plugin_manager.get_plugin(self.plugin_name)
@@ -338,7 +338,7 @@ class PluginConfigManager:
             config_dict = self._current_config.model_dump()
         
         try:
-            from ..plugins.mongo_manager import get_plugin_manager
+            from src.plugins.mongo_manager import get_plugin_manager
             
             plugin_manager = await get_plugin_manager()
             plugin_doc = await plugin_manager.get_plugin(self.plugin_name)

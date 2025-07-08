@@ -69,4 +69,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8002/health || exit 1
 
 # Run minimal LLM provider service for testing
-CMD ["python", "-m", "src.services.minimal_llm_service"]
+CMD ["python", "-m", "src.services.provider_services.minimal_llm_service"]

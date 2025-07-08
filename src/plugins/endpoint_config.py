@@ -90,14 +90,14 @@ class ServiceEndpointMapper:
         self.config = ServiceEndpointConfig(
             nlp_endpoints={
                 "conceptnet": "providers/conceptnet/expand",
-                "gensim": "gensim/similarity", 
+                "gensim": "providers/gensim/similarity", 
                 "spacy_temporal": "providers/spacy_temporal/expand",
                 "heideltime": "providers/heideltime/expand",
                 "sutime": "providers/sutime/expand"
             },
             llm_endpoints={
-                "keywords": "keywords/expand",
-                "general": "expand"
+                "keywords": "providers/llm/keywords/expand",
+                "general": "providers/llm/expand"
             },
             routing_patterns=[
                 RoutingPattern(pattern="conceptnet", service="nlp", endpoint="conceptnet"),
@@ -157,7 +157,7 @@ class ServiceEndpointMapper:
         
         # Ultimate fallback
         logger.warning(f"No routing found for plugin '{plugin_name}', using hardcoded fallback")
-        return "nlp", "gensim/similarity"
+        return "nlp", "providers/gensim/similarity"
     
     def _get_endpoint_path(self, service: str, endpoint_key: str) -> str:
         """Get the actual endpoint path for a service and endpoint key."""

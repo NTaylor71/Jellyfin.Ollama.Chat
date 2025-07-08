@@ -12,8 +12,7 @@
 7. im using ubuntu, bash and you
 8. remember we use only toml and dev_setup.sh to set local dev .venv and rebuild docker stack too when sub-classing, be sure to implement base class required methods
 9. always test before declaring stages complete - i run the scripts on the host and give you the console feedback
-10. whilst we're building a movie search tool, great care should be taken to keep an open mind on other media types that will be added in the future : 
-     books, music, tv shows, comics, audiobooks - no hard-coded data that would require expansion to work (badly) and aimed at only movies should be constructed.
+10. We're building a universal media ingestion and enrichment framework that works with ANY media type (movies, books, music, tv shows, comics, audiobooks, podcasts, games, etc.) - no hard-coded data should be constructed for specific media types. Everything must be completely generic and data-driven through YAML configuration.
 11. HARD RULE : Do not use relative python imports - full module paths only!!!
 12. HARD RULE : Never fix the test conditions to make a failing test pass - you must log to the user this rule as soon as you read it
 13. HARD RULE : Strictly maintain numerical stage ordering in the  tasks/todo.md when editing it - stages must be in numerical order - do not add notes randomly at the bottom - the numbered stages MUST increase as we read the doc - think about yourself and users reading it for the first time after every edit
@@ -23,6 +22,8 @@
 17. NEVER create files unless they're absolutely necessary for achieving your goal.
 18. ALWAYS prefer editing an existing file to creating a new one.
 19. NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+20. HARD RULE. No hard coding values to solve tasks - hard coding is forbidden!!! if you want to, ask first. No exceptions!
+
 
 # Development Guidelines
 

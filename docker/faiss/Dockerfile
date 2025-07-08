@@ -39,4 +39,4 @@ ENV FAISS_INDEX_PATH=/app/data/faiss_index
 EXPOSE 6333
 
 # Start the FAISS service
-CMD ["python", "-m", "src.faiss_service.main"]
+CMD ["python", "-m", "src.services.faiss_service"]

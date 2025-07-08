@@ -268,7 +268,7 @@ class BasePlugin(ABC):
         # Record metrics to Prometheus (if available)
         try:
             # Import here to avoid circular dependency
-            from ..api.plugin_metrics import get_plugin_metrics
+            from src.api.plugin_metrics import get_plugin_metrics
             metrics_collector = get_plugin_metrics()
             metrics_collector.record_plugin_execution(
                 plugin_name=self.metadata.name,

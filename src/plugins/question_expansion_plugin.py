@@ -17,11 +17,11 @@ from src.plugins.base import (
     PluginMetadata, PluginResourceRequirements, PluginExecutionContext,
     PluginExecutionResult, PluginType, ExecutionPriority
 )
-from src.concept_expansion.providers.llm.llm_provider import LLMProvider
-from src.concept_expansion.providers.conceptnet_provider import ConceptNetProvider
-from src.concept_expansion.providers.base_provider import ExpansionRequest
+from src.providers.llm.llm_provider import LLMProvider
+from src.providers.knowledge.conceptnet_provider import ConceptNetProvider
+from src.providers.nlp.base_provider import ExpansionRequest
 from src.shared.plugin_contracts import PluginResult, CacheType
-from src.data.cache_manager import CacheStrategy
+from src.storage.cache_manager import CacheStrategy
 
 logger = logging.getLogger(__name__)
 
