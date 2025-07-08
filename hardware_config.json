@@ -1,0 +1,20 @@
+{
+  "local_cpu_cores": 24,
+  "local_cpu_threads": 48,
+  "local_memory_gb": 125.26,
+  "local_storage_type": "ssd",
+  "cpu_endpoints": [],
+  "gpu_endpoints": [
+    {
+      "resource_type": "gpu",
+      "endpoint_url": null,
+      "capacity": 23.99,
+      "model": "NVIDIA GeForce RTX 4090",
+      "health_check_path": null,
+      "is_available": true,
+      "response_time_ms": 0.0
+    }
+  ],
+  "memory_endpoints": [],
+  "is_auto_detected": true
+}

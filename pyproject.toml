@@ -1,0 +1,119 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "universal-media-framework"
+version = "2.0.0"
+description = "Universal media ingestion and enrichment framework with AI-powered processing"
+requires-python = ">=3.12"
+
+# SHARED dependencies - used by ALL services
+dependencies = [
+    "pydantic>=2.11.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.26.0",
+    "redis>=5.0.0",
+    "structlog>=23.2.0",
+    "rich>=13.7.0",
+    "psutil",
+    "aiohttp"
+]
+
+[project.optional-dependencies]
+# API service - only what the API needs
+api = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "prometheus-fastapi-instrumentator>=6.1.0",
+    "slowapi>=0.1.9",
+    "watchdog"
+]
+
+# FAISS service - only vector search deps
+faiss = [
+    "faiss-cpu>=1.7.4",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0"
+]
+
+# Worker service - only queue processing deps
+worker = [
+    "celery[redis]>=5.3.0",
+    "kombu>=5.3.0"
+]
+
+# Ollama integration - only LLM deps
+ollama = [
+    "ollama>=0.1.7"
+]
+
+# Development - testing and tools
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.6.0"
+]
+
+# Monitoring - observability stack
+monitoring = [
+    "prometheus-client>=0.19.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0"
+]
+
+# Plugin system - hot-reload and plugin management
+plugins = [
+    "watchdog>=3.0.0",
+    "scikit-learn>=1.3.0",
+    "python-dateutil>=2.8.0",
+    "arrow>=1.3.0"
+]
+
+# Advanced NLP - optional for sophisticated temporal/linguistic analysis
+nlp = [
+    "spacy>=3.7.0",
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
+    "py-heideltime",
+    "sutime>=1.0.0",
+    "nltk>=3.8.0",
+    "gensim>=4.3.0"
+]
+
+# MongoDB - document storage and data pipeline
+mongodb = [
+    "motor>=3.3.0",
+    "pymongo>=4.6.0"
+]
+
+# Microservice-specific dependency groups
+llm = [
+    "production-rag-system[api,ollama,monitoring]"
+]
+
+router = [
+    "production-rag-system[api,monitoring]"
+]
+
+# GUI application - PyQt6 monitoring app
+gui = [
+    "PyQt6>=6.4.0",
+    "GPUtil>=1.4.0"
+]
+
+# Local development - everything for local work
+local = [
+    "production-rag-system[api,faiss,worker,ollama,dev,monitoring,plugins,mongodb,nlp,gui]"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["src/tests"]
+pythonpath = ["src"]

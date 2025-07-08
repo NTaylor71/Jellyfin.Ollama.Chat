@@ -1,0 +1,96 @@
+media_detection_rules:
+  movie:
+    description: "Detect movie media type"
+    field_patterns:
+      - pattern: "premiere.*date"
+        case_insensitive: true
+      - pattern: "production.*year"
+        case_insensitive: true  
+      - pattern: "runtime.*ticks"
+        case_insensitive: true
+      - pattern: "original.*title"
+        case_insensitive: true
+    weight: 1.0
+  
+  tv_show:
+    description: "Detect TV show media type"
+    field_patterns:
+      - pattern: "series.*name"
+        case_insensitive: true
+      - pattern: "season.*number"
+        case_insensitive: true
+      - pattern: "episode.*number"
+        case_insensitive: true
+      - pattern: "episode.*name"
+        case_insensitive: true
+    weight: 1.0
+  
+  book:
+    description: "Detect book media type"
+    field_patterns:
+      - pattern: "author"
+        case_insensitive: true
+      - pattern: "publisher"
+        case_insensitive: true
+      - pattern: "isbn"
+        case_insensitive: true
+      - pattern: "page.*count"
+        case_insensitive: true
+    weight: 1.0
+  
+  music:
+    description: "Detect music media type"
+    field_patterns:
+      - pattern: "artist"
+        case_insensitive: true
+      - pattern: "album"
+        case_insensitive: true
+      - pattern: "track.*number"
+        case_insensitive: true
+      - pattern: "duration"
+        case_insensitive: true
+    weight: 1.0
+
+temporal_extraction_rules:
+  text_field_patterns:
+    - pattern: ".*name.*"
+      case_insensitive: true
+      weight: 1.0
+    - pattern: ".*title.*"
+      case_insensitive: true
+      weight: 1.0
+    - pattern: ".*overview.*"
+      case_insensitive: true
+      weight: 1.5
+    - pattern: ".*description.*"
+      case_insensitive: true
+      weight: 1.5
+    - pattern: ".*summary.*"
+      case_insensitive: true
+      weight: 1.2
+    - pattern: ".*plot.*"
+      case_insensitive: true
+      weight: 1.2
+    - pattern: ".*content.*"
+      case_insensitive: true
+      weight: 1.0
+    - pattern: ".*synopsis.*"
+      case_insensitive: true
+      weight: 1.0
+  
+  date_field_patterns:
+    - pattern: ".*date.*"
+      case_insensitive: true
+      weight: 2.0
+    - pattern: ".*year.*"
+      case_insensitive: true
+      weight: 1.5
+    - pattern: ".*time.*"
+      case_insensitive: true
+      weight: 1.0
+    - pattern: ".*created.*"
+      case_insensitive: true
+      weight: 0.8
+    - pattern: ".*modified.*"
+      case_insensitive: true
+      weight: 0.5

@@ -1,0 +1,620 @@
+# Movie Media Type Configuration - HTTP-Only Plugin Architecture
+# This configuration demonstrates the full capabilities of the new enrichment system
+# Based on Jellyfin movie data structure with advanced plugin orchestration
+
+media_type: movie
+name: Movie
+description: Movie media type with comprehensive HTTP-only plugin enrichment
+
+# Global field weights for search ranking and processing priority
+field_weights:
+  Name: 2.5
+  OriginalTitle: 2.0
+  Overview: 1.8
+  Genres: 2.0
+  Tags: 1.5
+  Taglines: 1.2
+  Reviews: 1.0
+  Themes: 1.5
+  CulturalImpact: 0.8
+  Censorship: 0.6
+
+# Field definitions with enrichment pipelines
+fields:
+  # Simple enrichment - single plugin
+  Name:
+    source_field: Name
+    type: string
+    field_weight: 2.5
+    enrichments:
+      - plugin: conceptnet_keywords
+        config:
+          max_concepts: 5
+          min_confidence: 0.7
+          language: auto
+
+  # Multi-source title analysis with merging
+  TitleAnalysis:
+    source_field: null  # Synthetic field
+    type: dict
+    field_weight: 2.0
+    enrichments:
+      - group:
+          group_weight: 2.0
+          plugins:
+            - plugin: conceptnet_keywords
+              id: name_concepts
+              plugin_weight: 1.5
+              field_override: Name
+              config:
+                max_concepts: 7
+                
+            - plugin: conceptnet_keywords
+              id: original_concepts
+              plugin_weight: 1.0
+              field_override: OriginalTitle
+              config:
+                max_concepts: 7
+                
+            - plugin: llm_keywords
+              id: title_themes
+              plugin_weight: 2.0
+              config:
+                prompt: |
+                  Analyze the movie title "{Name}" (original: "{OriginalTitle}").
+                  Extract thematic keywords and cultural references.
+                max_keywords: 10
+                
+            - plugin: merge_keywords
+              id: merged_title_analysis
+              inputs: [name_concepts, original_concepts, title_themes]
+              config:
+                strategy: weighted
+                normalize_weights: true
+                max_results: 15
+
+  # Complex overview enrichment with multiple groups
+  Overview:
+    source_field: Overview
+    type: string
+    field_weight: 1.8
+    enrichments:
+      # Group 1: Keyword extraction
+      - group:
+          group_weight: 2.5
+          plugins:
+            - plugin: conceptnet_keywords
+              id: cn_overview
+              plugin_weight: 1.0
+              config:
+                max_concepts: 15
+                min_confidence: 0.6
+                
+            - plugin: llm_keywords
+              id: llm_overview
+              plugin_weight: 2.5
+              config:
+                prompt: |
+                  Extract key themes, concepts, and plot elements from this movie overview:
+                  {Overview}
+                  
+                  Focus on: narrative themes, character motivations, conflicts, and symbolism.
+                max_keywords: 20
+                temperature: 0.3
+                
+            - plugin: gensim_similarity
+              id: gensim_overview
+              plugin_weight: 0.8
+              config:
+                similarity_threshold: 0.7
+                max_similar: 15
+                model: "word2vec"
+                
+            - plugin: merge_keywords
+              inputs: [cn_overview, llm_overview, gensim_overview]
+              config:
+                strategy: ranked
+                ranking_factors:
+                  plugin_weight: 0.4
+                  frequency: 0.3
+                  confidence: 0.3
+                max_results: 25
+      
+      # Group 2: Temporal analysis
+      - group:
+          group_weight: 1.5
+          plugins:
+            - plugin: heideltime_temporal
+              id: heidel_temporal
+              plugin_weight: 1.2
+              config:
+                reference_date: "{ProductionYear}-01-01"
+                
+            - plugin: spacy_temporal
+              id: spacy_temporal
+              plugin_weight: 1.0
+              
+            - plugin: llm_temporal_intelligence
+              id: llm_temporal
+              plugin_weight: 2.0
+              config:
+                prompt: |
+                  Analyze temporal aspects of: {Overview}
+                  Production year: {ProductionYear}
+                  
+                  Extract: time periods, pacing, chronology, flashbacks, temporal themes
+                expected_format: dict
+
+  # Genre analysis with enrichment
+  Genres:
+    source_field: Genres
+    type: list[string]
+    field_weight: 2.0
+    enrichments:
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Movie: {Name}
+            Listed genres: {Genres}
+            
+            Analyze the genre combination and explain:
+            1. How these genres typically interact
+            2. Subgenres that might apply
+            3. Genre conventions likely present
+            4. Target audience for this genre mix
+          expected_format: dict
+          fields: ["genre_analysis", "subgenres", "conventions", "target_audience"]
+
+  # Tag enrichment with similarity expansion
+  Tags:
+    source_field: Tags
+    type: list[string]
+    field_weight: 1.5
+    enrichments:
+      - group:
+          plugins:
+            - plugin: conceptnet_keywords
+              id: tag_expansion
+              plugin_weight: 1.0
+              config:
+                expand_each_tag: true
+                max_per_tag: 3
+                
+            - plugin: gensim_similarity
+              id: tag_similarity
+              plugin_weight: 1.2
+              config:
+                find_similar_to_each: true
+                max_per_tag: 3
+                
+            - plugin: merge_keywords
+              inputs: [tag_expansion, tag_similarity]
+              config:
+                strategy: union
+                deduplication: true
+                max_results: 30
+
+  # Synthetic field: Reviews (multi-perspective)
+  Reviews:
+    source_field: null
+    type: dict
+    field_weight: 1.0
+    enrichments:
+      - group:
+          group_weight: 1.5
+          plugins:
+            - plugin: llm_question_answer
+              id: critic_review
+              plugin_weight: 2.5
+              config:
+                prompt: |
+                  Write a professional film critic's review of "{Name}" ({ProductionYear}).
+                  Genres: {Genres}
+                  Plot: {Overview}
+                  Rating: {CommunityRating}/10
+                  
+                  Include analysis of cinematography, performances, direction, and themes.
+                  Write in the style of a major publication review.
+                expected_format: string
+                max_length: 500
+                
+            - plugin: llm_question_answer
+              id: audience_review
+              plugin_weight: 2.0
+              config:
+                prompt: |
+                  Write an average moviegoer's review of "{Name}".
+                  
+                  Be conversational, mention entertainment value, relatability,
+                  and whether you'd recommend it to friends.
+                expected_format: string
+                max_length: 300
+                
+            - plugin: llm_question_answer
+              id: fan_review
+              plugin_weight: 1.5
+              config:
+                prompt: |
+                  Write an enthusiastic fan's review of "{Name}".
+                  Tags: {Tags}
+                  
+                  Express passion for the film's unique qualities and cult appeal.
+                expected_format: string
+                max_length: 300
+      
+      # Analysis of reviews (uses previous group outputs)
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Analyze these three perspectives on "{Name}":
+            
+            Critic review: {@critic_review}
+            Audience review: {@audience_review}
+            Fan review: {@fan_review}
+            
+            Synthesize:
+            1. Points of consensus
+            2. Key disagreements
+            3. Overall reception sentiment
+            4. Who would most enjoy this film
+          expected_format: dict
+          fields: ["consensus", "disagreements", "sentiment", "ideal_audience"]
+
+  # Synthetic field: Censorship and Controversies
+  Censorship:
+    source_field: null
+    type: dict
+    field_weight: 0.6
+    enrichments:
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Research censorship and controversy for "{Name}" ({ProductionYear}).
+            Director: {Director}
+            Genres: {Genres}
+            Production locations: {ProductionLocations}
+            
+            Find information about:
+            1. Censorship or bans in different countries
+            2. Rating controversies (current rating: {OfficialRating})
+            3. Scenes that were cut or modified
+            4. Public, political, or religious objections
+            5. Cultural sensitivity issues
+            
+            Return null if no significant issues found.
+          expected_format: dict
+          fields: ["censorship_issues", "countries_affected", "cut_content", "controversies", "cultural_issues"]
+          allow_null: true
+
+  # Synthetic field: Cultural Impact (with chaining)
+  CulturalImpact:
+    source_field: null
+    type: dict
+    field_weight: 0.8
+    enrichments:
+      # First extract cultural concepts
+      - group:
+          group_weight: 1.5
+          plugins:
+            - plugin: conceptnet_keywords
+              id: cultural_concepts
+              plugin_weight: 1.0
+              field_override: Name
+              config:
+                focus_on: ["cultural", "social", "historical"]
+                max_concepts: 10
+                
+            - plugin: llm_keywords
+              id: cultural_themes
+              plugin_weight: 2.0
+              config:
+                prompt: |
+                  Extract cultural and social themes from:
+                  Movie: {Name}
+                  Plot: {Overview}
+                  Tags: {Tags}
+                  Production: {ProductionLocations}
+                max_keywords: 15
+                
+            - plugin: merge_keywords
+              id: merged_cultural
+              inputs: [cultural_concepts, cultural_themes]
+              config:
+                strategy: weighted
+                max_results: 20
+      
+      # Then analyze impact using merged concepts
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Analyze cultural impact of "{Name}" ({ProductionYear}):
+            
+            Cultural themes identified: {@merged_cultural.keywords}
+            Genres: {Genres}
+            Production: {ProductionLocations}
+            
+            Assess:
+            1. Pop culture references and memes created
+            2. Influence on later films in the genre
+            3. Social or political impact
+            4. Memorable quotes or iconic scenes
+            5. International reception differences
+          expected_format: dict
+          fields: ["pop_culture", "film_influence", "social_impact", "iconic_elements", "international_reception"]
+
+  # Synthetic field: Themes (complex multi-stage analysis)
+  Themes:
+    source_field: null
+    type: dict
+    field_weight: 1.5
+    enrichments:
+      # Stage 1: Extract concepts from multiple sources
+      - group:
+          group_weight: 2.0
+          plugins:
+            - plugin: conceptnet_keywords
+              id: title_theme_concepts
+              plugin_weight: 1.5
+              field_override: Name
+              config:
+                semantic_expansion: true
+                max_concepts: 8
+                
+            - plugin: llm_keywords
+              id: plot_themes
+              plugin_weight: 2.5
+              field_override: Overview
+              config:
+                prompt: |
+                  What are the main themes in this plot:
+                  {Overview}
+                  
+                  Consider: moral themes, philosophical questions, human conditions explored
+                max_keywords: 12
+                
+            - plugin: llm_keywords
+              id: tagline_themes
+              plugin_weight: 1.0
+              field_override: Taglines
+              config:
+                prompt: "Extract deeper meaning from tagline: {Taglines}"
+                max_keywords: 5
+                
+            - plugin: merge_keywords
+              id: all_theme_concepts
+              inputs: [title_theme_concepts, plot_themes, tagline_themes]
+              config:
+                strategy: weighted
+                normalize_weights: true
+                max_results: 20
+      
+      # Stage 2: Genre-specific theme analysis
+      - plugin: llm_question_answer
+        id: genre_themes
+        config:
+          prompt: |
+            For a {Genres} film, what genre-specific themes are typically explored?
+            How do these manifest in "{Name}"?
+          expected_format: dict
+          fields: ["genre_conventions", "specific_manifestations"]
+      
+      # Stage 3: Final thematic synthesis
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Movie: {Name} ({ProductionYear})
+            Production: {ProductionLocations}
+            
+            Themes extracted: {@all_theme_concepts.keywords}
+            Genre themes: {@genre_themes.genre_conventions}
+            
+            Provide comprehensive thematic analysis:
+            1. Primary themes (top 3-5)
+            2. Secondary themes
+            3. How themes relate to production context
+            4. Universal vs culturally-specific themes
+            5. Thematic relevance today vs release year
+          expected_format: dict
+          fields: ["primary_themes", "secondary_themes", "contextual_relevance", "universal_vs_specific", "temporal_relevance"]
+
+  # Synthetic field: Behind The Scenes
+  BehindTheScenes:
+    source_field: null
+    type: dict
+    field_weight: 0.7
+    enrichments:
+      # Production facts
+      - group:
+          group_weight: 1.2
+          plugins:
+            - plugin: llm_question_answer
+              id: production_trivia
+              plugin_weight: 2.0
+              config:
+                prompt: |
+                  Find interesting production facts about "{Name}" ({ProductionYear}):
+                  Director: {Director}
+                  Cast: {People[?Type=='Actor'].Name}
+                  Studios: {Studios}
+                  
+                  Look for:
+                  - Casting decisions and alternatives
+                  - Production challenges or innovations
+                  - Budget constraints and solutions
+                  - On-set stories and accidents
+                  - Technical achievements
+                expected_format: dict
+                fields: ["casting_notes", "production_challenges", "budget_notes", "on_set_stories", "technical_innovations"]
+                
+            - plugin: llm_question_answer
+              id: creative_process
+              plugin_weight: 1.5
+              config:
+                prompt: |
+                  Analyze the creative process for "{Name}":
+                  Writers: {People[?Type=='Writer'].Name}
+                  
+                  Explore:
+                  - Story development and changes
+                  - Directorial vision and style
+                  - Collaborative process
+                expected_format: dict
+      
+      # Impact analysis using production info
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Given production details for "{Name}":
+            {@production_trivia}
+            {@creative_process}
+            
+            How did these behind-the-scenes elements affect:
+            1. The final film's quality and coherence
+            2. Critical and audience reception
+            3. The film's place in cinema history
+            4. Influence on the cast/crew's later work
+          expected_format: dict
+          fields: ["quality_impact", "reception_impact", "historical_significance", "career_impact"]
+
+  # Synthetic field: Audience Insights (multi-step analysis)
+  AudienceInsights:
+    source_field: null
+    type: dict
+    field_weight: 0.9
+    enrichments:
+      # Extract themes for audience analysis
+      - plugin: llm_keywords
+        id: audience_themes
+        field_override: Overview
+        config:
+          prompt: |
+            Extract themes relevant to audience appeal from: {Overview}
+            Consider emotional hooks, relatable elements, escapism factors
+          max_keywords: 10
+      
+      # Analyze target demographics
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Movie: {Name}
+            Genres: {Genres}
+            Rating: {OfficialRating}
+            Themes: {@audience_themes.keywords}
+            Community Rating: {CommunityRating}/10
+            
+            Determine:
+            1. Primary target demographic (age, interests, background)
+            2. Secondary audiences who would enjoy it
+            3. Why each audience would connect with it
+            4. Audiences who should avoid it and why
+            5. Optimal viewing context (theater, home, group, solo)
+          expected_format: dict
+          fields: ["primary_demographic", "secondary_audiences", "appeal_factors", "avoid_audiences", "viewing_context"]
+
+  # Person-based enrichments (Director focus)
+  Director:
+    source_field: People[?Type=='Director'].Name
+    type: string
+    field_weight: 1.2
+    enrichments:
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Analyze director {Director}'s work on "{Name}":
+            1. Signature style elements visible in this film
+            2. How this fits in their filmography
+            3. Thematic preoccupations evident
+            4. Technical innovations or experiments
+          expected_format: dict
+          fields: ["style_elements", "filmography_position", "themes", "innovations"]
+
+  # Production location analysis
+  ProductionContext:
+    source_field: ProductionLocations
+    type: dict
+    field_weight: 0.8
+    enrichments:
+      - plugin: llm_question_answer
+        config:
+          prompt: |
+            Movie: {Name} ({ProductionYear})
+            Production locations: {ProductionLocations}
+            
+            Analyze:
+            1. How the production location influenced the film
+            2. Local film industry context at the time
+            3. Cultural elements specific to the location
+            4. International co-production aspects (if any)
+          expected_format: dict
+          fields: ["location_influence", "industry_context", "cultural_elements", "international_aspects"]
+
+# Weighting configuration
+weighting:
+  combination_method: multiplicative
+  defaults:
+    field_weight: 1.0
+    group_weight: 1.0
+    plugin_weight: 1.0
+  bounds:
+    min_weight: 0.1
+    max_weight: 10.0
+  ranking_algorithm: weighted_borda_count
+
+# Execution configuration
+execution:
+  parallel_groups: true
+  max_concurrent_llm: 3
+  max_concurrent_http: 10
+  timeout_per_group: 60
+  retry_policy:
+    max_attempts: 3
+    backoff_multiplier: 2
+    max_backoff: 30
+
+# Priority order for field processing
+priority_order:
+  - Name
+  - OriginalTitle
+  - ProductionYear
+  - Genres
+  - Overview
+  - Tags
+  - Taglines
+  - TitleAnalysis
+  - Themes
+  - Reviews
+  - CulturalImpact
+  - AudienceInsights
+  - BehindTheScenes
+  - Censorship
+  - ProductionContext
+
+# Output configuration
+output:
+  format: mongodb
+  collection: movies_enriched
+  include_metadata: true
+  include_confidence_scores: true
+  include_plugin_timings: true
+  null_handling: omit
+  batch_size: 10
+  
+# Validation rules
+validation:
+  required_fields: [Name, ProductionYear]
+  field_constraints:
+    ProductionYear:
+      type: integer
+      min: 1888
+      max: 2030
+    CommunityRating:
+      type: float
+      min: 0.0
+      max: 10.0
+    Genres:
+      type: list
+      max_items: 10
+      allowed_values: ["Action", "Adventure", "Animation", "Biography", "Comedy", "Crime", 
+                       "Documentary", "Drama", "Family", "Fantasy", "Film-Noir", "History",
+                       "Horror", "Music", "Musical", "Mystery", "Romance", "Sci-Fi",
+                       "Sport", "Thriller", "War", "Western"]

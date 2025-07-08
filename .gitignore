@@ -1,0 +1,47 @@
+# Environment and secrets
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Data and logs
+data/
+!src/data/
+logs/
+*.log
+
+# FAISS indices
+*.index
+*.faiss
+*.pkl
+
+# Docker
+docker-compose.override.yml
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS files
+Thumbs.db
+
+HANDOFF.md
+.claude/
+models/

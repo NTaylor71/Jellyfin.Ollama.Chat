@@ -1,0 +1,58 @@
+media_type: book
+name: Book
+description: Book media type for testing generic ingestion
+
+# Global field weights
+field_weights:
+  Name: 2.5
+  Author: 2.0
+  Overview: 1.8
+  Genres: 2.0
+
+# Field definitions
+fields:
+  Name:
+    source_field: Name
+    type: string
+    field_weight: 2.5
+    
+  Author:
+    source_field: null  # Computed field
+    computed_from:
+      source: People
+      filters:
+        Type: Author
+      extract: Name
+      multiple: false
+    type: string
+    field_weight: 2.0
+
+  Overview:
+    source_field: Overview
+    type: string
+    field_weight: 1.8
+
+# Execution configuration
+execution:
+  api_type: Book
+  
+# Output configuration
+output:
+  collection: books_enriched
+
+# Validation rules  
+validation:
+  required_fields: [Name]
+  field_constraints:
+    PublicationYear:
+      type: integer
+      min: 1000
+      max: 2030
+    Rating:
+      type: float
+      min: 0.0
+      max: 5.0
+    Genres:
+      type: list
+      max_items: 5
+      allowed_values: ["Fiction", "Non-Fiction", "Biography", "History", "Science", "Fantasy", "Romance", "Mystery", "Thriller"]

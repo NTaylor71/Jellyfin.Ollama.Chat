@@ -1,0 +1,58 @@
+media_type: podcast
+name: Podcast
+description: Podcast media type for testing complete generic behavior
+
+# Global field weights
+field_weights:
+  Name: 2.5
+  Host: 2.0
+  Overview: 1.8
+  Categories: 2.0
+
+# Field definitions
+fields:
+  Name:
+    source_field: Name
+    type: string
+    field_weight: 2.5
+    
+  Host:
+    source_field: null  # Computed field
+    computed_from:
+      source: People
+      filters:
+        Type: Host
+      extract: Name
+      multiple: false
+    type: string
+    field_weight: 2.0
+
+  Overview:
+    source_field: Overview
+    type: string
+    field_weight: 1.8
+
+# Execution configuration
+execution:
+  api_type: Audio
+  
+# Output configuration
+output:
+  collection: podcasts_enriched
+
+# Validation rules  
+validation:
+  required_fields: [Name]
+  field_constraints:
+    ReleaseYear:
+      type: integer
+      min: 1990
+      max: 2030
+    Rating:
+      type: float
+      min: 0.0
+      max: 5.0
+    Categories:
+      type: list
+      max_items: 5
+      allowed_values: ["Technology", "Comedy", "News", "Education", "Health", "Business", "Science", "Entertainment"]

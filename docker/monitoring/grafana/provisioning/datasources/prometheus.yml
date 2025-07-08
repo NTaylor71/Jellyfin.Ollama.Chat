@@ -1,0 +1,47 @@
+# Grafana Datasource Configuration for Production RAG System
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: "5s"
+      queryTimeout: "60s"
+      exemplarTraceIdDestinations:
+        - name: "traceID"
+          datasourceUid: "jaeger"
+      customQueryParameters: {}
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.45.0"
+      cacheLevel: "High"
+      incrementalQuerying: true
+      disableRecordingRules: false
+    secureJsonFields: {}
+    version: 1
+    readOnly: false
+
+  # Additional datasource for custom metrics (if using InfluxDB or other)
+  - name: RAG-Metrics
+    type: prometheus  
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: "10s"
+      queryTimeout: "30s"
+      exemplarTraceIdDestinations: []
+      customQueryParameters: 
+        "match[]": "{__name__=~\"rag_.*|fastapi_.*|http_.*\"}"
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.45.0"
+      cacheLevel: "Medium"
+    version: 1
+    readOnly: false
