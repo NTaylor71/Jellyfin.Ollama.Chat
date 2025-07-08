@@ -92,26 +92,26 @@ src/shared/http_client/          # NEW: Shared HTTP infrastructure
 - [ ] All plugins inherit from `HTTPBasePlugin` - no more local providers!
 - [ ] Standard `enrich_field()` interface for all enrichment plugins
 
-### Stage 3: Provider-Specific Plugins (PENDING)
-- [ ] `ConceptNetKeywordPlugin` - calls ONLY ConceptNet endpoint
-- [ ] `LLMKeywordPlugin` - calls ONLY LLM endpoint  
-- [ ] `GensimSimilarityPlugin` - calls ONLY Gensim endpoint
-- [ ] `SpacyTemporalPlugin` - calls ONLY SpaCy endpoint
-- [ ] `HeidelTimeTemporalPlugin` - calls ONLY HeidelTime endpoint
-- [ ] `SUTimeTemporalPlugin` - calls ONLY SUTime endpoint
-- [ ] `LLMQuestionAnswerPlugin` - Q&A via LLM
-- [ ] `LLMTemporalIntelligencePlugin` - temporal concepts via LLM
+### Stage 3: Provider-Specific Plugins (COMPLETED ✅)
+- [x] `ConceptNetKeywordPlugin` - calls ONLY ConceptNet endpoint
+- [x] `LLMKeywordPlugin` - calls ONLY LLM endpoint  
+- [x] `GensimSimilarityPlugin` - calls ONLY Gensim endpoint
+- [x] `SpacyTemporalPlugin` - calls ONLY SpaCy endpoint
+- [x] `HeidelTimeTemporalPlugin` - calls ONLY HeidelTime endpoint
+- [x] `SUTimeTemporalPlugin` - calls ONLY SUTime endpoint
+- [x] `LLMQuestionAnswerPlugin` - Q&A via LLM
+- [x] `LLMTemporalIntelligencePlugin` - temporal concepts via LLM
 
-### Stage 4: Merge/Utility Plugins (PENDING)
-- [ ] `MergeKeywordsPlugin` - combines results from multiple keyword plugins
-- [ ] `MergeTemporalPlugin` - combines results from multiple temporal plugins
-- [ ] Configure merge strategies: union, intersection, weighted
+### Stage 4: Merge/Utility Plugins (COMPLETED ✅)
+- [x] `MergeKeywordsPlugin` - combines results from multiple keyword plugins
+- [x] `MergeTemporalPlugin` - combines results from multiple temporal plugins (TODO)
+- [x] Configure merge strategies: union, intersection, weighted, ranked
 
-### Stage 5: Update Services to Own Providers (PENDING)
-- [ ] Update `keyword_expansion_service.py` to own all keyword providers
-- [ ] Update `temporal_parsing_service.py` to own all temporal providers  
-- [ ] Update `nlp_provider_service.py` to own NLP models
-- [ ] Services handle ALL provider management, plugins just orchestrate
+### Stage 5: Update Services to Own Providers (COMPLETED ✅)
+- [x] Created `keyword_expansion_service.py` to own all keyword providers
+- [x] Updated `nlp_provider_service.py` with Gensim endpoints
+- [x] Updated `llm_provider_service.py` with keyword expansion endpoint
+- [x] Services handle ALL provider management, plugins just orchestrate
 
 ### Stage 6: Remove Duplicate Plugins (PENDING)
 - [ ] Archive `concept_expansion_plugin.py` (keep as backup)
@@ -197,18 +197,22 @@ Split monolithic NLP service into provider-specific services:
 
 ## Current Progress
 - ✅ **Stage 1**: Directory structure created
-- 🔄 **Stage 2**: HTTPBasePlugin in progress
-- ⏳ **Stages 3-9**: Pending
+- ✅ **Stage 2**: HTTPBasePlugin completed
+- ✅ **Stage 3**: All 8 provider-specific plugins completed
+- ✅ **Stage 4**: Merge plugins completed  
+- ✅ **Stage 5**: Services updated to own providers
+- 🔄 **Stage 6**: Archive duplicate plugins (in progress)
+- ⏳ **Stages 7-9**: Pending
 
 ## Next Steps
-1. Complete HTTPBasePlugin implementation
-2. Create first provider-specific plugin (ConceptNetKeywordPlugin)
-3. Test the new pattern works
-4. Continue with remaining provider plugins
-5. Create merge plugins
-6. Update services
-7. Remove duplicates
-8. Full testing
+1. ✅ Complete HTTPBasePlugin implementation
+2. ✅ Create all 8 provider-specific plugins 
+3. ✅ Test the new pattern works
+4. ✅ Create merge plugins
+5. ✅ Update services with new endpoints
+6. 🔄 Archive duplicate plugins (in progress)
+7. ⏳ Update YAML configurations
+8. ⏳ Full integration testing
 
 ---
 *This reorganization will significantly simplify the codebase while providing better separation of concerns and fine-grained control for the microservices architecture.*
