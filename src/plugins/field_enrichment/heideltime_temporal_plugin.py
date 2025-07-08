@@ -67,23 +67,34 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using HeidelTime")
             
-            # Call HeidelTime temporal service
-            service_url = self.get_service_url("temporal", "heideltime/extract")
+            # Call HeidelTime provider via NLP service
+            # HeidelTime provider expects ProviderRequest format
+            service_url = self.get_plugin_service_url()
             request_data = {
-                "text": text,
-                "document_type": config.get("document_type", "news"),  # news, narrative, colloquial, scientific
-                "document_creation_time": config.get("document_creation_time", None),
-                "language": config.get("language", "english"),
-                "output_format": config.get("output_format", "timeml"),
-                "normalize_timex": config.get("normalize_timex", True),
-                "extract_temporal_relations": config.get("extract_temporal_relations", False)
+                "concept": text,
+                "media_context": "movie",
+                "max_concepts": config.get("max_concepts", 20),
+                "field_name": field_name,
+                "options": {
+                    "document_type": config.get("document_type", "news"),  # news, narrative, colloquial, scientific
+                    "document_creation_time": config.get("document_creation_time", None),
+                    "language": config.get("language", "english"),
+                    "output_format": config.get("output_format", "timeml"),
+                    "normalize_timex": config.get("normalize_timex", True),
+                    "extract_temporal_relations": config.get("extract_temporal_relations", False)
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            temporal_expressions = response.get("temporal_expressions", [])
-            metadata = response.get("metadata", {})
+            # Process response from ProviderResponse format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                temporal_expressions = result_data.get("temporal_expressions", result_data.get("expressions", []))
+                metadata = response.get("metadata", {})
+            else:
+                temporal_expressions = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             self._logger.info(
                 f"HeidelTime extracted {len(temporal_expressions)} temporal expressions from field {field_name}"
@@ -97,8 +108,8 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
                     "provider": "heideltime",
                     "expression_count": len(temporal_expressions),
                     "text_length": len(text),
-                    "document_type": request_data["document_type"],
-                    "language": request_data["language"],
+                    "document_type": request_data["options"]["document_type"],
+                    "language": request_data["options"]["language"],
                     "service_metadata": metadata
                 }
             }

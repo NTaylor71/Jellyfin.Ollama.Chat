@@ -81,25 +81,36 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal concepts from {len(text)} characters using LLM")
             
-            # Call LLM temporal intelligence service
-            service_url = self.get_service_url("llm", "temporal/analyze")
+            # Call LLM service (using general expand endpoint for temporal analysis)
+            # LLM expand endpoint expects LLMRequest format
+            service_url = self.get_plugin_service_url()
             request_data = {
-                "text": text,
+                "concept": text,
+                "media_context": "movie",
+                "max_concepts": config.get("max_concepts", 15),
                 "field_name": field_name,
-                "analysis_type": config.get("analysis_type", "comprehensive"),
-                "extract_periods": config.get("extract_periods", True),
-                "extract_sequences": config.get("extract_sequences", True),
-                "extract_relationships": config.get("extract_relationships", True),
-                "reasoning_depth": config.get("reasoning_depth", "medium"),
-                "temperature": config.get("temperature", 0.2),  # Lower for more consistent results
-                "context_window": config.get("context_window", "full")
+                "options": {
+                    "task_type": "temporal_intelligence",
+                    "analysis_type": config.get("analysis_type", "comprehensive"),
+                    "extract_periods": config.get("extract_periods", True),
+                    "extract_sequences": config.get("extract_sequences", True),
+                    "extract_relationships": config.get("extract_relationships", True),
+                    "reasoning_depth": config.get("reasoning_depth", "medium"),
+                    "temperature": config.get("temperature", 0.2),  # Lower for more consistent results
+                    "context_window": config.get("context_window", "full")
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            temporal_concepts = response.get("temporal_concepts", [])
-            metadata = response.get("metadata", {})
+            # Process response from LLMRequest format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                temporal_concepts = result_data.get("temporal_concepts", result_data.get("concepts", []))
+                metadata = response.get("metadata", {})
+            else:
+                temporal_concepts = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             self._logger.info(
                 f"LLM extracted {len(temporal_concepts)} temporal concepts from field {field_name}"
@@ -113,8 +124,8 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
                     "provider": "llm_temporal",
                     "concept_count": len(temporal_concepts),
                     "text_length": len(text),
-                    "analysis_type": request_data["analysis_type"],
-                    "reasoning_depth": request_data["reasoning_depth"],
+                    "analysis_type": request_data["options"]["analysis_type"],
+                    "reasoning_depth": request_data["options"]["reasoning_depth"],
                     "service_metadata": metadata
                 }
             }

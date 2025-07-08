@@ -92,24 +92,38 @@ class LLMKeywordPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Expanding {len(keywords)} keywords using LLM")
             
-            # Call LLM service
-            service_url = self.get_service_url("llm", "keywords/expand")
+            # Call LLM service using general expand endpoint
+            # LLM expand endpoint expects LLMRequest format
+            service_url = self.get_plugin_service_url()
+            
+            # Convert keywords list to a single concept string with context
+            keywords_text = ", ".join(keywords)
+            concept_text = f"Keywords: {keywords_text}. Context: {context_text}"
+            
             request_data = {
-                "keywords": keywords,
-                "context": context_text,
-                "field_name": field_name,
+                "concept": concept_text,
+                "media_context": "movie",
                 "max_concepts": config.get("max_concepts", 15),
-                "expansion_style": config.get("expansion_style", "semantic_related"),
-                "prompt_template": config.get("prompt_template", self._get_default_prompt(field_name)),
-                "temperature": config.get("temperature", 0.3),  # Lower for more focused results
-                "smart_retry_until": config.get("smart_retry_until", "list")
+                "field_name": field_name,
+                "options": {
+                    "task_type": "keyword_expansion",
+                    "expansion_style": config.get("expansion_style", "semantic_related"),
+                    "prompt_template": config.get("prompt_template", self._get_default_prompt(field_name)),
+                    "temperature": config.get("temperature", 0.3),  # Lower for more focused results
+                    "smart_retry_until": config.get("smart_retry_until", "list")
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            expanded_keywords = response.get("concepts", [])
-            metadata = response.get("metadata", {})
+            # Process response from LLMRequest format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                expanded_keywords = result_data.get("expanded_concepts", result_data.get("concepts", []))
+                metadata = response.get("metadata", {})
+            else:
+                expanded_keywords = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             # LLM might return nested structure, flatten if needed
             if expanded_keywords and isinstance(expanded_keywords[0], dict):

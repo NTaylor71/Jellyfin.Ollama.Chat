@@ -39,21 +39,15 @@ class PluginLoader:
         self.http_client: Optional[httpx.AsyncClient] = None
         self.settings = get_settings()
         
-        # Plugin categories
-        self.local_plugins: Set[str] = {
+        # Plugin categories (dynamically discovered)
+        self.local_plugins: Set[str] = set()
+        self.service_plugins: Set[str] = set()
+        
+        # Known local plugins (lightweight, always load locally)
+        self.known_local_plugins = {
             "ServiceRegistryPlugin",
             "CacheManagerPlugin", 
             "MetricsPlugin"
-        }
-        
-        self.service_plugins: Set[str] = {
-            "ConceptExpansionPlugin",
-            "TemporalAnalysisPlugin", 
-            "QuestionExpansionPlugin",
-            "GensimProvider",
-            "SpacyTemporalProvider",
-            "HeidelTimeProvider",
-            "LLMProvider"
         }
     
     async def initialize(self) -> bool:
@@ -120,13 +114,94 @@ class PluginLoader:
         """Discover available plugins and categorize them."""
         logger.info("Discovering available plugins...")
         
-        # Use static mapping for service plugins to avoid import issues
-        # This avoids importing heavy NLP dependencies in the lightweight worker
+        # Add known local plugins
+        self.local_plugins.update(self.known_local_plugins)
+        
+        # Discover HTTP-only plugins dynamically by scanning field_enrichment directory
+        await self._discover_field_enrichment_plugins()
+        
+        # Map discovered service plugins to services
         for plugin_name in self.service_plugins:
             self.plugin_service_mapping[plugin_name] = self._get_service_for_plugin(plugin_name)
             logger.debug(f"Mapped service plugin: {plugin_name} -> {self.plugin_service_mapping[plugin_name]}")
         
-        logger.info(f"Plugin discovery complete. Found {len(self.plugin_service_mapping)} service plugins.")
+        logger.info(f"Plugin discovery complete. Found {len(self.local_plugins)} local plugins, {len(self.service_plugins)} service plugins.")
+    
+    async def _discover_field_enrichment_plugins(self):
+        """Dynamically discover HTTP-only plugins in field_enrichment directory."""
+        try:
+            from pathlib import Path
+            import importlib.util
+            
+            field_enrichment_dir = Path("src/plugins/field_enrichment")
+            if not field_enrichment_dir.exists():
+                logger.warning("Field enrichment plugins directory not found")
+                return
+            
+            for plugin_file in field_enrichment_dir.glob("*_plugin.py"):
+                try:
+                    # Extract plugin name from filename and convert to proper class name
+                    module_name = plugin_file.stem
+                    # Handle special cases like LLM, SUTime, HeidelTime
+                    words = module_name.split('_')
+                    class_name_parts = []
+                    for word in words:
+                        if word.lower() == 'llm':
+                            class_name_parts.append('LLM')
+                        elif word.lower() == 'sutime':
+                            class_name_parts.append('SUTime')
+                        elif word.lower() == 'heideltime':
+                            class_name_parts.append('HeidelTime')
+                        elif word.lower() == 'conceptnet':
+                            class_name_parts.append('ConceptNet')
+                        else:
+                            class_name_parts.append(word.capitalize())
+                    plugin_class_name = ''.join(class_name_parts)
+                    
+                    # Import module and get class
+                    spec = importlib.util.spec_from_file_location(
+                        f"src.plugins.field_enrichment.{module_name}", 
+                        plugin_file
+                    )
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    
+                    # Get plugin class
+                    if hasattr(module, plugin_class_name):
+                        plugin_class = getattr(module, plugin_class_name)
+                        # Check if it's an HTTP-based plugin (inherits from HTTPBasePlugin)
+                        if hasattr(plugin_class, '__bases__') and any(
+                            'HTTPBasePlugin' in str(base) for base in plugin_class.__bases__
+                        ):
+                            self.service_plugins.add(plugin_class_name)
+                            logger.debug(f"Discovered HTTP-only plugin: {plugin_class_name}")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to inspect plugin file {plugin_file}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to discover field enrichment plugins: {e}")
+            # Fallback to prevent system failure
+            logger.info("Using fallback plugin discovery...")
+            self._fallback_plugin_discovery()
+    
+    def _fallback_plugin_discovery(self):
+        """Fallback plugin discovery if dynamic discovery fails."""
+        logger.warning("Using fallback static plugin discovery")
+        
+        # Add known HTTP-only plugins as fallback
+        fallback_plugins = {
+            "ConceptNetKeywordPlugin",
+            "LLMKeywordPlugin", 
+            "GensimSimilarityPlugin",
+            "SpacyTemporalPlugin",
+            "HeidelTimeTemporalPlugin",
+            "SUTimeTemporalPlugin",
+            "LLMQuestionAnswerPlugin",
+            "LLMTemporalIntelligencePlugin",
+            "MergeKeywordsPlugin"
+        }
+        self.service_plugins.update(fallback_plugins)
     
     async def _load_local_plugins(self):
         """Load only lightweight local plugins."""
@@ -173,24 +248,17 @@ class PluginLoader:
             return None
     
     def _get_service_for_plugin(self, plugin_name: str) -> str:
-        """Determine which service should handle a plugin."""
-        # NLP service plugins
-        nlp_plugins = {
-            "ConceptExpansionPlugin", "TemporalAnalysisPlugin",
-            "GensimProvider", "SpacyTemporalProvider", "HeidelTimeProvider"
-        }
+        """Determine which service should handle a plugin based on plugin name patterns."""
+        # Use plugin name patterns to determine service routing
+        # This avoids importing heavy plugins just to determine routing
         
-        # LLM service plugins
-        llm_plugins = {
-            "QuestionExpansionPlugin", "LLMProvider"
-        }
-        
-        if plugin_name in nlp_plugins:
-            return "nlp_provider"
-        elif plugin_name in llm_plugins:
+        # LLM service patterns
+        if any(pattern in plugin_name.lower() for pattern in ['llm', 'language_model', 'gpt']):
             return "llm_provider"
-        else:
-            return "nlp_provider"  # Default
+        
+        # NLP service patterns (everything else including merge operations)
+        # ConceptNet, Gensim, SpaCy, HeidelTime, SUTime, Merge plugins
+        return "nlp_provider"
     
     async def execute_plugin(
         self, 

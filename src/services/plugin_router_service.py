@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
+from src.plugins.endpoint_config import get_endpoint_mapper
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ class PluginRouter:
         self.error_count = 0
         self.start_time = asyncio.get_event_loop().time()
         self.http_client: Optional[httpx.AsyncClient] = None
+        self.endpoint_mapper = get_endpoint_mapper()
     
     async def initialize_router(self):
         """Initialize the router with service discovery."""
@@ -88,19 +90,11 @@ class PluginRouter:
             )
         }
         
-        # Configure plugin-to-service mapping
-        self.plugin_service_mapping = {
-            # NLP Provider plugins
-            "ConceptExpansionPlugin": "nlp_provider",
-            "TemporalAnalysisPlugin": "nlp_provider", 
-            "GensimProvider": "nlp_provider",
-            "SpacyTemporalProvider": "nlp_provider",
-            "HeidelTimeProvider": "nlp_provider",
-            
-            # LLM Provider plugins
-            "QuestionExpansionPlugin": "llm_provider",
-            "LLMProvider": "llm_provider",
-        }
+        # Plugin-to-service mapping (populated dynamically)
+        self.plugin_service_mapping = {}
+        
+        # Discover plugins dynamically
+        await self._discover_available_plugins()
         
         # Initialize HTTP client
         self.http_client = httpx.AsyncClient(timeout=30.0)
@@ -108,7 +102,52 @@ class PluginRouter:
         # Perform initial health checks
         await self.check_all_service_health()
         
-        logger.info(f"Plugin Router initialized. {len(self.services)} services configured.")
+        logger.info(f"Plugin Router initialized. {len(self.services)} services, {len(self.plugin_service_mapping)} plugins configured.")
+    
+    async def _discover_available_plugins(self):
+        """Dynamically discover available HTTP-only plugins."""
+        try:
+            from pathlib import Path
+            import importlib.util
+            
+            field_enrichment_dir = Path("src/plugins/field_enrichment")
+            if not field_enrichment_dir.exists():
+                logger.warning("Field enrichment plugins directory not found")
+                return
+            
+            for plugin_file in field_enrichment_dir.glob("*_plugin.py"):
+                try:
+                    # Extract plugin name from filename and convert to proper class name
+                    module_name = plugin_file.stem
+                    # Handle special cases like LLM, SUTime, HeidelTime
+                    words = module_name.split('_')
+                    class_name_parts = []
+                    for word in words:
+                        if word.lower() == 'llm':
+                            class_name_parts.append('LLM')
+                        elif word.lower() == 'sutime':
+                            class_name_parts.append('SUTime')
+                        elif word.lower() == 'heideltime':
+                            class_name_parts.append('HeidelTime')
+                        elif word.lower() == 'conceptnet':
+                            class_name_parts.append('ConceptNet')
+                        else:
+                            class_name_parts.append(word.capitalize())
+                    plugin_class_name = ''.join(class_name_parts)
+                    
+                    # Use configuration-driven service mapping
+                    service_name, _ = self.endpoint_mapper.get_service_and_endpoint(plugin_class_name)
+                    # Map to service provider names for consistency  
+                    service_provider = f"{service_name}_provider"
+                    
+                    self.plugin_service_mapping[plugin_class_name] = service_provider
+                    logger.debug(f"Discovered plugin: {plugin_class_name} -> {service_name}")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to process plugin file {plugin_file}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to discover plugins: {e}")
     
     async def cleanup_router(self):
         """Cleanup router resources."""
@@ -276,15 +315,10 @@ class PluginRouter:
             )
     
     def _map_plugin_to_provider(self, plugin_name: str) -> str:
-        """Map plugin name to provider name for NLP service."""
-        mapping = {
-            "ConceptExpansionPlugin": "gensim",  # Could be dynamic
-            "TemporalAnalysisPlugin": "spacy_temporal",
-            "GensimProvider": "gensim",
-            "SpacyTemporalProvider": "spacy_temporal",
-            "HeidelTimeProvider": "heideltime"
-        }
-        return mapping.get(plugin_name, "gensim")  # Default to gensim
+        """Map plugin name to service endpoint using configuration."""
+        # Use configuration-driven endpoint mapping
+        service_name, endpoint_path = self.endpoint_mapper.get_service_and_endpoint(plugin_name)
+        return endpoint_path
     
     def get_health_status(self) -> RouterHealth:
         """Get router health status."""

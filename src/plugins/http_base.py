@@ -18,6 +18,7 @@ from src.plugins.http_provider_plugin import (
     ServiceEndpoint, HTTPRequest, HTTPResponse, CircuitBreakerInfo
 )
 from src.shared.config import get_settings
+from src.plugins.endpoint_config import get_endpoint_mapper
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class HTTPBasePlugin(BasePlugin):
     def __init__(self):
         super().__init__()
         self.settings = get_settings()
+        self.endpoint_mapper = get_endpoint_mapper()
         self.session: Optional[aiohttp.ClientSession] = None
         self.circuit_breakers: Dict[str, CircuitBreakerInfo] = {}
         self._request_count = 0
@@ -183,12 +185,11 @@ class HTTPBasePlugin(BasePlugin):
             return False
     
     def _init_circuit_breakers(self):
-        """Initialize circuit breakers for common services."""
+        """Initialize circuit breakers for actual docker services."""
         services = [
-            "keyword_service",
-            "temporal_service", 
-            "nlp_service",
-            "llm_service"
+            "nlp_service",      # Port 8001: SpaCy, HeidelTime, Gensim, ConceptNet
+            "llm_service",      # Port 8002: LLM/Ollama operations  
+            "router_service"    # Port 8003: Plugin coordination
         ]
         
         for service_name in services:
@@ -250,14 +251,15 @@ class HTTPBasePlugin(BasePlugin):
     
     def _extract_service_name(self, url: str) -> str:
         """Extract service name from URL for circuit breaker tracking."""
-        if "keyword" in url or ":8001" in url:
-            return "keyword_service"
-        elif "temporal" in url or ":8004" in url:
-            return "temporal_service"
-        elif "nlp" in url or ":8002" in url:
-            return "nlp_service"
-        elif "llm" in url or ":8003" in url:
-            return "llm_service"
+        # Map ports to correct services based on docker-compose.dev.yml
+        if ":8001" in url or "nlp" in url:
+            return "nlp_service"        # Port 8001: NLP Provider Service
+        elif ":8002" in url or "llm" in url:
+            return "llm_service"        # Port 8002: LLM Provider Service  
+        elif ":8003" in url or "router" in url:
+            return "router_service"     # Port 8003: Plugin Router Service
+        elif ":8004" in url:
+            return "worker_service"     # Port 8004: Worker metrics
         else:
             return "unknown_service"
     
@@ -455,18 +457,17 @@ class HTTPBasePlugin(BasePlugin):
         Get service URL from environment configuration.
         
         Args:
-            service_name: Name of the service (e.g., "keyword", "temporal")
+            service_name: Name of the service (e.g., "nlp", "llm", "router")
             endpoint: Optional endpoint path
             
         Returns:
             Complete service URL
         """
-        # Get URLs from environment/config
+        # Get URLs from environment-aware configuration (no hard-coding)
         service_urls = {
-            "keyword": getattr(self.settings, "KEYWORD_SERVICE_URL", "http://localhost:8001"),
-            "temporal": getattr(self.settings, "TEMPORAL_SERVICE_URL", "http://localhost:8004"),
-            "nlp": getattr(self.settings, "NLP_SERVICE_URL", "http://localhost:8002"),
-            "llm": getattr(self.settings, "LLM_SERVICE_URL", "http://localhost:8003"),
+            "nlp": self.settings.nlp_service_url,      # Environment-aware: localhost or docker
+            "llm": self.settings.llm_service_url,      # Environment-aware: localhost or docker
+            "router": self.settings.router_service_url, # Environment-aware: localhost or docker
         }
         
         base_url = service_urls.get(service_name, f"http://localhost:8000")
@@ -475,3 +476,20 @@ class HTTPBasePlugin(BasePlugin):
             return f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
         else:
             return base_url
+    
+    def get_plugin_service_url(self, plugin_name: Optional[str] = None) -> str:
+        """
+        Get service URL for this plugin using configuration-driven mapping.
+        
+        Args:
+            plugin_name: Plugin name (defaults to this plugin's metadata name)
+            
+        Returns:
+            Complete service URL with endpoint
+        """
+        if plugin_name is None:
+            plugin_name = self.metadata.name
+            
+        # Use configuration to determine service and endpoint
+        service_name, endpoint_path = self.endpoint_mapper.get_service_and_endpoint(plugin_name)
+        return self.get_service_url(service_name, endpoint_path)

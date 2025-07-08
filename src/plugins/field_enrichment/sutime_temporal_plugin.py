@@ -67,23 +67,36 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using SUTime")
             
-            # Call SUTime temporal service
-            service_url = self.get_service_url("temporal", "sutime/extract")
+            # Call SUTime provider via NLP service  
+            # SUTime provider expects ProviderRequest format
+            service_url = self.get_plugin_service_url()
             request_data = {
-                "text": text,
-                "reference_date": config.get("reference_date", None),
-                "include_nested": config.get("include_nested", True),
-                "include_range": config.get("include_range", True),
-                "resolve_relative": config.get("resolve_relative", True),
-                "timezone": config.get("timezone", "UTC"),
-                "output_format": config.get("output_format", "json")
+                "concept": text,
+                "media_context": "movie",
+                "max_concepts": config.get("max_concepts", 20),
+                "field_name": field_name,
+                "options": {
+                    "reference_date": config.get("reference_date", None),
+                    "include_nested": config.get("include_nested", True),
+                    "include_range": config.get("include_range", True),
+                    "resolve_relative": config.get("resolve_relative", True),
+                    "timezone": config.get("timezone", "UTC"),
+                    "output_format": config.get("output_format", "json")
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            temporal_annotations = response.get("temporal_annotations", [])
-            metadata = response.get("metadata", {})
+            # Process response from ProviderResponse format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                # SUTime provider returns expanded_concepts containing temporal annotations
+                temporal_annotations = result_data.get("expanded_concepts", [])
+                metadata = response.get("metadata", {})
+                metadata.update(result_data.get("analysis", {}))
+            else:
+                temporal_annotations = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             self._logger.info(
                 f"SUTime extracted {len(temporal_annotations)} temporal annotations from field {field_name}"
@@ -97,8 +110,8 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
                     "provider": "sutime",
                     "annotation_count": len(temporal_annotations),
                     "text_length": len(text),
-                    "reference_date": request_data["reference_date"],
-                    "timezone": request_data["timezone"],
+                    "reference_date": request_data["options"]["reference_date"],
+                    "timezone": request_data["options"]["timezone"],
                     "service_metadata": metadata
                 }
             }

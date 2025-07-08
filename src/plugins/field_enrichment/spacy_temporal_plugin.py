@@ -67,23 +67,36 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using SpaCy")
             
-            # Call SpaCy temporal service
-            service_url = self.get_service_url("temporal", "spacy/extract")
+            # Call SpaCy temporal provider via NLP service
+            # SpaCy temporal provider expects ProviderRequest format
+            service_url = self.get_plugin_service_url()
             request_data = {
-                "text": text,
-                "extract_dates": config.get("extract_dates", True),
-                "extract_times": config.get("extract_times", True),
-                "extract_durations": config.get("extract_durations", True),
-                "entity_types": config.get("entity_types", ["DATE", "TIME", "DURATION"]),
-                "normalize_dates": config.get("normalize_dates", True),
-                "reference_date": config.get("reference_date", None)
+                "concept": text,
+                "media_context": "movie",
+                "max_concepts": config.get("max_concepts", 20),
+                "field_name": field_name,
+                "options": {
+                    "extract_dates": config.get("extract_dates", True),
+                    "extract_times": config.get("extract_times", True),
+                    "extract_durations": config.get("extract_durations", True),
+                    "entity_types": config.get("entity_types", ["DATE", "TIME", "DURATION"]),
+                    "normalize_dates": config.get("normalize_dates", True),
+                    "reference_date": config.get("reference_date", None)
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            temporal_entities = response.get("temporal_entities", [])
-            metadata = response.get("metadata", {})
+            # Process response from ProviderResponse format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                # SpaCy provider returns expanded_concepts containing temporal entities
+                temporal_entities = result_data.get("expanded_concepts", [])
+                metadata = response.get("metadata", {})
+                metadata.update(result_data.get("analysis", {}))
+            else:
+                temporal_entities = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             self._logger.info(
                 f"SpaCy extracted {len(temporal_entities)} temporal entities from field {field_name}"
@@ -98,7 +111,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
                     "entity_count": len(temporal_entities),
                     "text_length": len(text),
                     "service_metadata": metadata,
-                    "extraction_types": request_data["entity_types"]
+                    "extraction_types": request_data["options"]["entity_types"]
                 }
             }
             

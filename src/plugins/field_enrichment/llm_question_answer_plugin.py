@@ -87,24 +87,39 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Answering {len(questions)} questions for field {field_name}")
             
-            # Call LLM Q&A service
-            service_url = self.get_service_url("llm", "qa/answer")
+            # Call LLM service (using general expand endpoint for Q&A)
+            # LLM expand endpoint expects LLMRequest format
+            service_url = self.get_plugin_service_url()
+            
+            # Create a concept that includes context and questions for LLM processing
+            concept_text = f"Context: {context}\n\nQuestions: {', '.join(questions)}"
+            
             request_data = {
-                "context": context,
-                "questions": questions,
+                "concept": concept_text,
+                "media_context": "movie",
+                "max_concepts": config.get("max_concepts", 10),
                 "field_name": field_name,
-                "answer_format": config.get("answer_format", "concise"),
-                "max_answer_length": config.get("max_answer_length", 200),
-                "confidence_threshold": config.get("confidence_threshold", 0.5),
-                "temperature": config.get("temperature", 0.1),  # Lower for more factual answers
-                "include_reasoning": config.get("include_reasoning", False)
+                "options": {
+                    "task_type": "question_answering",
+                    "questions": questions,
+                    "answer_format": config.get("answer_format", "concise"),
+                    "max_answer_length": config.get("max_answer_length", 200),
+                    "confidence_threshold": config.get("confidence_threshold", 0.5),
+                    "temperature": config.get("temperature", 0.1),  # Lower for more factual answers
+                    "include_reasoning": config.get("include_reasoning", False)
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            qa_results = response.get("answers", [])
-            metadata = response.get("metadata", {})
+            # Process response from LLMRequest format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                qa_results = result_data.get("answers", result_data.get("concepts", []))
+                metadata = response.get("metadata", {})
+            else:
+                qa_results = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             self._logger.info(
                 f"LLM answered {len(qa_results)} questions for field {field_name}"

@@ -74,22 +74,38 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Finding similar terms for {len(keywords)} keywords using Gensim")
             
-            # Call Gensim service
-            service_url = self.get_service_url("nlp", "gensim/similarity")
+            # Call Gensim provider via generic NLP service endpoint
+            # Gensim provider expects ProviderRequest format
+            service_url = self.get_plugin_service_url()
+            
+            # Convert keywords list to a single concept string for provider request
+            concept_text = ", ".join(keywords)
+            
             request_data = {
-                "keywords": keywords,
-                "similarity_threshold": config.get("threshold", 0.7),
-                "max_similar": config.get("max_similar", 8),
-                "model_type": config.get("model_type", "word2vec"),  # or "fasttext"
-                "include_scores": config.get("include_scores", True),
-                "filter_duplicates": config.get("filter_duplicates", True)
+                "concept": concept_text,
+                "media_context": "movie",
+                "max_concepts": config.get("max_similar", 8),
+                "field_name": field_name,
+                "options": {
+                    "task_type": "similarity_search",
+                    "similarity_threshold": config.get("threshold", 0.7),
+                    "model_type": config.get("model_type", "word2vec"),  # or "fasttext"
+                    "include_scores": config.get("include_scores", True),
+                    "filter_duplicates": config.get("filter_duplicates", True)
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            similar_keywords = response.get("similar_terms", [])
-            metadata = response.get("metadata", {})
+            # Process response from ProviderResponse format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                # Gensim provider returns expanded_concepts, use as similar terms
+                similar_keywords = result_data.get("expanded_concepts", result_data.get("similar_terms", []))
+                metadata = response.get("metadata", {})
+            else:
+                similar_keywords = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             # Extract just the terms if scores are included
             if similar_keywords and isinstance(similar_keywords[0], dict):

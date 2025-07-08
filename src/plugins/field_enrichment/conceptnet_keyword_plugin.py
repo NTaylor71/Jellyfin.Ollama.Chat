@@ -74,20 +74,34 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Expanding {len(keywords)} keywords using ConceptNet")
             
-            # Call ConceptNet service
-            service_url = self.get_service_url("keyword", "conceptnet/expand")
+            # Call ConceptNet provider using configuration-driven routing
+            service_url = self.get_plugin_service_url()
+            
+            # ConceptNet provider expects single concept string, not keywords array
+            # Convert keywords list to a single concept string
+            concept_text = ", ".join(keywords)
+            
             request_data = {
-                "keywords": keywords,
+                "concept": concept_text,
+                "media_context": "movie",
                 "max_concepts": config.get("max_concepts", 10),
-                "relation_types": config.get("relation_types", ["RelatedTo", "IsA", "PartOf"]),
-                "language": config.get("language", "en")
+                "field_name": field_name,
+                "options": {
+                    "relation_types": config.get("relation_types", ["RelatedTo", "IsA", "PartOf"]),
+                    "language": config.get("language", "en")
+                }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response
-            expanded_keywords = response.get("concepts", [])
-            metadata = response.get("metadata", {})
+            # Process response from ProviderResponse format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                expanded_keywords = result_data.get("concepts", [])
+                metadata = response.get("metadata", {})
+            else:
+                expanded_keywords = []
+                metadata = {"error": response.get("error_message", "Unknown error")}
             
             self._logger.info(
                 f"ConceptNet expanded {len(keywords)} keywords to {len(expanded_keywords)} concepts"

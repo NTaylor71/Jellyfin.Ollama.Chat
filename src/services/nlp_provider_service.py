@@ -113,6 +113,40 @@ class NLPProviderManager:
             self.initialization_errors["heideltime"] = str(e)
             logger.error(f"❌ HeidelTime provider error: {e}")
         
+        # Initialize ConceptNet Provider
+        try:
+            from src.concept_expansion.providers.conceptnet_provider import ConceptNetProvider
+            conceptnet_provider = ConceptNetProvider()
+            if await conceptnet_provider.initialize():
+                self.providers["conceptnet"] = conceptnet_provider
+                logger.info("✅ ConceptNet provider initialized")
+            else:
+                self.initialization_errors["conceptnet"] = "Initialization failed"
+                logger.error("❌ ConceptNet provider initialization failed")
+        except ImportError as e:
+            self.initialization_errors["conceptnet"] = f"Import error: {e}"
+            logger.error(f"❌ ConceptNet provider import failed: {e}")
+        except Exception as e:
+            self.initialization_errors["conceptnet"] = str(e)
+            logger.error(f"❌ ConceptNet provider error: {e}")
+        
+        # Initialize SUTime Provider
+        try:
+            from src.concept_expansion.providers.sutime_provider import SUTimeProvider
+            sutime_provider = SUTimeProvider()
+            if await sutime_provider.initialize():
+                self.providers["sutime"] = sutime_provider
+                logger.info("✅ SUTime provider initialized")
+            else:
+                self.initialization_errors["sutime"] = "Initialization failed"
+                logger.error("❌ SUTime provider initialization failed")
+        except ImportError as e:
+            self.initialization_errors["sutime"] = f"Import error: {e}"
+            logger.error(f"❌ SUTime provider import failed: {e}")
+        except Exception as e:
+            self.initialization_errors["sutime"] = str(e)
+            logger.error(f"❌ SUTime provider error: {e}")
+        
         logger.info(f"NLP Provider initialization complete. {len(self.providers)} providers available.")
     
     async def cleanup_providers(self):

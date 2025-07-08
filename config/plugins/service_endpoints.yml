@@ -1,0 +1,48 @@
+# Service Endpoint Mapping Configuration
+# Maps plugin types to their corresponding service endpoints
+
+# NLP Service Endpoints (nlp-service:8001)
+nlp_endpoints:
+  conceptnet: "providers/conceptnet/expand"
+  gensim: "providers/gensim/expand"  # Use generic provider endpoint instead of specialized similarity
+  spacy_temporal: "providers/spacy/expand"  # Use 'spacy' provider name, not 'spacy_temporal'
+  heideltime: "providers/heideltime/expand"
+  sutime: "providers/sutime/expand"
+  # Add more NLP endpoints as needed
+
+# LLM Service Endpoints (llm-service:8002)
+llm_endpoints:
+  keywords: "expand"  # Use general expand endpoint, not specialized keywords/expand
+  general: "expand"
+  # Add more LLM endpoints as needed
+
+# Plugin to Service Mapping Rules
+plugin_routing:
+  # Pattern-based routing (case-insensitive)
+  patterns:
+    - pattern: "conceptnet"
+      service: "nlp"
+      endpoint: "conceptnet"
+    - pattern: "gensim"
+      service: "nlp"
+      endpoint: "gensim"
+    - pattern: "spacy"
+      service: "nlp"
+      endpoint: "spacy_temporal"
+    - pattern: "heideltime"
+      service: "nlp"
+      endpoint: "heideltime"
+    - pattern: "sutime"
+      service: "nlp"
+      endpoint: "sutime"
+    - pattern: "llm.*keyword"
+      service: "llm"
+      endpoint: "keywords"
+    - pattern: "llm"
+      service: "llm"
+      endpoint: "general"
+  
+  # Default routing
+  default:
+    service: "nlp"
+    endpoint: "gensim"
