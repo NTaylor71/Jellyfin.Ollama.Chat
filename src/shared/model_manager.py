@@ -126,8 +126,10 @@ class ModelManager:
             ),
             
             # Ollama Models (external, check-only)
+            # NOTE: These are fallback values when YAML config is not available
+            # Primary configuration should come from config/models/ollama_models.yaml
             "ollama_chat": ModelInfo(
-                name="llama3.2:3b",
+                name="mistral:latest",  # Updated to match current YAML config
                 package="ollama",
                 storage_path="external",
                 size_mb=2000,

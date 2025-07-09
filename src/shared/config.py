@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     
     OLLAMA_CHAT_BASE_URL: str = Field(default="http://localhost:11434")
-    OLLAMA_CHAT_MODEL: str = Field(default="llama3.2:3b")
+    # NOTE: OLLAMA_CHAT_MODEL moved to YAML config at config/models/ollama_models.yaml
     OLLAMA_CHAT_TIMEOUT: int = Field(default=300)
     
     # ==========================================================================

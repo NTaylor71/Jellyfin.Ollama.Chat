@@ -202,6 +202,7 @@ services:
       - "8002:8002"
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Model configs
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
     environment:
@@ -235,6 +236,7 @@ services:
       - "8005:8005"
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Model configs
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
       - model-data:/app/models  # Unified model storage

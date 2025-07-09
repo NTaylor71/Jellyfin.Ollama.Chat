@@ -19,6 +19,13 @@ from src.providers.llm.base_llm_client import (
 from src.shared.config import get_settings
 from src.shared.hardware_config import get_resource_limits
 
+# Import will be added when config loader is stable
+try:
+    from src.shared.model_config_loader import get_model_config_loader
+    CONFIG_LOADER_AVAILABLE = True
+except ImportError:
+    CONFIG_LOADER_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +41,7 @@ class OllamaBackendClient(BaseLLMClient):
         super().__init__()
         self.settings = get_settings()
         self.base_url = self.settings.OLLAMA_CHAT_BASE_URL
-        self.model = self.settings.OLLAMA_CHAT_MODEL
+        self.model = self._get_chat_model()
         self.timeout = self.settings.OLLAMA_CHAT_TIMEOUT
         
         # HTTP client for API calls
@@ -49,6 +56,33 @@ class OllamaBackendClient(BaseLLMClient):
         self._min_request_interval = 0.1  # 10 requests per second max
         
         logger.info(f"Initialized Ollama client: {self.base_url}, model: {self.model}")
+    
+    def _get_chat_model(self) -> str:
+        """Get chat model from YAML config, fallback to env var."""
+        if CONFIG_LOADER_AVAILABLE:
+            try:
+                config_loader = get_model_config_loader()
+                ollama_models = config_loader.get_models_for_service('ollama')
+                
+                # Look for chat model in YAML config
+                chat_model_config = ollama_models.get('chat_model')
+                if chat_model_config:
+                    logger.info(f"Using chat model from YAML config: {chat_model_config.name}")
+                    return chat_model_config.name
+                    
+            except Exception as e:
+                logger.warning(f"Failed to load chat model from YAML config: {e}")
+        
+        # Fallback to environment variable or default
+        try:
+            model_name = self.settings.OLLAMA_CHAT_MODEL
+            logger.info(f"Using chat model from environment variable: {model_name}")
+            return model_name
+        except AttributeError:
+            # Final fallback if env var is not defined
+            default_model = "mistral:latest"
+            logger.info(f"Using default chat model: {default_model}")
+            return default_model
     
     async def initialize(self) -> bool:
         """Initialize the Ollama client and check availability."""

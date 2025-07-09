@@ -99,7 +99,7 @@ class ServiceHealth(BaseModel):
     status: str
     uptime_seconds: float
     model_manager_ready: bool
-    models_status: Dict[str, str]
+    models_status: Dict[str, Dict[str, Any]]
     total_requests: int
     failed_requests: int
 
@@ -503,6 +503,29 @@ async def download_models(request: ModelDownloadRequest):
             media_type="system"
         ).observe(execution_time_ms / 1000)
         
+        # Hard-fail if any service is missing (per requirements)
+        if not success:
+            # Determine which services failed
+            failed_services = []
+            for service_name, service_status in all_models_status.items():
+                if not service_status.get("success", False):
+                    failed_services.append(service_name)
+            
+            error_detail = {
+                "error": "Model download orchestration failed - missing services detected",
+                "failed_services": failed_services,
+                "remedy": "Ensure all required services are running and accessible. Check service health endpoints and Docker container status.",
+                "required_services": ["nlp-service", "llm-service"],
+                "service_urls": {
+                    "nlp-service": "http://nlp-service:8001/health",
+                    "llm-service": "http://llm-service:8002/health"
+                }
+            }
+            
+            logger.error(f"Orchestration hard-fail: {error_detail}")
+            track_failed_request()
+            raise HTTPException(status_code=503, detail=error_detail)
+        
         return ModelDownloadResponse(
             success=success,
             execution_time_ms=execution_time_ms,
@@ -510,6 +533,9 @@ async def download_models(request: ModelDownloadRequest):
             failed_models=failed_models
         )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions without modification
+        raise
     except Exception as e:
         track_failed_request()
         execution_time_ms = get_execution_time_ms(start_time)
