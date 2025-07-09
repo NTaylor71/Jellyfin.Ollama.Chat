@@ -92,7 +92,10 @@ class MicroservicesArchitectureTest:
         
         # Test Docker services
         services = [
-            ("NLP Service", "http://localhost:8001/health"),
+            ("ConceptNet Service", "http://localhost:8001/health"),
+            ("Gensim Service", "http://localhost:8006/health"),
+            ("SpaCy Service", "http://localhost:8007/health"),
+            ("HeidelTime Service", "http://localhost:8008/health"),
             ("LLM Service", "http://localhost:8002/health"), 
             ("Router Service", "http://localhost:8003/health"),
             ("Worker Service", "http://localhost:8004/metrics")  # Prometheus endpoint
@@ -108,9 +111,9 @@ class MicroservicesArchitectureTest:
         """Test service endpoints directly."""
         print("\n🔍 Testing Service Endpoints...")
         
-        # Test NLP Service providers
+        # Test Split Architecture Service providers
         await self._run_test(
-            "NLP Service Providers List",
+            "ConceptNet Service Providers List",
             self._test_nlp_providers
         )
         
@@ -124,14 +127,14 @@ class MicroservicesArchitectureTest:
         """Test individual providers through services."""
         print("\n🔍 Testing Providers...")
         
-        # Test each NLP provider
-        nlp_tests = [
+        # Test each Split Architecture provider
+        split_tests = [
             ("Gensim Provider", "gensim", "action movie thriller"),
             ("SpaCy Provider", "spacy", "90s action movie"),
             ("HeidelTime Provider", "heideltime", "movie from 1995")
         ]
         
-        for test_name, provider, concept in nlp_tests:
+        for test_name, provider, concept in split_tests:
             await self._run_test(
                 test_name,
                 lambda p=provider, c=concept: self._test_nlp_provider(p, c)
@@ -224,10 +227,10 @@ class MicroservicesArchitectureTest:
         return response.json()
     
     async def _test_nlp_providers(self) -> Dict[str, Any]:
-        """Test NLP service provider listing."""
+        """Test ConceptNet service provider listing."""
         response = await self.http_client.get("http://localhost:8001/providers")
         if response.status_code != 200:
-            raise Exception(f"NLP providers failed: {response.status_code}")
+            raise Exception(f"ConceptNet providers failed: {response.status_code}")
         
         data = response.json()
         providers = data.get("available_providers", [])
@@ -248,7 +251,7 @@ class MicroservicesArchitectureTest:
         data = response.json()
         services = data.get("services", {})
         
-        expected_services = ["nlp_provider", "llm_provider"]
+        expected_services = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider"]
         for service in expected_services:
             if service not in services:
                 raise Exception(f"Missing service: {service}")
@@ -256,7 +259,7 @@ class MicroservicesArchitectureTest:
         return data
     
     async def _test_nlp_provider(self, provider: str, concept: str) -> Dict[str, Any]:
-        """Test NLP provider through service."""
+        """Test split architecture provider through service."""
         request_data = {
             "concept": concept,
             "media_context": "movie",

@@ -1,0 +1,85 @@
+# =============================================================================
+# Gensim Provider Service - Word2Vec and similarity search
+# =============================================================================
+
+# =============================================================================
+# STAGE 1: BUILDER - Install dependencies and build tools
+# =============================================================================
+FROM python:3.12-slim as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml ./
+COPY src/ ./src/
+
+# Install Python dependencies to /opt/venv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -e .[gensim,api,monitoring]
+
+# =============================================================================
+# STAGE 2: RUNTIME - Copy only necessary files from builder
+# =============================================================================
+FROM python:3.12-slim as runtime
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    GENSIM_DATA_DIR=/app/models/gensim_data
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy Python virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy project files from builder
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/pyproject.toml ./
+
+# Create directories
+RUN mkdir -p logs models/gensim_data
+
+# Create non-root user
+RUN groupadd -g 1000 gensim && \
+    useradd -u 1000 -g 1000 -m gensim && \
+    chown -R gensim:gensim /app && \
+    chown -R gensim:gensim /opt/venv
+
+# Environment variables
+ENV PYTHONPATH=/app
+
+# Expose port
+EXPOSE 8006
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8006/health/ready || exit 1
+
+# Switch to non-root user
+USER gensim
+
+# Run Gensim service
+CMD ["python", "-m", "src.services.provider_services.gensim_service"]

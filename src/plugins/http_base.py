@@ -257,9 +257,12 @@ class HTTPBasePlugin(BasePlugin):
     def _init_circuit_breakers(self):
         """Initialize circuit breakers for actual docker services."""
         services = [
-            "nlp_service",      # Port 8001: SpaCy, HeidelTime, Gensim, ConceptNet
-            "llm_service",      # Port 8002: LLM/Ollama operations  
-            "router_service"    # Port 8003: Plugin coordination
+            "conceptnet_service",  # Port 8001: ConceptNet
+            "gensim_service",      # Port 8006: Gensim similarity
+            "spacy_service",       # Port 8007: SpaCy NLP
+            "heideltime_service",  # Port 8008: HeidelTime temporal
+            "llm_service",         # Port 8002: LLM/Ollama operations  
+            "router_service"       # Port 8003: Plugin coordination
         ]
         
         for service_name in services:
@@ -322,12 +325,18 @@ class HTTPBasePlugin(BasePlugin):
     def _extract_service_name(self, url: str) -> str:
         """Extract service name from URL for circuit breaker tracking."""
         # Map ports to correct services based on docker-compose.dev.yml
-        if ":8001" in url or "nlp" in url:
-            return "nlp_service"        # Port 8001: NLP Provider Service
+        if ":8001" in url or "conceptnet" in url:
+            return "conceptnet_service"  # Port 8001: ConceptNet Service
+        elif ":8006" in url or "gensim" in url:
+            return "gensim_service"      # Port 8006: Gensim Service
+        elif ":8007" in url or "spacy" in url:
+            return "spacy_service"       # Port 8007: SpaCy Service
+        elif ":8008" in url or "heideltime" in url:
+            return "heideltime_service"  # Port 8008: HeidelTime Service
         elif ":8002" in url or "llm" in url:
-            return "llm_service"        # Port 8002: LLM Provider Service  
+            return "llm_service"         # Port 8002: LLM Provider Service  
         elif ":8003" in url or "router" in url:
-            return "router_service"     # Port 8003: Plugin Router Service
+            return "router_service"      # Port 8003: Plugin Router Service
         elif ":8004" in url:
             return "worker_service"     # Port 8004: Worker metrics
         else:
@@ -535,7 +544,10 @@ class HTTPBasePlugin(BasePlugin):
         """
         # Get URLs from environment-aware configuration (no hard-coding)
         service_urls = {
-            "nlp": self.settings.nlp_service_url,      # Environment-aware: localhost or docker
+            "conceptnet": "http://conceptnet-service:8001",
+            "gensim": "http://gensim-service:8006", 
+            "spacy": "http://spacy-service:8007",
+            "heideltime": "http://heideltime-service:8008",
             "llm": self.settings.llm_service_url,      # Environment-aware: localhost or docker
             "router": self.settings.router_service_url, # Environment-aware: localhost or docker
         }

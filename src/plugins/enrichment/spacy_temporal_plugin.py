@@ -69,7 +69,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using SpaCy")
             
-            # Call SpaCy temporal provider via NLP service
+            # Call SpaCy temporal provider via dedicated SpaCy service
             # SpaCy temporal provider expects ProviderRequest format
             service_url = self.get_plugin_service_url()
             request_data = {

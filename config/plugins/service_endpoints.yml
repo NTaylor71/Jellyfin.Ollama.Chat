@@ -1,41 +1,43 @@
 # Service Endpoint Mapping Configuration
-# Maps plugin types to their corresponding service endpoints
+# Maps plugin types to their corresponding split architecture service endpoints
 
-# NLP Service Endpoints (nlp-service:8001)
-nlp_endpoints:
+# ConceptNet Service Endpoints (conceptnet-service:8001)
+conceptnet_endpoints:
   conceptnet: "providers/conceptnet/expand"
-  gensim: "providers/gensim/expand"  # Use generic provider endpoint instead of specialized similarity
-  spacy_temporal: "providers/spacy_temporal/expand"  # Matches actual provider name
+
+# Gensim Service Endpoints (gensim-service:8006)
+gensim_endpoints:
+  gensim: "providers/gensim/expand"
+
+# SpaCy Service Endpoints (spacy-service:8007)
+spacy_endpoints:
+  spacy_temporal: "providers/spacy_temporal/expand"
+
+# HeidelTime Service Endpoints (heideltime-service:8008)
+heideltime_endpoints:
   heideltime: "providers/heideltime/expand"
-  sutime: "providers/sutime/expand"
-  # Add more NLP endpoints as needed
 
 # LLM Service Endpoints (llm-service:8002)
-# Standardized to match NLP pattern
 llm_endpoints:
-  keywords: "providers/llm/keywords/expand"  # Standardized LLM keyword expansion
-  general: "providers/llm/expand"           # Standardized LLM concept expansion
-  # Add more LLM endpoints as needed
+  keywords: "providers/llm/keywords/expand"
+  general: "providers/llm/expand"
 
-# Plugin to Service Mapping Rules
+# Plugin to Service Mapping Rules (Split Architecture)
 plugin_routing:
   # Pattern-based routing (case-insensitive)
   patterns:
     - pattern: "conceptnet"
-      service: "nlp"
+      service: "conceptnet"
       endpoint: "conceptnet"
     - pattern: "gensim"
-      service: "nlp"
+      service: "gensim"
       endpoint: "gensim"
     - pattern: "spacy"
-      service: "nlp"
+      service: "spacy"
       endpoint: "spacy_temporal"
     - pattern: "heideltime"
-      service: "nlp"
+      service: "heideltime"
       endpoint: "heideltime"
-    - pattern: "sutime"
-      service: "nlp"
-      endpoint: "sutime"
     - pattern: "llm.*keyword"
       service: "llm"
       endpoint: "keywords"
@@ -45,5 +47,5 @@ plugin_routing:
   
   # Default routing
   default:
-    service: "nlp"
-    endpoint: "gensim"
+    service: "conceptnet"
+    endpoint: "conceptnet"

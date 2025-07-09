@@ -74,7 +74,7 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Finding similar terms for {len(keywords)} keywords using Gensim")
             
-            # Call Gensim provider via generic NLP service endpoint
+            # Call Gensim provider via dedicated Gensim service endpoint
             # Gensim provider expects ProviderRequest format
             service_url = self.get_plugin_service_url()
             

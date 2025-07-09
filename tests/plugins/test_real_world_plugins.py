@@ -78,10 +78,12 @@ async def test_plugin_with_real_services():
         
         async with aiohttp.ClientSession() as session:
             services_to_test = [
-                ("Keyword Service", "http://localhost:8001/health"),
+                ("ConceptNet Service", "http://localhost:8001/health"),
                 ("LLM Service", "http://localhost:8002/health"), 
-                ("NLP Service", "http://localhost:8003/health"),
-                ("Temporal Service", "http://localhost:8004/health")
+                ("Router Service", "http://localhost:8003/health"),
+                ("Gensim Service", "http://localhost:8006/health"),
+                ("SpaCy Service", "http://localhost:8007/health"),
+                ("HeidelTime Service", "http://localhost:8008/health")
             ]
             
             service_status = {}
@@ -107,7 +109,10 @@ async def test_plugin_with_real_services():
         print("💡 To test with real services, start the microservices first:")
         print("   python -m src.services.keyword_expansion_service &")
         print("   python -m src.services.llm_provider_service &")
-        print("   python -m src.services.nlp_provider_service &")
+        print("   python -m src.services.provider_services.conceptnet_service &")
+        print("   python -m src.services.provider_services.gensim_service &")
+        print("   python -m src.services.provider_services.spacy_service &")
+        print("   python -m src.services.provider_services.heideltime_service &")
     
     # Test 3: Plugin Initialization Test
     print("\\n🚀 PLUGIN INITIALIZATION TEST:")
@@ -237,7 +242,7 @@ async def test_plugin_with_real_services():
     print("💡 Service connectivity depends on running microservices")
     
     print("\\n📋 NEXT STEPS FOR FULL REAL-WORLD TESTING:")
-    print("1. Start all microservices (keyword, llm, nlp, temporal)")
+    print("1. Start all microservices (conceptnet, gensim, spacy, heideltime, llm)")
     print("2. Run this test with services online")
     print("3. Test with actual model inference")
     print("4. Monitor resource usage in production")

@@ -32,10 +32,28 @@ class ServiceTestManager:
     def __init__(self):
         self.settings = get_settings()
         self.services = {
-            "nlp_provider": {
-                "module": "src.services.provider_services.nlp_provider_service",
+            "conceptnet_provider": {
+                "module": "src.services.provider_services.conceptnet_service",
                 "port": 8001,
-                "url": self.settings.nlp_service_url,
+                "url": "http://localhost:8001",
+                "process": None
+            },
+            "gensim_provider": {
+                "module": "src.services.provider_services.gensim_service",
+                "port": 8006,
+                "url": "http://localhost:8006",
+                "process": None
+            },
+            "spacy_provider": {
+                "module": "src.services.provider_services.spacy_service",
+                "port": 8007,
+                "url": "http://localhost:8007",
+                "process": None
+            },
+            "heideltime_provider": {
+                "module": "src.services.provider_services.heideltime_service",
+                "port": 8008,
+                "url": "http://localhost:8008",
                 "process": None
             },
             "llm_provider": {
@@ -72,7 +90,7 @@ class ServiceTestManager:
             # Start Docker services
             result = subprocess.run([
                 "docker", "compose", "-f", "docker-compose.dev.yml", "up", "-d",
-                "nlp-service", "llm-service", "router-service", "redis", "mongodb", "ollama"
+                "conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service", "redis", "mongodb", "ollama"
             ], capture_output=True, text=True, timeout=120)
             
             if result.returncode != 0:
@@ -150,18 +168,18 @@ class ServiceTestManager:
         service = self.services[service_name]
         base_url = service['url']
         
-        if service_name == "nlp_provider":
-            # Test NLP provider endpoints
+        if service_name in ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider"]:
+            # Test split architecture provider endpoints
             response = await self.http_client.get(f"{base_url}/providers")
             if response.status_code != 200:
-                raise AssertionError(f"❌ NLP providers endpoint failed: HTTP {response.status_code}")
+                raise AssertionError(f"❌ {service_name} providers endpoint failed: HTTP {response.status_code}")
             
             providers_data = response.json()
             available_providers = providers_data.get("available_providers", [])
-            logger.info(f"✅ NLP providers available: {available_providers}")
+            logger.info(f"✅ {service_name} providers available: {available_providers}")
             
             if not available_providers:
-                raise AssertionError("❌ No NLP providers available - check provider initialization")
+                raise AssertionError(f"❌ No {service_name} providers available - check provider initialization")
         
         elif service_name == "llm_provider":
             # Test LLM provider endpoints
@@ -193,7 +211,7 @@ async def test_service_startup_sequence():
         await manager.start_docker_services()
         
         # Test each service health and endpoints
-        service_order = ["nlp_provider", "llm_provider", "plugin_router"]
+        service_order = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider", "plugin_router"]
         
         for service_name in service_order:
             # Verify health

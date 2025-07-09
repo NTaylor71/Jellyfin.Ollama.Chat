@@ -31,7 +31,10 @@ class DefaultRouting(BaseModel):
 class ServiceEndpointConfig(BasePluginConfig):
     """Configuration for service endpoint mapping."""
     
-    nlp_endpoints: Dict[str, str] = Field(default_factory=dict, description="NLP service endpoint mappings")
+    conceptnet_endpoints: Dict[str, str] = Field(default_factory=dict, description="ConceptNet service endpoint mappings")
+    gensim_endpoints: Dict[str, str] = Field(default_factory=dict, description="Gensim service endpoint mappings")
+    spacy_endpoints: Dict[str, str] = Field(default_factory=dict, description="SpaCy service endpoint mappings")
+    heideltime_endpoints: Dict[str, str] = Field(default_factory=dict, description="HeidelTime service endpoint mappings")
     llm_endpoints: Dict[str, str] = Field(default_factory=dict, description="LLM service endpoint mappings")
     routing_patterns: List[RoutingPattern] = Field(default_factory=list, description="Pattern-based routing rules")
     default_routing: Optional[DefaultRouting] = Field(default=None, description="Default routing fallback")
@@ -100,15 +103,15 @@ class ServiceEndpointMapper:
                 "general": "providers/llm/expand"
             },
             routing_patterns=[
-                RoutingPattern(pattern="conceptnet", service="nlp", endpoint="conceptnet"),
-                RoutingPattern(pattern="gensim", service="nlp", endpoint="gensim"),
-                RoutingPattern(pattern="spacy", service="nlp", endpoint="spacy_temporal"),
-                RoutingPattern(pattern="heideltime", service="nlp", endpoint="heideltime"),
-                RoutingPattern(pattern="sutime", service="nlp", endpoint="sutime"),
+                RoutingPattern(pattern="conceptnet", service="conceptnet", endpoint="conceptnet"),
+                RoutingPattern(pattern="gensim", service="gensim", endpoint="gensim"),
+                RoutingPattern(pattern="spacy", service="spacy", endpoint="spacy_temporal"),
+                RoutingPattern(pattern="heideltime", service="heideltime", endpoint="heideltime"),
+                RoutingPattern(pattern="sutime", service="sutime", endpoint="sutime"),
                 RoutingPattern(pattern="llm.*keyword", service="llm", endpoint="keywords"),
                 RoutingPattern(pattern="llm", service="llm", endpoint="general"),
             ],
-            default_routing=DefaultRouting(service="nlp", endpoint="gensim")
+            default_routing=DefaultRouting(service="conceptnet", endpoint="conceptnet")
         )
         
         self._compile_patterns()
@@ -157,14 +160,15 @@ class ServiceEndpointMapper:
         
         # Ultimate fallback
         logger.warning(f"No routing found for plugin '{plugin_name}', using hardcoded fallback")
-        return "nlp", "providers/gensim/similarity"
+        return "conceptnet", "providers/conceptnet/expand"
     
     def _get_endpoint_path(self, service: str, endpoint_key: str) -> str:
         """Get the actual endpoint path for a service and endpoint key."""
         if not self.config:
             return endpoint_key
             
-        if service == "nlp" and endpoint_key in self.config.nlp_endpoints:
+        # Handle split services
+        if service in ["conceptnet", "gensim", "spacy", "heideltime", "sutime"] and endpoint_key in self.config.nlp_endpoints:
             return self.config.nlp_endpoints[endpoint_key]
         elif service == "llm" and endpoint_key in self.config.llm_endpoints:
             return self.config.llm_endpoints[endpoint_key]
@@ -177,7 +181,8 @@ class ServiceEndpointMapper:
         if not self.config:
             self.load_config()
             
-        if service == "nlp":
+        # Handle split services
+        if service in ["conceptnet", "gensim", "spacy", "heideltime", "sutime"]:
             return self.config.nlp_endpoints.copy()
         elif service == "llm":
             return self.config.llm_endpoints.copy()

@@ -71,6 +71,73 @@ class PluginRouter:
         self.endpoint_mapper = get_endpoint_mapper()
         self.initialization_state = "starting"  # starting -> discovering_services -> checking_dependencies -> ready
         self.initialization_progress = {}
+        self.use_split_architecture = True  # Always use split architecture
+    
+    def _check_split_architecture(self) -> bool:
+        """Always use split architecture mode."""
+        return True
+    
+    def _configure_service_routes(self, settings) -> Dict[str, ServiceRoute]:
+        """Configure service routes for split architecture."""
+        import os
+        
+        services = {}
+        
+        logger.info("🔄 Configuring split architecture service routes")
+        
+        # Split NLP services with defaults
+        split_services = {
+            "conceptnet_provider": ("CONCEPTNET_SERVICE_URL", "http://conceptnet-service:8001"),
+            "gensim_provider": ("GENSIM_SERVICE_URL", "http://gensim-service:8006"),
+            "spacy_provider": ("SPACY_SERVICE_URL", "http://spacy-service:8007"),
+            "heideltime_provider": ("HEIDELTIME_SERVICE_URL", "http://heideltime-service:8008")
+        }
+        
+        for service_name, (env_var, default_url) in split_services.items():
+            service_url = os.getenv(env_var, default_url)
+            service_type = service_name.replace("_provider", "")
+            services[service_name] = ServiceRoute(
+                url=service_url,
+                service_type=service_type,
+                health_endpoint="/health/ready"
+            )
+            logger.info(f"  ✅ {service_name}: {service_url}")
+        
+        # Always include LLM service
+        services["llm_provider"] = ServiceRoute(
+            url=settings.llm_service_url,
+            service_type="llm",
+            health_endpoint="/health/ready"
+        )
+        logger.info(f"  ✅ llm_provider: {settings.llm_service_url}")
+        
+        return services
+    
+    def _map_plugin_to_split_service(self, plugin_class_name: str, service_name: str) -> str:
+        """Map plugin to split service provider."""
+        # Plugin-to-service mapping for split architecture
+        plugin_service_mapping = {
+            "ConceptNetKeywordPlugin": "conceptnet_provider",
+            "GensimSimilarityPlugin": "gensim_provider",
+            "SpacyTemporalPlugin": "spacy_provider",
+            "HeidelTimeTemporalPlugin": "heideltime_provider",
+            "LLMKeywordPlugin": "llm_provider",
+            "LLMQAPlugin": "llm_provider",
+            "LLMKeywordExtractionPlugin": "llm_provider"
+        }
+        
+        # Check if we have a specific mapping for this plugin
+        if plugin_class_name in plugin_service_mapping:
+            mapped_service = plugin_service_mapping[plugin_class_name]
+            logger.debug(f"Split architecture: {plugin_class_name} -> {mapped_service}")
+            return mapped_service
+        
+        # Fallback to service name mapping
+        if service_name == "nlp":
+            logger.warning(f"Plugin {plugin_class_name} mapped to nlp service but using split architecture - routing to conceptnet_provider")
+            return "conceptnet_provider"  # Default fallback
+        
+        return f"{service_name}_provider"
     
     async def initialize_router(self):
         """Initialize the router with service discovery."""
@@ -80,19 +147,8 @@ class PluginRouter:
         
         settings = get_settings()
         
-        # Configure service routes using config
-        self.services = {
-            "nlp_provider": ServiceRoute(
-                url=settings.nlp_service_url,
-                service_type="nlp",
-                health_endpoint="/health/ready"  # Use stateful health checks
-            ),
-            "llm_provider": ServiceRoute(
-                url=settings.llm_service_url, 
-                service_type="llm",
-                health_endpoint="/health/ready"  # Use stateful health checks
-            )
-        }
+        # Configure service routes based on architecture mode
+        self.services = self._configure_service_routes(settings)
         
         # Plugin-to-service mapping (populated dynamically)
         self.plugin_service_mapping = {}
@@ -160,11 +216,12 @@ class PluginRouter:
                     
                     # Use configuration-driven service mapping
                     service_name, _ = self.endpoint_mapper.get_service_and_endpoint(plugin_class_name)
-                    # Map to service provider names for consistency  
-                    service_provider = f"{service_name}_provider"
+                    
+                    # Map to service provider names using split architecture
+                    service_provider = self._map_plugin_to_split_service(plugin_class_name, service_name)
                     
                     self.plugin_service_mapping[plugin_class_name] = service_provider
-                    logger.debug(f"Discovered plugin: {plugin_class_name} -> {service_name}")
+                    logger.debug(f"Discovered plugin: {plugin_class_name} -> {service_provider}")
                     
                 except Exception as e:
                     logger.warning(f"Failed to process plugin file {plugin_file}: {e}")
@@ -220,13 +277,13 @@ class PluginRouter:
         
         # Plugin type-based routing
         if plugin_type in ["concept_expansion", "temporal_analysis"]:
-            return "nlp_provider"
+            return "conceptnet_provider"
         elif plugin_type in ["query_processing", "llm_concept"]:
             return "llm_provider"
         
-        # Default to NLP provider for unknown plugins
-        logger.warning(f"Unknown plugin {plugin_name} ({plugin_type}), routing to nlp_provider")
-        return "nlp_provider"
+        # Default to ConceptNet provider for unknown plugins
+        logger.warning(f"Unknown plugin {plugin_name} ({plugin_type}), routing to conceptnet_provider")
+        return "conceptnet_provider"
     
     async def route_plugin_execution(
         self, 
@@ -262,7 +319,7 @@ class PluginRouter:
             
             # Route to appropriate service endpoint
             if service.service_type == "nlp":
-                # For NLP service, determine the specific provider
+                # For split NLP services, use direct provider endpoint
                 provider_name = self._map_plugin_to_provider(plugin_name)
                 endpoint = f"{service.url}/providers/{provider_name}/expand"
                 
@@ -456,8 +513,10 @@ async def refresh_service_health():
 async def list_services():
     """List all configured services."""
     return {
+        "architecture": "split",
         "services": router.services,
-        "plugin_mapping": router.plugin_service_mapping
+        "plugin_mapping": router.plugin_service_mapping,
+        "total_services": len(router.services)
     }
 
 

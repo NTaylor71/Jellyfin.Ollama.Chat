@@ -170,13 +170,21 @@ class ServiceRegistryPlugin(BasePlugin):
         """Register default known services."""
         settings = get_settings()
         
-        # NLP Provider Service
-        self.services["nlp_provider"] = ServiceInfo(
-            name="nlp_provider",
-            url=settings.nlp_service_url,
-            service_type="nlp",
-            capabilities=["gensim", "spacy_temporal", "heideltime", "concept_expansion"]
-        )
+        # Split NLP Provider Services  
+        split_services = [
+            ("conceptnet_provider", "http://conceptnet-service:8001", ["concept_expansion"]),
+            ("gensim_provider", "http://gensim-service:8006", ["gensim_similarity"]),
+            ("spacy_provider", "http://spacy-service:8007", ["spacy_temporal"]),
+            ("heideltime_provider", "http://heideltime-service:8008", ["heideltime_temporal"])
+        ]
+        
+        for service_name, service_url, capabilities in split_services:
+            self.services[service_name] = ServiceInfo(
+                name=service_name,
+                url=service_url,
+                service_type="nlp",
+                capabilities=capabilities
+            )
         
         # LLM Provider Service
         self.services["llm_provider"] = ServiceInfo(

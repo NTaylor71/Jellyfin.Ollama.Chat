@@ -174,7 +174,10 @@ async def test_service_health():
     
     services = [
         ("Router", "http://localhost:8003/health"),
-        ("NLP", "http://localhost:8001/health"),
+        ("ConceptNet", "http://localhost:8001/health"),
+        ("Gensim", "http://localhost:8006/health"),
+        ("SpaCy", "http://localhost:8007/health"),
+        ("HeidelTime", "http://localhost:8008/health"),
         ("LLM", "http://localhost:8002/health"),
         ("Worker Metrics", "http://localhost:8004/metrics")
     ]

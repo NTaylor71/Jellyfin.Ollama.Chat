@@ -128,13 +128,21 @@ class ServiceRunner:
         """Configure all services."""
         logger.info("Configuring services...")
         
-        # NLP Provider Service
-        self.services["nlp_provider"] = ServiceProcess(
-            name="NLP Provider Service",
-            module="src.services.provider_services.nlp_provider_service",
-            port=8001,
-            env={"PORT": "8001"}
-        )
+        # Split NLP Provider Services
+        split_services = [
+            ("conceptnet_provider", "ConceptNet Service", "src.services.provider_services.conceptnet_service", 8001),
+            ("gensim_provider", "Gensim Service", "src.services.provider_services.gensim_service", 8006),
+            ("spacy_provider", "SpaCy Service", "src.services.provider_services.spacy_service", 8007),
+            ("heideltime_provider", "HeidelTime Service", "src.services.provider_services.heideltime_service", 8008)
+        ]
+        
+        for service_key, service_name, module_name, port in split_services:
+            self.services[service_key] = ServiceProcess(
+                name=service_name,
+                module=module_name,
+                port=port,
+                env={"PORT": str(port)}
+            )
         
         # LLM Provider Service  
         self.services["llm_provider"] = ServiceProcess(
@@ -258,7 +266,7 @@ async def main():
     parser.add_argument("action", choices=["start", "stop", "restart", "status", "run"], 
                        help="Action to perform")
     parser.add_argument("--services", nargs="+", 
-                       choices=["nlp_provider", "llm_provider", "plugin_router"],
+                       choices=["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider", "plugin_router"],
                        help="Specific services to target")
     parser.add_argument("--log-level", default="INFO", 
                        choices=["DEBUG", "INFO", "WARNING", "ERROR"],

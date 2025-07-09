@@ -3,7 +3,7 @@
 Stage 4.3 SUCCESS TEST - Service-Oriented Plugin Architecture
 
 This test proves the microservices architecture is working:
-✅ NLP Provider Service
+✅ Split Architecture Provider Services
 ✅ LLM Provider Service  
 ✅ Plugin Router Service
 ✅ Service Communication
@@ -23,13 +23,13 @@ async def test_individual_services():
     logger.info("-" * 40)
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # Test NLP Service
+        # Test ConceptNet Service
         response = await client.get("http://localhost:8001/health")
         assert response.status_code == 200
         health = response.json()
         assert health["status"] == "healthy"
         assert len(health["providers"]) > 0
-        logger.info("✅ NLP Service: Healthy with {} providers".format(len(health["providers"])))
+        logger.info("✅ ConceptNet Service: Healthy with {} providers".format(len(health["providers"])))
         
         # Test LLM Service
         response = await client.get("http://localhost:8002/health")
@@ -124,7 +124,10 @@ async def test_service_communication():
         response = await client.get("http://localhost:8003/services")
         assert response.status_code == 200
         services = response.json()
-        assert "nlp_provider" in services["services"]
+        # Check that split architecture services are available
+        split_services = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider"]
+        available_services = services["services"].keys()
+        assert any(service in available_services for service in split_services), f"No split services found in {available_services}"
         assert "llm_provider" in services["services"]
         logger.info("✅ Service Discovery: Router knows about {} services".format(len(services["services"])))
         
@@ -197,7 +200,7 @@ async def main():
         
         logger.info("\n" + "=" * 70)
         logger.info("🎉 ALL TESTS PASSED - STAGE 4.3 COMPLETE!")
-        logger.info("✅ NLP Provider Service: WORKING")
+        logger.info("✅ Split Architecture Provider Services: WORKING")
         logger.info("✅ LLM Provider Service: WORKING") 
         logger.info("✅ Plugin Router Service: WORKING")
         logger.info("✅ Service Communication: WORKING")

@@ -149,12 +149,17 @@ services:
   # MICROSERVICES ARCHITECTURE
   # ===========================================================================
 
-  nlp-service:
+
+  # ===========================================================================
+  # SPLIT NLP SERVICES
+  # ===========================================================================
+
+  conceptnet-service:
     build:
       context: .
-      dockerfile: docker/services/Dockerfile.nlp
-    image: jelly-nlp-service
-    container_name: rag-nlp-service
+      dockerfile: docker/services/Dockerfile.conceptnet
+    image: jelly-conceptnet-service
+    container_name: rag-conceptnet-service
     restart: unless-stopped
     ports:
       - "8001:8001"
@@ -162,16 +167,13 @@ services:
       - ./src:/app/src:ro  # Hot reload
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
-      - model-data:/app/models  # Unified model storage
     environment:
       - ENV=docker
       - REDIS_HOST=redis
       - MONGODB_HOST=mongodb
       - LOG_LEVEL=DEBUG
-      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-      - NLTK_DATA=/app/models/nltk_data
-      - GENSIM_DATA_DIR=/app/models/gensim_data
-      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
+      - ENABLE_METRICS=true
+      - ENABLE_CORS=true
     networks:
       - rag-network
     depends_on:
@@ -184,7 +186,128 @@ services:
       interval: 30s
       timeout: 10s
       retries: 999
-      start_period: 1s
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  gensim-service:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.gensim
+    image: jelly-gensim-service
+    container_name: rag-gensim-service
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+      - model-data:/app/models  # Unified model storage
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - LOG_LEVEL=DEBUG
+      - GENSIM_DATA_DIR=/app/models/gensim_data
+      - ENABLE_METRICS=true
+      - ENABLE_CORS=true
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 999
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  spacy-service:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.spacy
+    image: jelly-spacy-service
+    container_name: rag-spacy-service
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+      - model-data:/app/models  # Unified model storage
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - LOG_LEVEL=DEBUG
+      - ENABLE_METRICS=true
+      - ENABLE_CORS=true
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 999
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  heideltime-service:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.heideltime
+    image: jelly-heideltime-service
+    container_name: rag-heideltime-service
+    restart: unless-stopped
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    environment:
+      - ENV=docker
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - LOG_LEVEL=DEBUG
+      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      - ENABLE_METRICS=true
+      - ENABLE_CORS=true
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 999
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
@@ -248,6 +371,11 @@ services:
       - OLLAMA_CHAT_BASE_URL=http://ollama:11434
       - NLTK_DATA=/app/models/nltk_data
       - GENSIM_DATA_DIR=/app/models/gensim_data
+      # Service discovery endpoints for split architecture
+      - CONCEPTNET_SERVICE_URL=http://conceptnet-service:8001
+      - GENSIM_SERVICE_URL=http://gensim-service:8006
+      - SPACY_SERVICE_URL=http://spacy-service:8007
+      - HEIDELTIME_SERVICE_URL=http://heideltime-service:8008
     networks:
       - rag-network
     depends_on:
@@ -255,9 +383,16 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-      nlp-service:
-        condition: service_healthy
       llm-service:
+        condition: service_healthy
+      # Dependencies for split architecture
+      conceptnet-service:
+        condition: service_healthy
+      gensim-service:
+        condition: service_healthy
+      spacy-service:
+        condition: service_healthy
+      heideltime-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8005/health/ready"]
@@ -270,6 +405,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
 
   router-service:
     build:
@@ -287,8 +423,12 @@ services:
     environment:
       - ENV=docker
       - LOG_LEVEL=DEBUG
-      - NLP_SERVICE_URL=http://nlp-service:8001
       - LLM_SERVICE_URL=http://llm-service:8002
+      # Split service endpoints
+      - CONCEPTNET_SERVICE_URL=http://conceptnet-service:8001
+      - GENSIM_SERVICE_URL=http://gensim-service:8006
+      - SPACY_SERVICE_URL=http://spacy-service:8007
+      - HEIDELTIME_SERVICE_URL=http://heideltime-service:8008
     networks:
       - rag-network
     depends_on:
@@ -304,6 +444,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
 
   # ===========================================================================
   # RAG SYSTEM SERVICES

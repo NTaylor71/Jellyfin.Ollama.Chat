@@ -69,7 +69,7 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using HeidelTime")
             
-            # Call HeidelTime provider via NLP service
+            # Call HeidelTime provider via dedicated HeidelTime service
             # HeidelTime provider expects ProviderRequest format
             service_url = self.get_plugin_service_url()
             request_data = {

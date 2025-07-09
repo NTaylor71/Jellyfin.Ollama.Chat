@@ -39,10 +39,31 @@ scrape_configs:
     scrape_interval: 15s
     scrape_timeout: 10s
 
-  # NLP Service metrics
-  - job_name: 'nlp-service'
+  # Split NLP Services metrics
+  - job_name: 'conceptnet-service'
     static_configs:
-      - targets: ['nlp-service:8001']
+      - targets: ['conceptnet-service:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    
+  - job_name: 'gensim-service'
+    static_configs:
+      - targets: ['gensim-service:8006']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    
+  - job_name: 'spacy-service'
+    static_configs:
+      - targets: ['spacy-service:8007']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    
+  - job_name: 'heideltime-service'
+    static_configs:
+      - targets: ['heideltime-service:8008']
     metrics_path: '/metrics'
     scrape_interval: 15s
     scrape_timeout: 10s

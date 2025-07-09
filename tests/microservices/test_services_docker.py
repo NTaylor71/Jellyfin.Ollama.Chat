@@ -41,14 +41,20 @@ class DockerServiceManager:
         self.services = [
             "redis",
             "mongodb", 
-            "nlp-service",
+            "conceptnet-service",
+            "gensim-service",
+            "spacy-service",
+            "heideltime-service",
             "llm-service",
             "router-service",
             "worker"
         ]
         
         self.service_urls = {
-            "nlp-service": "http://localhost:8001",
+            "conceptnet-service": "http://localhost:8001",
+            "gensim-service": "http://localhost:8006",
+            "spacy-service": "http://localhost:8007",
+            "heideltime-service": "http://localhost:8008",
             "llm-service": "http://localhost:8002", 
             "router-service": "http://localhost:8003"
         }
@@ -77,7 +83,7 @@ class DockerServiceManager:
         
         try:
             # Build only the microservices
-            services_to_build = ["nlp-service", "llm-service", "router-service"]
+            services_to_build = ["conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service"]
             
             for service in services_to_build:
                 logger.info(f"🔨 Building {service}...")
@@ -131,7 +137,7 @@ class DockerServiceManager:
         
         try:
             # Start in dependency order
-            service_order = ["nlp-service", "llm-service", "router-service"]
+            service_order = ["conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service"]
             
             for service in service_order:
                 logger.info(f"🚀 Starting {service}...")
@@ -334,7 +340,7 @@ async def test_docker_microservices():
         
         # Get logs for debugging
         logger.error("\n📋 Service logs for debugging:")
-        for service in ["nlp-service", "llm-service", "router-service"]:
+        for service in ["conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service"]:
             logger.error(f"\n--- {service} logs ---")
             logs = manager.get_service_logs(service)
             logger.error(logs)

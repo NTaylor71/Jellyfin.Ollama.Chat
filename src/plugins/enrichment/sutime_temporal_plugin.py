@@ -67,7 +67,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using SUTime")
             
-            # Call SUTime provider via NLP service  
+            # Call SUTime provider via dedicated SUTime service  
             # SUTime provider expects ProviderRequest format
             service_url = self.get_plugin_service_url()
             request_data = {

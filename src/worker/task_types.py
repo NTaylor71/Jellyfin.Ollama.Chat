@@ -74,7 +74,7 @@ TASK_DEFINITIONS: Dict[TaskType, TaskDefinition] = {
         optional_fields=["media_context", "max_concepts", "field_name"],
         execution_timeout=30.0,
         requires_service=True,
-        service_type="nlp"
+        service_type="split_nlp"
     ),
     
     TaskType.TEMPORAL_ANALYSIS: TaskDefinition(
@@ -85,7 +85,7 @@ TASK_DEFINITIONS: Dict[TaskType, TaskDefinition] = {
         optional_fields=["media_context", "document_date"],
         execution_timeout=20.0,
         requires_service=True,
-        service_type="nlp"
+        service_type="split_nlp"
     ),
     
     TaskType.QUESTION_EXPANSION: TaskDefinition(
@@ -125,7 +125,7 @@ TASK_DEFINITIONS: Dict[TaskType, TaskDefinition] = {
         optional_fields=["processing_options"],
         execution_timeout=120.0,
         requires_service=True,
-        service_type="nlp"
+        service_type="split_nlp"
     ),
     
     TaskType.DATA_ENHANCEMENT: TaskDefinition(
@@ -136,7 +136,7 @@ TASK_DEFINITIONS: Dict[TaskType, TaskDefinition] = {
         optional_fields=["enhancement_types", "confidence_threshold"],
         execution_timeout=90.0,
         requires_service=True,
-        service_type="nlp"
+        service_type="split_nlp"
     ),
     
     TaskType.HEALTH_CHECK: TaskDefinition(

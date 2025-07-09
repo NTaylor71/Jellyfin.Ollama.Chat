@@ -147,11 +147,18 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         
         endpoints = []
         
-        # Core application services
-        if settings.nlp_service_url:
+        # Core application services - Split architecture
+        split_services = [
+            ("conceptnet_service", "http://conceptnet-service:8001"),
+            ("gensim_service", "http://gensim-service:8006"),
+            ("spacy_service", "http://spacy-service:8007"),
+            ("heideltime_service", "http://heideltime-service:8008")
+        ]
+        
+        for service_name, service_url in split_services:
             endpoints.append(ServiceEndpoint(
-                name="nlp_service",
-                url=settings.nlp_service_url,
+                name=service_name,
+                url=service_url,
                 timeout_seconds=10.0,
                 retry_attempts=1,
                 health_check_path="/health",

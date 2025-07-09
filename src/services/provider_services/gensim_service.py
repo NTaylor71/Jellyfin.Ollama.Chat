@@ -1,8 +1,8 @@
 """
-NLP Provider Service - FastAPI service hosting SpaCy, HeidelTime, and Gensim providers.
+Gensim Provider Service - Service for Word2Vec and similarity search.
 
-Lightweight service that handles all heavy NLP operations, allowing the worker
-to remain lightweight and focused on orchestration.
+This service provides Gensim Word2Vec functionality with pre-trained models
+for semantic similarity and concept expansion.
 """
 
 import asyncio
@@ -10,9 +10,10 @@ import logging
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 from src.services.base_service import BaseService
@@ -21,10 +22,8 @@ from src.shared.model_manager import ModelManager, ModelStatus
 logger = logging.getLogger(__name__)
 
 
-
-
 class ProviderRequest(BaseModel):
-    """Request to a provider."""
+    """Request to Gensim provider."""
     concept: str = Field(..., min_length=1, max_length=500)
     media_context: str = Field(default="movie")
     max_concepts: int = Field(default=10, ge=1, le=50)
@@ -33,7 +32,7 @@ class ProviderRequest(BaseModel):
 
 
 class ProviderResponse(BaseModel):
-    """Response from a provider."""
+    """Response from Gensim provider."""
     success: bool
     provider_name: str
     execution_time_ms: float
@@ -50,6 +49,29 @@ class ServiceHealth(BaseModel):
     total_requests: int
     failed_requests: int
     models_ready: bool = False
+
+
+class GensimSimilarityRequest(BaseModel):
+    """Request for Gensim similarity search."""
+    keywords: List[str] = Field(..., min_items=1, max_items=10)
+    similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    max_similar: int = Field(default=8, ge=1, le=20)
+    model_type: str = Field(default="word2vec")
+    include_scores: bool = Field(default=True)
+    filter_duplicates: bool = Field(default=True)
+
+
+class GensimSimilarityResponse(BaseModel):
+    """Response from Gensim similarity search."""
+    similar_terms: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+
+class GensimCompareRequest(BaseModel):
+    """Request to compare similarity between two terms."""
+    term1: str = Field(..., min_length=1)
+    term2: str = Field(..., min_length=1)
+    model_type: str = Field(default="word2vec")
 
 
 class ModelInfo(BaseModel):
@@ -84,158 +106,62 @@ class ModelDownloadResponse(BaseModel):
     error_message: Optional[str] = None
 
 
-class NLPProviderManager(BaseService):
-    """Manages NLP provider instances and their lifecycle."""
+class GensimProviderManager(BaseService):
+    """Manages Gensim provider instance."""
     
     def __init__(self):
-        self.providers: Dict[str, Any] = {}
-        self.initialization_errors: Dict[str, str] = {}
+        self.provider = None
+        self.initialization_error = None
         self.request_count = 0
         self.error_count = 0
-        self.start_time = None  # Will be set during initialization
-        self.initialization_state = "starting"  # starting -> initializing_providers -> ready
-        self.initialization_progress = {}  # Track what's being initialized
+        self.start_time = None
+        self.initialization_state = "starting"
     
-    async def initialize_providers(self):
-        """Initialize all NLP providers."""
-        logger.info("Initializing NLP providers...")
+    async def initialize_provider(self):
+        """Initialize Gensim provider."""
+        logger.info("Initializing Gensim provider...")
         self.start_time = asyncio.get_event_loop().time()
-        self.initialization_state = "initializing_providers"
-        self.initialization_progress = {"phase": "initializing_providers", "completed": [], "failed": []}
+        self.initialization_state = "initializing"
         
-        # Skip model downloading - Model Manager Service will handle this
-        logger.info("Skipping model download - Model Manager Service will orchestrate this")
-        self.initialization_progress["model_download_status"] = "delegated_to_model_manager"
-        
-        # Initialize Gensim Provider
-        self.initialization_progress["current_task"] = "initializing Gensim provider"
         try:
             from src.providers.similarity.gensim_provider import GensimProvider
-            gensim_provider = GensimProvider()
-            if await gensim_provider.initialize():
-                self.providers["gensim"] = gensim_provider
-                self.initialization_progress["completed"].append("gensim")
-                logger.info("✅ Gensim provider initialized")
+            
+            self.provider = GensimProvider()
+            if await self.provider.initialize():
+                self.initialization_state = "ready"
+                logger.info("✅ Gensim provider initialized successfully")
             else:
-                self.initialization_errors["gensim"] = "Initialization failed"
-                self.initialization_progress["failed"].append("gensim")
+                self.initialization_error = "Provider initialization failed"
+                self.initialization_state = "failed"
                 logger.error("❌ Gensim provider initialization failed")
+                
         except ImportError as e:
-            self.initialization_errors["gensim"] = f"Import error: {e}"
-            self.initialization_progress["failed"].append("gensim")
+            self.initialization_error = f"Import error: {e}"
+            self.initialization_state = "failed"
             logger.error(f"❌ Gensim provider import failed: {e}")
         except Exception as e:
-            self.initialization_errors["gensim"] = str(e)
-            self.initialization_progress["failed"].append("gensim")
+            self.initialization_error = str(e)
+            self.initialization_state = "failed"
             logger.error(f"❌ Gensim provider error: {e}")
-        
-        # Initialize SpaCy Temporal Provider
-        self.initialization_progress["current_task"] = "initializing SpaCy temporal provider"
-        try:
-            from src.providers.nlp.spacy_temporal_provider import SpacyTemporalProvider
-            spacy_provider = SpacyTemporalProvider()
-            if await spacy_provider.initialize():
-                self.providers["spacy_temporal"] = spacy_provider
-                self.initialization_progress["completed"].append("spacy_temporal")
-                logger.info("✅ SpaCy temporal provider initialized")
-            else:
-                self.initialization_errors["spacy_temporal"] = "Initialization failed"
-                self.initialization_progress["failed"].append("spacy_temporal")
-                logger.error("❌ SpaCy temporal provider initialization failed")
-        except ImportError as e:
-            self.initialization_errors["spacy_temporal"] = f"Import error: {e}"
-            self.initialization_progress["failed"].append("spacy_temporal")
-            logger.error(f"❌ SpaCy temporal provider import failed: {e}")
-        except Exception as e:
-            self.initialization_errors["spacy_temporal"] = str(e)
-            self.initialization_progress["failed"].append("spacy_temporal")
-            logger.error(f"❌ SpaCy temporal provider error: {e}")
-        
-        # Initialize HeidelTime Provider
-        self.initialization_progress["current_task"] = "initializing HeidelTime provider"
-        try:
-            from src.providers.nlp.heideltime_provider import HeidelTimeProvider
-            heideltime_provider = HeidelTimeProvider()
-            if await heideltime_provider.initialize():
-                self.providers["heideltime"] = heideltime_provider
-                self.initialization_progress["completed"].append("heideltime")
-                logger.info("✅ HeidelTime provider initialized")
-            else:
-                self.initialization_errors["heideltime"] = "Initialization failed"
-                self.initialization_progress["failed"].append("heideltime")
-                logger.error("❌ HeidelTime provider initialization failed")
-        except ImportError as e:
-            self.initialization_errors["heideltime"] = f"Import error: {e}"
-            self.initialization_progress["failed"].append("heideltime")
-            logger.error(f"❌ HeidelTime provider import failed: {e}")
-        except Exception as e:
-            self.initialization_errors["heideltime"] = str(e)
-            self.initialization_progress["failed"].append("heideltime")
-            logger.error(f"❌ HeidelTime provider error: {e}")
-        
-        # Initialize SUTime Provider - TEMPORARILY DISABLED due to Java dependency issues
-        # TODO: Fix SUTime Java dependencies and re-enable
-        self.initialization_progress["current_task"] = "skipping SUTime provider (Java dependency issues)"
-        logger.warning("⚠️  SUTime provider temporarily disabled due to Java dependency issues")
-        self.initialization_errors["sutime"] = "Temporarily disabled due to Java dependency issues"
-        self.initialization_progress["failed"].append("sutime")
-        
-        # Initialize ConceptNet Provider
-        self.initialization_progress["current_task"] = "initializing ConceptNet provider"
-        try:
-            from src.providers.knowledge.conceptnet_provider import ConceptNetProvider
-            conceptnet_provider = ConceptNetProvider()
-            if await conceptnet_provider.initialize():
-                self.providers["conceptnet"] = conceptnet_provider
-                self.initialization_progress["completed"].append("conceptnet")
-                logger.info("✅ ConceptNet provider initialized")
-            else:
-                self.initialization_errors["conceptnet"] = "Initialization failed"
-                self.initialization_progress["failed"].append("conceptnet")
-                logger.error("❌ ConceptNet provider initialization failed")
-        except ImportError as e:
-            self.initialization_errors["conceptnet"] = f"Import error: {e}"
-            self.initialization_progress["failed"].append("conceptnet")
-            logger.error(f"❌ ConceptNet provider import failed: {e}")
-        except Exception as e:
-            self.initialization_errors["conceptnet"] = str(e)
-            self.initialization_progress["failed"].append("conceptnet")
-            logger.error(f"❌ ConceptNet provider error: {e}")
-        
-        # Mark as ready
-        self.initialization_state = "ready"
-        self.initialization_progress = {
-            "phase": "completed",
-            "total_providers": len(self.providers) + len(self.initialization_errors),
-            "successful_providers": len(self.providers),
-            "failed_providers": len(self.initialization_errors),
-            "completed_providers": list(self.providers.keys()),
-            "failed_providers": list(self.initialization_errors.keys())
-        }
-        
-        logger.info(f"🎉 NLP service initialization complete: {len(self.providers)} providers ready, {len(self.initialization_errors)} failed")
     
-    async def cleanup_providers(self):
-        """Cleanup all providers."""
-        logger.info("Cleaning up NLP providers...")
-        for name, provider in self.providers.items():
+    async def cleanup_provider(self):
+        """Cleanup Gensim provider."""
+        logger.info("Cleaning up Gensim provider...")
+        if self.provider and hasattr(self.provider, 'cleanup'):
             try:
-                if hasattr(provider, 'cleanup'):
-                    await provider.cleanup()
-                logger.info(f"✅ {name} provider cleaned up")
+                await self.provider.cleanup()
+                logger.info("✅ Gensim provider cleaned up")
             except Exception as e:
-                logger.error(f"❌ Error cleaning up {name} provider: {e}")
+                logger.error(f"❌ Error cleaning up Gensim provider: {e}")
     
-    def get_provider(self, provider_name: str):
-        """Get a provider by name."""
-        if provider_name not in self.providers:
+    def get_provider(self):
+        """Get the Gensim provider instance."""
+        if self.provider is None:
             raise HTTPException(
-                status_code=404, 
-                detail=f"Provider '{provider_name}' not available. Available providers: {list(self.providers.keys())}"
+                status_code=503,
+                detail="Gensim provider not available. Service may be initializing or failed to start."
             )
-        provider = self.providers[provider_name]
-        logger.debug(f"Returning provider {provider_name} instance: {id(provider)}")
-        return provider
+        return self.provider
     
     async def check_models_ready(self) -> bool:
         """Check if all required models are available."""
@@ -243,7 +169,7 @@ class NLPProviderManager(BaseService):
             # Call our own models status endpoint
             import httpx
             async with httpx.AsyncClient() as client:
-                response = await client.get("http://localhost:8001/models/status")
+                response = await client.get("http://localhost:8006/models/status")
                 if response.status_code == 200:
                     status_data = response.json()
                     missing_required = status_data.get("summary", {}).get("missing_required", 0)
@@ -258,68 +184,63 @@ class NLPProviderManager(BaseService):
         current_time = asyncio.get_event_loop().time()
         uptime = current_time - self.start_time if self.start_time else 0
         
-        provider_statuses = {}
-        for name, provider in self.providers.items():
+        providers = {}
+        if self.provider:
             try:
-                metadata = provider.metadata
-                provider_statuses[name] = {
+                metadata = self.provider.metadata
+                providers["gensim"] = {
                     "status": "healthy",
                     "type": metadata.provider_type,
                     "version": metadata.version,
-                    "initialized": getattr(provider, '_initialized', False)
+                    "initialized": True
                 }
             except Exception as e:
-                provider_statuses[name] = {
+                providers["gensim"] = {
                     "status": "error",
                     "error": str(e)
                 }
+        elif self.initialization_error:
+            providers["gensim"] = {
+                "status": "failed_to_initialize",
+                "error": self.initialization_error
+            }
         
-        # Add initialization errors
-        for name, error in self.initialization_errors.items():
-            if name not in provider_statuses:
-                provider_statuses[name] = {
-                    "status": "failed_to_initialize",
-                    "error": error
-                }
-        
-        # Determine overall service status based on initialization state
-        service_status = "starting"
-        if self.initialization_state == "ready":
-            service_status = "healthy" if self.providers else "degraded"
-        elif self.initialization_state in ["downloading_models", "initializing_providers"]:
+        # Service status based on provider availability
+        if self.initialization_state == "ready" and self.provider:
+            service_status = "healthy"
+        elif self.initialization_state == "initializing":
             service_status = "initializing"
         else:
-            service_status = "starting"
+            service_status = "unhealthy"
         
         return ServiceHealth(
             status=service_status,
             uptime_seconds=uptime,
-            providers=provider_statuses,
+            providers=providers,
             total_requests=self.request_count,
-            failed_requests=self.error_count,
-            models_ready=False  # This will be set by the endpoint
+            failed_requests=self.error_count
         )
 
 
 # Global provider manager
-provider_manager = NLPProviderManager()
+provider_manager = GensimProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    await provider_manager.initialize_providers()
+    await provider_manager.initialize_provider()
     yield
     # Shutdown
-    await provider_manager.cleanup_providers()
+    await provider_manager.cleanup_provider()
 
 
 # Create FastAPI app
 settings = get_settings()
 app = FastAPI(
-    title="NLP Provider Service",
-    description="FastAPI service hosting SpaCy, HeidelTime, and Gensim providers",
+    title="Gensim Provider Service",
+    description="Service for Word2Vec and similarity search functionality",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -334,31 +255,17 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
+# Prometheus metrics
+if settings.ENABLE_METRICS:
+    Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/health", response_model=ServiceHealth)
 async def health_check():
     """Get service health status."""
     health = provider_manager.get_health_status()
-    # Add models status to health check
     health.models_ready = await provider_manager.check_models_ready()
     return health
-
-
-@app.get("/health/detailed")
-async def detailed_health_check():
-    """Get detailed health status with initialization progress."""
-    health = provider_manager.get_health_status()
-    
-    return {
-        "status": health.status,
-        "initialization_state": provider_manager.initialization_state,
-        "initialization_progress": provider_manager.initialization_progress,
-        "uptime_seconds": health.uptime_seconds,
-        "providers": health.providers,
-        "total_requests": health.total_requests,
-        "failed_requests": health.failed_requests,
-        "ready": provider_manager.initialization_state == "ready"
-    }
 
 
 @app.get("/health/ready")
@@ -373,39 +280,38 @@ async def readiness_check():
 @app.get("/providers")
 async def list_providers():
     """List available providers."""
-    providers_info = {}
-    for name, provider in provider_manager.providers.items():
-        metadata = provider.metadata
-        providers_info[name] = {
-            "name": metadata.name,
-            "type": metadata.provider_type,
-            "version": metadata.version,
-            "strengths": metadata.strengths,
-            "best_for": metadata.best_for,
-            "context_aware": metadata.context_aware
-        }
+    provider_info = {}
+    if provider_manager.provider:
+        try:
+            metadata = provider_manager.provider.metadata
+            provider_info["gensim"] = {
+                "name": metadata.name,
+                "type": metadata.provider_type,
+                "version": metadata.version,
+                "strengths": metadata.strengths,
+                "best_for": metadata.best_for,
+                "context_aware": metadata.context_aware
+            }
+        except Exception as e:
+            logger.error(f"Error getting provider metadata: {e}")
     
     return {
-        "available_providers": list(provider_manager.providers.keys()),
-        "providers": providers_info,
-        "initialization_errors": provider_manager.initialization_errors
+        "available_providers": ["gensim"] if provider_manager.provider else [],
+        "providers": provider_info,
+        "initialization_error": provider_manager.initialization_error
     }
 
 
-@app.post("/providers/{provider_name}/expand", response_model=ProviderResponse)
-async def expand_concept(
-    provider_name: str,
-    request: ProviderRequest,
-    background_tasks: BackgroundTasks
-):
-    """Expand a concept using the specified provider."""
+@app.post("/providers/gensim/expand", response_model=ProviderResponse)
+async def expand_concept(request: ProviderRequest):
+    """Expand a concept using Gensim."""
     start_time = asyncio.get_event_loop().time()
     
     try:
-        provider = provider_manager.get_provider(provider_name)
+        provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Import ExpansionRequest here to avoid import issues  
+        # Import ExpansionRequest
         from src.providers.nlp.base_provider import ExpansionRequest
         
         # Create expansion request
@@ -422,14 +328,11 @@ async def expand_concept(
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Normalize Unicode text in the result
-        normalized_result = provider_manager.normalize_text(result.enhanced_data) if result.success else None
-        
         return ProviderResponse(
             success=result.success,
-            provider_name=provider_name,
+            provider_name="gensim",
             execution_time_ms=execution_time_ms,
-            result=normalized_result,
+            result=result.enhanced_data if result.success else None,
             error_message=result.error_message if not result.success else None,
             metadata={
                 "confidence_score": result.confidence_score.overall if result.success else None,
@@ -443,99 +346,21 @@ async def expand_concept(
         provider_manager.error_count += 1
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        logger.error(f"Error expanding concept with {provider_name}: {e}")
+        logger.error(f"Error expanding concept with Gensim: {e}")
         
         return ProviderResponse(
             success=False,
-            provider_name=provider_name,
+            provider_name="gensim",
             execution_time_ms=execution_time_ms,
             error_message=str(e)
         )
-
-
-@app.get("/providers/{provider_name}/metadata")
-async def get_provider_metadata(provider_name: str):
-    """Get metadata for a specific provider."""
-    provider = provider_manager.get_provider(provider_name)
-    metadata = provider.metadata
-    
-    return {
-        "name": metadata.name,
-        "provider_type": metadata.provider_type,
-        "version": metadata.version,
-        "context_aware": metadata.context_aware,
-        "strengths": metadata.strengths,
-        "weaknesses": metadata.weaknesses,
-        "best_for": metadata.best_for
-    }
-
-
-@app.post("/providers/{provider_name}/health")
-async def check_provider_health(provider_name: str):
-    """Check health of a specific provider."""
-    provider = provider_manager.get_provider(provider_name)
-    
-    try:
-        if hasattr(provider, 'health_check'):
-            health_status = await provider.health_check()
-        else:
-            health_status = {
-                "status": "healthy",
-                "initialized": getattr(provider, '_initialized', False)
-            }
-        
-        return {
-            "provider": provider_name,
-            "health": health_status,
-            "metadata": {
-                "name": provider.metadata.name,
-                "type": provider.metadata.provider_type,
-                "version": provider.metadata.version
-            }
-        }
-        
-    except Exception as e:
-        return {
-            "provider": provider_name,
-            "health": {
-                "status": "error",
-                "error": str(e)
-            }
-        }
-
-
-# ============================================================================
-# NEW ENDPOINTS FOR HTTP-ONLY PLUGIN ARCHITECTURE
-# ============================================================================
-
-class GensimSimilarityRequest(BaseModel):
-    """Request for Gensim similarity search."""
-    keywords: List[str] = Field(..., min_items=1, max_items=10)
-    similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
-    max_similar: int = Field(default=8, ge=1, le=20)
-    model_type: str = Field(default="word2vec")
-    include_scores: bool = Field(default=True)
-    filter_duplicates: bool = Field(default=True)
-
-
-class GensimSimilarityResponse(BaseModel):
-    """Response from Gensim similarity search."""
-    similar_terms: List[Dict[str, Any]]
-    metadata: Dict[str, Any]
-
-
-class GensimCompareRequest(BaseModel):
-    """Request to compare similarity between two terms."""
-    term1: str = Field(..., min_length=1)
-    term2: str = Field(..., min_length=1)
-    model_type: str = Field(default="word2vec")
 
 
 @app.post("/providers/gensim/similarity", response_model=GensimSimilarityResponse)
 async def gensim_similarity_search(request: GensimSimilarityRequest):
     """Find similar terms using Gensim word vectors."""
     try:
-        provider = provider_manager.get_provider("gensim")
+        provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
         start_time = asyncio.get_event_loop().time()
@@ -603,7 +428,7 @@ async def gensim_similarity_search(request: GensimSimilarityRequest):
 async def gensim_compare_similarity(request: GensimCompareRequest):
     """Compare similarity between two specific terms."""
     try:
-        provider = provider_manager.get_provider("gensim")
+        provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
         start_time = asyncio.get_event_loop().time()
@@ -642,27 +467,71 @@ async def gensim_compare_similarity(request: GensimCompareRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/providers/gensim/metadata")
+async def get_provider_metadata():
+    """Get Gensim provider metadata."""
+    provider = provider_manager.get_provider()
+    metadata = provider.metadata
+    
+    return {
+        "name": metadata.name,
+        "provider_type": metadata.provider_type,
+        "version": metadata.version,
+        "context_aware": metadata.context_aware,
+        "strengths": metadata.strengths,
+        "weaknesses": metadata.weaknesses,
+        "best_for": metadata.best_for
+    }
+
+
+@app.post("/providers/gensim/health")
+async def check_provider_health():
+    """Check Gensim provider health."""
+    provider = provider_manager.get_provider()
+    
+    try:
+        health_status = await provider.health_check()
+        
+        return {
+            "provider": "gensim",
+            "health": health_status,
+            "metadata": {
+                "name": provider.metadata.name,
+                "type": provider.metadata.provider_type,
+                "version": provider.metadata.version
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "provider": "gensim",
+            "health": {
+                "status": "error",
+                "error": str(e)
+            }
+        }
+
+
 # =============================================================================
 # MODEL MANAGEMENT ENDPOINTS
 # =============================================================================
 
 @app.get("/models/status", response_model=ModelStatusResponse)
 async def get_models_status():
-    """Get status of all NLP models (NLTK, SpaCy, Gensim)."""
+    """Get status of Gensim models."""
     try:
-        # Create a temporary ModelManager to check status
-        # This doesn't download models, just checks their status
+        # Create ModelManager to check status
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only NLP models (exclude Ollama)
-        nlp_models = {
+        # Filter to only Gensim models
+        gensim_models = {
             k: v for k, v in model_manager.models.items()
-            if v.package in ["nltk", "spacy", "gensim"]
+            if v.package == "gensim"
         }
         
-        # Check status of NLP models
+        # Check status of Gensim models
         models_info = {}
-        for model_id, model_info in nlp_models.items():
+        for model_id, model_info in gensim_models.items():
             status = await model_manager._check_model_status(model_info)
             models_info[model_id] = ModelInfo(
                 name=model_info.name,
@@ -698,23 +567,23 @@ async def get_models_status():
 
 @app.post("/models/download", response_model=ModelDownloadResponse)
 async def download_models(request: ModelDownloadRequest):
-    """Download specific NLP models."""
+    """Download specific Gensim models."""
     try:
-        logger.info(f"Downloading NLP models - model_ids: {request.model_ids}, force: {request.force_download}")
+        logger.info(f"Downloading Gensim models - model_ids: {request.model_ids}, force: {request.force_download}")
         
         # Create ModelManager for downloading
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only NLP models
-        nlp_models = {
+        # Filter to only Gensim models
+        gensim_models = {
             k: v for k, v in model_manager.models.items()
-            if v.package in ["nltk", "spacy", "gensim"]
+            if v.package == "gensim"
         }
         
         # If specific model IDs requested, filter further
         if request.model_ids:
-            nlp_models = {
-                k: v for k, v in nlp_models.items()
+            gensim_models = {
+                k: v for k, v in gensim_models.items()
                 if k in request.model_ids
             }
         
@@ -722,7 +591,7 @@ async def download_models(request: ModelDownloadRequest):
         failed_models = []
         
         # Download each model
-        for model_id, model_info in nlp_models.items():
+        for model_id, model_info in gensim_models.items():
             if not model_info.required and not request.force_download:
                 continue
                 
@@ -776,9 +645,9 @@ if __name__ == "__main__":
     
     # Run the service
     uvicorn.run(
-        "src.services.provider_services.nlp_provider_service:app",
+        "src.services.provider_services.gensim_service:app",
         host="0.0.0.0",
-        port=8001,
-        reload=False,  # Disable reload for testing
+        port=8006,
+        reload=False,
         log_level=settings.LOG_LEVEL.lower()
     )

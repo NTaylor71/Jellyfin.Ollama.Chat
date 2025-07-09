@@ -36,7 +36,12 @@ class MicroservicesValidator:
         
         # Infrastructure tests
         await self._test("Redis Connection", self._test_redis)
-        await self._test("NLP Service", self._test_nlp_service)
+        
+        # Split Architecture Service Tests
+        await self._test("ConceptNet Service", self._test_conceptnet_service)
+        await self._test("Gensim Service", self._test_gensim_service)
+        await self._test("SpaCy Service", self._test_spacy_service)
+        await self._test("HeidelTime Service", self._test_heideltime_service)
         await self._test("LLM Service", self._test_llm_service)
         await self._test("Router Service", self._test_router_service)
         
@@ -75,8 +80,8 @@ class MicroservicesValidator:
             raise Exception("Redis ping failed")
         return "Connected"
     
-    async def _test_nlp_service(self) -> Dict[str, Any]:
-        """Test NLP service health and providers."""
+    async def _test_conceptnet_service(self) -> Dict[str, Any]:
+        """Test ConceptNet service health and providers."""
         response = await self.client.get("http://localhost:8001/health")
         if response.status_code != 200:
             raise Exception(f"Health check failed: {response.status_code}")
@@ -91,7 +96,82 @@ class MicroservicesValidator:
             raise Exception(f"Providers endpoint failed: {response.status_code}")
         
         providers_data = response.json()
-        expected = ["gensim", "spacy", "heideltime"]
+        expected = ["conceptnet"]
+        available = providers_data.get("available_providers", [])
+        
+        for provider in expected:
+            if provider not in available:
+                raise Exception(f"Missing provider: {provider}")
+        
+        return {"status": "healthy", "providers": len(available)}
+    
+    async def _test_gensim_service(self) -> Dict[str, Any]:
+        """Test Gensim service health and providers."""
+        response = await self.client.get("http://localhost:8006/health")
+        if response.status_code != 200:
+            raise Exception(f"Health check failed: {response.status_code}")
+        
+        health_data = response.json()
+        if health_data.get("status") != "healthy":
+            raise Exception(f"Service unhealthy: {health_data}")
+        
+        # Check providers
+        response = await self.client.get("http://localhost:8006/providers")
+        if response.status_code != 200:
+            raise Exception(f"Providers endpoint failed: {response.status_code}")
+        
+        providers_data = response.json()
+        expected = ["gensim"]
+        available = providers_data.get("available_providers", [])
+        
+        for provider in expected:
+            if provider not in available:
+                raise Exception(f"Missing provider: {provider}")
+        
+        return {"status": "healthy", "providers": len(available)}
+    
+    async def _test_spacy_service(self) -> Dict[str, Any]:
+        """Test SpaCy service health and providers."""
+        response = await self.client.get("http://localhost:8007/health")
+        if response.status_code != 200:
+            raise Exception(f"Health check failed: {response.status_code}")
+        
+        health_data = response.json()
+        if health_data.get("status") != "healthy":
+            raise Exception(f"Service unhealthy: {health_data}")
+        
+        # Check providers
+        response = await self.client.get("http://localhost:8007/providers")
+        if response.status_code != 200:
+            raise Exception(f"Providers endpoint failed: {response.status_code}")
+        
+        providers_data = response.json()
+        expected = ["spacy_temporal"]
+        available = providers_data.get("available_providers", [])
+        
+        for provider in expected:
+            if provider not in available:
+                raise Exception(f"Missing provider: {provider}")
+        
+        return {"status": "healthy", "providers": len(available)}
+    
+    async def _test_heideltime_service(self) -> Dict[str, Any]:
+        """Test HeidelTime service health and providers."""
+        response = await self.client.get("http://localhost:8008/health")
+        if response.status_code != 200:
+            raise Exception(f"Health check failed: {response.status_code}")
+        
+        health_data = response.json()
+        if health_data.get("status") != "healthy":
+            raise Exception(f"Service unhealthy: {health_data}")
+        
+        # Check providers
+        response = await self.client.get("http://localhost:8008/providers")
+        if response.status_code != 200:
+            raise Exception(f"Providers endpoint failed: {response.status_code}")
+        
+        providers_data = response.json()
+        expected = ["heideltime"]
         available = providers_data.get("available_providers", [])
         
         for provider in expected:
@@ -134,7 +214,7 @@ class MicroservicesValidator:
         services_data = response.json()
         services = services_data.get("services", {})
         
-        expected_services = ["nlp_provider", "llm_provider"]
+        expected_services = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider"]
         for service in expected_services:
             if service not in services:
                 raise Exception(f"Missing service: {service}")
@@ -142,7 +222,7 @@ class MicroservicesValidator:
         return {"status": "healthy", "services": len(services)}
     
     async def _test_gensim_provider(self) -> Dict[str, Any]:
-        """Test Gensim provider through NLP service."""
+        """Test Gensim provider through dedicated Gensim service."""
         request_data = {
             "concept": "action thriller",
             "media_context": "movie", 
@@ -171,7 +251,7 @@ class MicroservicesValidator:
         return {"concepts": concepts[:3], "count": len(concepts)}
     
     async def _test_spacy_provider(self) -> Dict[str, Any]:
-        """Test SpaCy provider through NLP service."""
+        """Test SpaCy provider through dedicated SpaCy service."""
         request_data = {
             "concept": "90s action movie",
             "media_context": "movie",
@@ -197,7 +277,7 @@ class MicroservicesValidator:
         return {"concepts": concepts, "detected_temporal": "90s" in concepts}
     
     async def _test_heideltime_provider(self) -> Dict[str, Any]:
-        """Test HeidelTime provider through NLP service.""" 
+        """Test HeidelTime provider through dedicated HeidelTime service.""" 
         request_data = {
             "concept": "movie from 1995",
             "media_context": "movie",
@@ -286,7 +366,7 @@ class MicroservicesValidator:
         concepts = result.get("expanded_concepts", [])
         service_used = data.get("service_used")
         
-        if service_used != "nlp_provider":
+        if service_used not in ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider"]:
             raise Exception(f"Wrong service used: {service_used}")
         
         return {

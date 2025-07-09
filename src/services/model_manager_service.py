@@ -113,11 +113,43 @@ total_requests = 0
 failed_requests = 0
 http_client: Optional[httpx.AsyncClient] = None
 
-# Service endpoints for coordination
-SERVICE_ENDPOINTS = {
-    "nlp-service": "http://nlp-service:8001",
-    "llm-service": "http://llm-service:8002"
-}
+# Service endpoints for coordination - build dynamically from environment
+def get_service_endpoints():
+    """Get service endpoints for split architecture."""
+    import os
+    
+    endpoints = {}
+    
+    # Split architecture service endpoints (default configuration)
+    split_service_defaults = {
+        "conceptnet-service": "http://conceptnet-service:8001",
+        "gensim-service": "http://gensim-service:8006", 
+        "spacy-service": "http://spacy-service:8007",
+        "heideltime-service": "http://heideltime-service:8008"
+    }
+    
+    # Environment variables for split services (optional override)
+    split_service_env_vars = {
+        "conceptnet-service": "CONCEPTNET_SERVICE_URL",
+        "gensim-service": "GENSIM_SERVICE_URL", 
+        "spacy-service": "SPACY_SERVICE_URL",
+        "heideltime-service": "HEIDELTIME_SERVICE_URL"
+    }
+    
+    # Use split architecture services
+    for service_name, default_url in split_service_defaults.items():
+        # Check for environment variable override, otherwise use default
+        env_var = split_service_env_vars[service_name]
+        service_url = os.getenv(env_var, default_url)
+        endpoints[service_name] = service_url
+        logger.info(f"Split service: {service_name} -> {service_url}")
+    
+    # Always include LLM service
+    endpoints["llm-service"] = "http://llm-service:8002"
+    
+    return endpoints
+
+SERVICE_ENDPOINTS = get_service_endpoints()
 
 # Initialization state tracking (following NLP service pattern)
 initialization_state = "starting"  # starting -> coordinating_services -> downloading_models -> ready
@@ -372,6 +404,18 @@ async def readiness_check():
     else:
         return {"ready": False, "status": initialization_state}, 503
 
+@app.get("/services/discover")
+async def discover_services():
+    """Service discovery endpoint showing all configured services."""
+    track_request()
+    
+    return {
+        "success": True,
+        "architecture": "split",
+        "services": SERVICE_ENDPOINTS,
+        "total_services": len(SERVICE_ENDPOINTS)
+    }
+
 @app.get("/providers/models/status", response_model=ModelStatusResponse)
 async def get_model_status():
     """Get status of all models across services."""
@@ -511,15 +555,17 @@ async def download_models(request: ModelDownloadRequest):
                 if not service_status.get("success", False):
                     failed_services.append(service_name)
             
+            # Build dynamic service URLs for health checks
+            service_health_urls = {}
+            for service_name, service_url in SERVICE_ENDPOINTS.items():
+                service_health_urls[service_name] = f"{service_url}/health"
+            
             error_detail = {
                 "error": "Model download orchestration failed - missing services detected",
                 "failed_services": failed_services,
                 "remedy": "Ensure all required services are running and accessible. Check service health endpoints and Docker container status.",
-                "required_services": ["nlp-service", "llm-service"],
-                "service_urls": {
-                    "nlp-service": "http://nlp-service:8001/health",
-                    "llm-service": "http://llm-service:8002/health"
-                }
+                "required_services": list(SERVICE_ENDPOINTS.keys()),
+                "service_urls": service_health_urls
             }
             
             logger.error(f"Orchestration hard-fail: {error_detail}")

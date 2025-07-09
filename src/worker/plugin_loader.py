@@ -256,9 +256,22 @@ class PluginLoader:
         if any(pattern in plugin_name.lower() for pattern in ['llm', 'language_model', 'gpt']):
             return "llm_provider"
         
-        # NLP service patterns (everything else including merge operations)
-        # ConceptNet, Gensim, SpaCy, HeidelTime, SUTime, Merge plugins
-        return "nlp_provider"
+        # Split architecture service patterns - map to specific services
+        if 'conceptnet' in plugin_name.lower():
+            return "conceptnet_provider"
+        elif 'gensim' in plugin_name.lower():
+            return "gensim_provider"
+        elif 'spacy' in plugin_name.lower():
+            return "spacy_provider"
+        elif 'heideltime' in plugin_name.lower():
+            return "heideltime_provider"
+        elif 'sutime' in plugin_name.lower():
+            return "sutime_provider"
+        elif 'merge' in plugin_name.lower():
+            return "conceptnet_provider"  # Merge operations handled by ConceptNet service
+        
+        # Default fallback to ConceptNet service for unknown NLP patterns
+        return "conceptnet_provider"
     
     async def execute_plugin(
         self, 
