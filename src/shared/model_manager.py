@@ -18,6 +18,13 @@ import json
 import httpx
 from src.shared.config import get_settings
 
+# Import will be added when config loader is stable
+try:
+    from src.shared.model_config_loader import get_model_config_loader
+    CONFIG_LOADER_AVAILABLE = True
+except ImportError:
+    CONFIG_LOADER_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,7 +77,8 @@ class ModelManager:
         os.environ['NLTK_DATA'] = str(self.nltk_data_path)
         os.environ['GENSIM_DATA_DIR'] = str(self.gensim_data_path)
         
-        self.models = self._define_required_models()
+        # Load models from configuration
+        self.models = self._load_models_from_config()
         self.ollama_base_url = self.settings.OLLAMA_CHAT_BASE_URL
     
     def _define_required_models(self) -> Dict[str, ModelInfo]:
@@ -133,6 +141,29 @@ class ModelManager:
                 required=False  # Optional for now
             )
         }
+    
+    def _load_models_from_config(self) -> Dict[str, ModelInfo]:
+        """Load models from YAML configuration files."""
+        if not CONFIG_LOADER_AVAILABLE:
+            logger.warning("Config loader not available, falling back to hardcoded models")
+            return self._define_required_models()
+        
+        try:
+            config_loader = get_model_config_loader()
+            all_models = {}
+            
+            # Load models for each service type
+            for service_type in config_loader.get_service_types():
+                service_models = config_loader.convert_to_model_info(service_type, str(self.models_base_path))
+                all_models.update(service_models)
+            
+            logger.info(f"Loaded {len(all_models)} models from configuration")
+            return all_models
+            
+        except Exception as e:
+            logger.error(f"Failed to load models from config: {e}")
+            logger.info("Falling back to hardcoded models")
+            return self._define_required_models()
     
     async def check_all_models(self) -> Dict[str, ModelStatus]:
         """Check status of all models."""

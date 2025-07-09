@@ -15,6 +15,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.shared.config import get_settings
 from src.services.base_service import BaseService
+from src.shared.model_manager import ModelManager, ModelStatus
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,39 @@ class LLMServiceHealth(BaseModel):
     total_requests: int
     failed_requests: int
     models_available: List[str]
+    models_ready: bool = False
+
+
+class ModelInfo(BaseModel):
+    """Information about a model."""
+    name: str
+    package: str
+    storage_path: str
+    size_mb: int
+    required: bool
+    status: str
+    error_message: Optional[str] = None
+
+
+class ModelStatusResponse(BaseModel):
+    """Response for model status check."""
+    success: bool
+    models: Dict[str, ModelInfo]
+    summary: Dict[str, Any]
+
+
+class ModelDownloadRequest(BaseModel):
+    """Request to download models."""
+    model_ids: Optional[List[str]] = Field(default=None, description="Specific model IDs to download, or None for all required")
+    force_download: bool = Field(default=False, description="Force re-download existing models")
+
+
+class ModelDownloadResponse(BaseModel):
+    """Response for model download."""
+    success: bool
+    downloaded_models: List[str]
+    failed_models: List[str]
+    error_message: Optional[str] = None
 
 
 class MinimalLLMManager(BaseService):
@@ -58,7 +92,7 @@ class MinimalLLMManager(BaseService):
         self.settings = get_settings()
         self.ollama_url = self.settings.OLLAMA_CHAT_BASE_URL
         self.model = self.settings.OLLAMA_CHAT_MODEL
-        self.initialization_state = "starting"  # starting -> connecting_ollama -> checking_model -> ready
+        self.initialization_state = "starting"  # starting -> connecting_ollama -> ready
         self.initialization_progress = {}
         logger.info(f"Initialized LLM manager with Ollama URL: {self.ollama_url}, model: {self.model}")
     
@@ -79,44 +113,14 @@ class MinimalLLMManager(BaseService):
                 logger.error(f"Ollama not available: {response.status_code}")
                 return False
                 
-            # Check if model is available
-            self.initialization_state = "checking_model"
-            self.initialization_progress = {"phase": "checking_model", "current_task": f"checking if model {self.model} is available"}
-            
-            models_data = response.json()
-            available_models = [model.get("name", "") for model in models_data.get("models", [])]
-            model_available = any(self.model in model_name for model_name in available_models)
-            
-            if not model_available:
-                logger.warning(f"Model {self.model} not found. Available: {available_models}")
-                self.initialization_progress["current_task"] = f"downloading model {self.model} (this may take several minutes)"
-                logger.info(f"Automatically pulling model {self.model}...")
-                
-                # Automatically pull the missing model
-                try:
-                    pull_response = await self.http_client.post(
-                        f"{self.ollama_url}/api/pull",
-                        json={"name": self.model},
-                        timeout=600.0  # 10 minutes for model download
-                    )
-                    
-                    if pull_response.status_code == 200:
-                        logger.info(f"✅ Successfully pulled model {self.model}")
-                    else:
-                        self.initialization_progress["error"] = f"Failed to pull model {self.model}: {pull_response.status_code}"
-                        logger.error(f"❌ Failed to pull model {self.model}: {pull_response.status_code}")
-                        return False
-                        
-                except Exception as e:
-                    self.initialization_progress["error"] = f"Error pulling model {self.model}: {e}"
-                    logger.error(f"❌ Error pulling model {self.model}: {e}")
-                    return False
+            # Skip model downloading - Model Manager Service will handle this
+            logger.info("Skipping model check/download - Model Manager Service will orchestrate this")
                 
             self.initialization_state = "ready"
             self.initialization_progress = {
                 "phase": "completed",
                 "status": "ready",
-                "model_available": self.model,
+                "model_download_status": "delegated_to_model_manager",
                 "ollama_url": self.ollama_url
             }
             logger.info("✅ Ollama LLM Provider initialization complete.")
@@ -138,6 +142,22 @@ class MinimalLLMManager(BaseService):
                 detail="Ollama LLM provider not available"
             )
         return self
+    
+    async def check_models_ready(self) -> bool:
+        """Check if all required models are available."""
+        try:
+            # Call our own models status endpoint
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://localhost:8002/models/status")
+                if response.status_code == 200:
+                    status_data = response.json()
+                    missing_required = status_data.get("summary", {}).get("missing_required", 0)
+                    return missing_required == 0
+                return False
+        except Exception as e:
+            logger.error(f"Error checking models ready: {e}")
+            return False
     
     async def get_health_status(self) -> LLMServiceHealth:
         """Get service health status."""
@@ -197,7 +217,8 @@ class MinimalLLMManager(BaseService):
             llm_provider=provider_status,
             total_requests=self.request_count,
             failed_requests=self.error_count,
-            models_available=models_available
+            models_available=models_available,
+            models_ready=False  # This will be set by the endpoint
         )
 
 
@@ -253,7 +274,10 @@ if settings.ENABLE_METRICS:
 @app.get("/health", response_model=LLMServiceHealth)
 async def health_check():
     """Get service health status."""
-    return await provider_manager.get_health_status()
+    health = await provider_manager.get_health_status()
+    # Add models status to health check
+    health.models_ready = await provider_manager.check_models_ready()
+    return health
 
 
 @app.get("/health/detailed")
@@ -360,28 +384,14 @@ Related {request.media_context} concepts:"""
             json=payload
         )
         
-        # If model not found, try to pull it automatically
+        # If model not found, return error (Model Manager Service handles downloads)
         if response.status_code == 404:
-            logger.warning(f"Model {provider_manager.model} not found, attempting to pull...")
-            try:
-                pull_response = await provider_manager.http_client.post(
-                    f"{provider_manager.ollama_url}/api/pull",
-                    json={"name": provider_manager.model},
-                    timeout=600.0
-                )
-                
-                if pull_response.status_code == 200:
-                    logger.info(f"✅ Successfully pulled model {provider_manager.model}, retrying generation...")
-                    # Retry the original request
-                    response = await provider_manager.http_client.post(
-                        f"{provider_manager.ollama_url}/api/generate",
-                        json=payload
-                    )
-                else:
-                    logger.error(f"❌ Failed to pull model: {pull_response.status_code}")
-                    
-            except Exception as e:
-                logger.error(f"❌ Error pulling model: {e}")
+            logger.error(f"Model {provider_manager.model} not found. Models should be downloaded via Model Manager Service.")
+            return LLMResponse(
+                success=False,
+                execution_time_ms=(asyncio.get_event_loop().time() - start_time) * 1000,
+                error_message=f"Model {provider_manager.model} not available. Please ensure models are downloaded via Model Manager Service."
+            )
         
         if response.status_code == 200:
             response_data = response.json()
@@ -442,6 +452,141 @@ Related {request.media_context} concepts:"""
             execution_time_ms=execution_time_ms,
             error_message=str(e)
         )
+
+
+# =============================================================================
+# MODEL MANAGEMENT ENDPOINTS
+# =============================================================================
+
+@app.get("/models/status", response_model=ModelStatusResponse)
+async def get_models_status():
+    """Get status of all Ollama models."""
+    try:
+        # Create a temporary ModelManager to check status
+        # This doesn't download models, just checks their status
+        model_manager = ModelManager(models_base_path="/app/models")
+        
+        # Filter to only Ollama models
+        ollama_models = {
+            k: v for k, v in model_manager.models.items()
+            if v.package == "ollama"
+        }
+        
+        # Check status of Ollama models
+        models_info = {}
+        for model_id, model_info in ollama_models.items():
+            status = await model_manager._check_model_status(model_info)
+            models_info[model_id] = ModelInfo(
+                name=model_info.name,
+                package=model_info.package,
+                storage_path=model_info.storage_path,
+                size_mb=model_info.size_mb,
+                required=model_info.required,
+                status=status.value,
+                error_message=model_info.error_message
+            )
+        
+        # Get summary
+        available_count = sum(1 for m in models_info.values() if m.status == "available")
+        required_count = sum(1 for m in models_info.values() if m.required)
+        
+        summary = {
+            "total_models": len(models_info),
+            "available_models": available_count,
+            "required_models": required_count,
+            "missing_required": required_count - available_count
+        }
+        
+        return ModelStatusResponse(
+            success=True,
+            models=models_info,
+            summary=summary
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get models status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/models/download", response_model=ModelDownloadResponse)
+async def download_models(request: ModelDownloadRequest):
+    """Download specific Ollama models."""
+    try:
+        logger.info(f"Downloading Ollama models - model_ids: {request.model_ids}, force: {request.force_download}")
+        
+        # Create ModelManager for model info
+        model_manager = ModelManager(models_base_path="/app/models")
+        
+        # Filter to only Ollama models
+        ollama_models = {
+            k: v for k, v in model_manager.models.items()
+            if v.package == "ollama"
+        }
+        
+        # If specific model IDs requested, filter further
+        if request.model_ids:
+            ollama_models = {
+                k: v for k, v in ollama_models.items()
+                if k in request.model_ids
+            }
+        
+        downloaded_models = []
+        failed_models = []
+        
+        # Download each model using Ollama API
+        for model_id, model_info in ollama_models.items():
+            if not model_info.required and not request.force_download:
+                continue
+                
+            try:
+                # Check if model needs downloading
+                current_status = await model_manager._check_model_status(model_info)
+                
+                if request.force_download or current_status == ModelStatus.MISSING:
+                    logger.info(f"Pulling Ollama model {model_info.name}")
+                    
+                    # Use Ollama API to pull model
+                    pull_response = await provider_manager.http_client.post(
+                        f"{provider_manager.ollama_url}/api/pull",
+                        json={"name": model_info.name},
+                        timeout=600.0  # 10 minutes for model download
+                    )
+                    
+                    if pull_response.status_code == 200:
+                        downloaded_models.append(model_id)
+                        logger.info(f"✅ Downloaded {model_id}")
+                    else:
+                        failed_models.append(model_id)
+                        logger.error(f"❌ Failed to pull {model_id}: {pull_response.status_code}")
+                else:
+                    logger.info(f"Model {model_id} already available")
+                    
+            except Exception as e:
+                logger.error(f"Error downloading {model_id}: {e}")
+                failed_models.append(model_id)
+        
+        success = len(failed_models) == 0
+        
+        return ModelDownloadResponse(
+            success=success,
+            downloaded_models=downloaded_models,
+            failed_models=failed_models,
+            error_message=None if success else f"Failed to download {len(failed_models)} models"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to download models: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/models/ready")
+async def models_ready_check():
+    """Check if all required models are available."""
+    models_ready = await provider_manager.check_models_ready()
+    if models_ready:
+        return {"models_ready": True}
+    else:
+        return {"models_ready": False}, 503
 
 
 if __name__ == "__main__":

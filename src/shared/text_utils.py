@@ -131,12 +131,14 @@ def extract_key_concepts(text: str, max_concepts: int = 10) -> List[str]:
         import nltk
         from nltk.corpus import stopwords
         
-        # Download stopwords if not available
+        # Use stopwords if available (Model Manager Service handles downloads)
         try:
             stop_words = set(stopwords.words('english'))
         except LookupError:
-            nltk.download('stopwords', quiet=True)
-            stop_words = set(stopwords.words('english'))
+            logger.warning("NLTK stopwords not available - falling back to simple word splitting")
+            # Fallback to simple word splitting without stopwords
+            words = re.split(r'[,\.\!\?\;\:\s\-\(\)]+', normalize_text_for_analysis(text).lower())
+            return [w for w in words if len(w) >= 3 and not w.isdigit()][:max_concepts]
             
     except ImportError:
         # Fallback if NLTK not available - return simple word split without filtering

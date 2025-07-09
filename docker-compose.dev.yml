@@ -224,6 +224,51 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  model-manager:
+    build:
+      context: .
+      dockerfile: docker/services/Dockerfile.model_manager
+    image: jelly-model-manager
+    container_name: rag-model-manager
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./src:/app/src:ro  # Hot reload
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+      - model-data:/app/models  # Unified model storage
+    environment:
+      - ENV=docker
+      - LOG_LEVEL=DEBUG
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
+      - NLTK_DATA=/app/models/nltk_data
+      - GENSIM_DATA_DIR=/app/models/gensim_data
+    networks:
+      - rag-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      nlp-service:
+        condition: service_healthy
+      llm-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 999
+      start_period: 1s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   router-service:
     build:
       context: .
@@ -245,9 +290,7 @@ services:
     networks:
       - rag-network
     depends_on:
-      nlp-service:
-        condition: service_healthy
-      llm-service:
+      model-manager:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health/ready"]

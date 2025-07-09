@@ -14,8 +14,15 @@ import httpx
 from motor.motor_asyncio import AsyncIOMotorClient
 import yaml
 from pydantic import BaseModel, Field, ValidationError, create_model
+import time
 
 from src.shared.config import get_settings
+from src.shared.metrics import (
+    track_ingestion_metrics, track_enrichment_metrics,
+    config_loading_total, config_loading_duration,
+    update_manager_count, update_stored_items_count,
+    track_mongodb_metrics
+)
 import logging
 
 
@@ -66,27 +73,58 @@ class IngestionManager:
         
     async def connect(self):
         """Connect to MongoDB and load configuration."""
-        # Connect to MongoDB
-        self.mongo_client = AsyncIOMotorClient(self.settings.mongodb_url)
-        self.db = self.mongo_client[self.settings.MONGODB_DATABASE]
+        start_time = time.time()
         
-        # Test connection
-        await self.db.command('ping')
-        self.logger.info("Connected to MongoDB")
-        
-        # Load media type configuration
-        config_path = Path(f"config/media_types/{self.media_type}.yaml")
-        if not config_path.exists():
-            raise FileNotFoundError(f"Media type configuration not found: {config_path}")
+        try:
+            # Connect to MongoDB
+            self.mongo_client = AsyncIOMotorClient(self.settings.mongodb_url)
+            self.db = self.mongo_client[self.settings.MONGODB_DATABASE]
             
-        with open(config_path, 'r') as f:
-            config_data = yaml.safe_load(f)
-            self.media_config = MediaTypeConfig(**config_data)
+            # Test connection
+            await self.db.command('ping')
+            self.logger.info("Connected to MongoDB")
             
-        # Create dynamic model based on validation rules
-        self._create_dynamic_model()
+            # Load media type configuration
+            config_path = Path(f"config/media_types/{self.media_type}.yaml")
+            if not config_path.exists():
+                raise FileNotFoundError(f"Media type configuration not found: {config_path}")
+                
+            with open(config_path, 'r') as f:
+                config_data = yaml.safe_load(f)
+                self.media_config = MediaTypeConfig(**config_data)
+                
+            # Create dynamic model based on validation rules
+            self._create_dynamic_model()
             
-        self.logger.info(f"Loaded {self.media_type} configuration: {self.media_config.name}")
+            # Track successful config loading
+            config_loading_total.labels(
+                media_type=self.media_type,
+                status='success'
+            ).inc()
+            
+            duration = time.time() - start_time
+            config_loading_duration.labels(
+                media_type=self.media_type
+            ).observe(duration)
+            
+            # Update manager count
+            update_manager_count(self.media_type, 1)
+                
+            self.logger.info(f"Loaded {self.media_type} configuration: {self.media_config.name}")
+            
+        except Exception as e:
+            # Track failed config loading
+            config_loading_total.labels(
+                media_type=self.media_type,
+                status='error'
+            ).inc()
+            
+            duration = time.time() - start_time
+            config_loading_duration.labels(
+                media_type=self.media_type
+            ).observe(duration)
+            
+            raise
         
     def _create_dynamic_model(self):
         """Create a dynamic Pydantic model based on YAML validation rules."""
@@ -170,6 +208,8 @@ class IngestionManager:
         """Disconnect from MongoDB."""
         if self.mongo_client:
             self.mongo_client.close()
+            # Update manager count
+            update_manager_count(self.media_type, -1)
             self.logger.info("Disconnected from MongoDB")
             
     async def load_media_from_json(self, file_path: Union[str, Path]) -> List[MediaData]:
@@ -234,6 +274,12 @@ class IngestionManager:
     async def load_media_from_api(self, 
                                 limit: Optional[int] = None,
                                 item_names: Optional[List[str]] = None) -> List[MediaData]:
+        """Load media data from external API (Jellyfin/Emby/Plex) based on configured media type."""
+        return await self.load_media_from_jellyfin(limit, item_names)
+    
+    async def load_media_from_jellyfin(self, 
+                                     limit: Optional[int] = None,
+                                     item_names: Optional[List[str]] = None) -> List[MediaData]:
         """Load media data from external API (Jellyfin/Emby/Plex) based on configured media type."""
         if not self.settings.JELLYFIN_API_KEY:
             raise ValueError("External API key not configured")
@@ -318,6 +364,7 @@ class IngestionManager:
         self.logger.info(f"Loaded {len(media_items)} {self.media_type} items from external API")
         return media_items
         
+    @track_enrichment_metrics
     async def enrich_media_item(self, media_item: MediaData) -> Dict[str, Any]:
         """Enrich a single media item using the configured pipeline."""
         # Convert to dict for processing
@@ -406,6 +453,7 @@ class IngestionManager:
         else:
             return None
             
+    @track_mongodb_metrics("upsert", "enriched")
     async def store_media_item(self, media_data: Dict[str, Any]):
         """Store enriched media data in MongoDB."""
         collection_name = self.media_config.output.get("collection", f"{self.media_type}_enriched") if self.media_config.output else f"{self.media_type}_enriched"
@@ -428,6 +476,7 @@ class IngestionManager:
         else:
             self.logger.info(f"Updated {self.media_type}: {media_data['Name']}")
             
+    @track_ingestion_metrics
     async def ingest_media(self, 
                          media_items: List[MediaData],
                          batch_size: int = 5,
@@ -435,28 +484,53 @@ class IngestionManager:
         """Ingest media items with optional enrichment."""
         total = len(media_items)
         
+        # Get rate limiting config from YAML
+        max_concurrent = batch_size  # Default to batch size
+        if self.media_config.execution:
+            max_concurrent = self.media_config.execution.get("max_concurrent_llm", batch_size)
+        
+        # Create a semaphore for rate limiting
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
         # Process in batches
         for i in range(0, total, batch_size):
             batch = media_items[i:i + batch_size]
             
-            # Process each item in the batch
+            # Process each item in the batch with rate limiting
             tasks = []
             for item in batch:
                 if skip_enrichment:
                     # Store without enrichment
-                    tasks.append(self.store_media_item(item.model_dump()))
+                    tasks.append(self._rate_limited_store(semaphore, item.model_dump()))
                 else:
                     # Enrich and store
-                    async def process_item(media_item):
-                        enriched = await self.enrich_media_item(media_item)
-                        await self.store_media_item(enriched)
-                        
-                    tasks.append(process_item(item))
+                    tasks.append(self._rate_limited_process(semaphore, item))
                     
             # Execute batch
-            await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Check for exceptions
+            for j, result in enumerate(results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Error processing item {batch[j].Name}: {result}")
             
             self.logger.info(f"Processed batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size}")
+    
+    async def _rate_limited_store(self, semaphore: asyncio.Semaphore, media_dict: Dict[str, Any]):
+        """Store media item with rate limiting."""
+        async with semaphore:
+            await self.store_media_item(media_dict)
+    
+    async def _rate_limited_process(self, semaphore: asyncio.Semaphore, media_item: MediaData):
+        """Process (enrich and store) media item with rate limiting."""
+        async with semaphore:
+            try:
+                enriched = await self.enrich_media_item(media_item)
+                await self.store_media_item(enriched)
+            except Exception as e:
+                self.logger.error(f"Error processing {media_item.Name}: {e}")
+                # Store without enrichment on error
+                await self.store_media_item(media_item.model_dump())
             
     async def verify_ingestion(self):
         """Verify ingestion results."""
