@@ -32,6 +32,27 @@ class ProviderRequest(BaseModel):
     options: Dict[str, Any] = Field(default_factory=dict)
 
 
+class NERRequest(BaseModel):
+    """Request for NER extraction."""
+    text: str = Field(..., min_length=1, max_length=5000)
+    field_name: str = Field(default="text")
+    options: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LinguisticRequest(BaseModel):
+    """Request for linguistic analysis."""
+    text: str = Field(..., min_length=1, max_length=5000)
+    field_name: str = Field(default="text")
+    options: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SimilarityRequest(BaseModel):
+    """Request for similarity computation."""
+    text1: str = Field(..., min_length=1, max_length=5000)
+    text2: str = Field(..., min_length=1, max_length=5000)
+    options: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ProviderResponse(BaseModel):
     """Response from SpaCy provider."""
     success: bool
@@ -102,9 +123,9 @@ class SpacyProviderManager(BaseService):
         self.initialization_state = "initializing"
         
         try:
-            from src.providers.nlp.spacy_temporal_provider import SpacyTemporalProvider
+            from src.providers.nlp.spacy_provider import SpacyProvider
             
-            self.provider = SpacyTemporalProvider()
+            self.provider = SpacyProvider()
             if await self.provider.initialize():
                 self.initialization_state = "ready"
                 logger.info("✅ SpaCy provider initialized successfully")
@@ -399,6 +420,202 @@ async def check_provider_health():
                 "error": str(e)
             }
         }
+
+
+# New comprehensive NLP endpoints
+
+@app.post("/providers/spacy/entities", response_model=ProviderResponse)
+async def extract_entities(request: NERRequest):
+    """Extract named entities using SpaCy NER."""
+    start_time = asyncio.get_event_loop().time()
+    
+    try:
+        provider = provider_manager.get_provider()
+        provider_manager.request_count += 1
+        
+        # Set extraction type to entities
+        options = request.options.copy()
+        options["extraction_type"] = "entities"
+        
+        from src.providers.nlp.base_provider import ExpansionRequest
+        
+        expansion_request = ExpansionRequest(
+            concept=request.text,
+            media_context="general",
+            max_concepts=50,  # Allow more entities
+            field_name=request.field_name,
+            options=options
+        )
+        
+        result = await provider.expand_concept(expansion_request)
+        
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        if result is None:
+            return ProviderResponse(
+                success=False,
+                provider_name="spacy_ner",
+                execution_time_ms=execution_time_ms,
+                error_message="No entities found or provider returned no result"
+            )
+        
+        return ProviderResponse(
+            success=result.success,
+            provider_name="spacy_ner",
+            execution_time_ms=execution_time_ms,
+            result=result.enhanced_data if result.success else None,
+            error_message=result.error_message if not result.success else None,
+            metadata={
+                "confidence_score": result.confidence_score.overall if result.success else None,
+                "total_entities": result.enhanced_data.get("total_entities", 0) if result.success else 0,
+                "model_used": result.enhanced_data.get("model") if result.success else None
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        provider_manager.error_count += 1
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        logger.error(f"Error extracting entities with SpaCy: {e}")
+        
+        return ProviderResponse(
+            success=False,
+            provider_name="spacy_ner",
+            execution_time_ms=execution_time_ms,
+            error_message=str(e)
+        )
+
+
+@app.post("/providers/spacy/linguistic", response_model=ProviderResponse)
+async def analyze_linguistic_features(request: LinguisticRequest):
+    """Analyze linguistic features using SpaCy."""
+    start_time = asyncio.get_event_loop().time()
+    
+    try:
+        provider = provider_manager.get_provider()
+        provider_manager.request_count += 1
+        
+        # Set extraction type to linguistic
+        options = request.options.copy()
+        options["extraction_type"] = "linguistic"
+        
+        from src.providers.nlp.base_provider import ExpansionRequest
+        
+        expansion_request = ExpansionRequest(
+            concept=request.text,
+            media_context="general",
+            max_concepts=100,  # Allow more features
+            field_name=request.field_name,
+            options=options
+        )
+        
+        result = await provider.expand_concept(expansion_request)
+        
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        if result is None:
+            return ProviderResponse(
+                success=False,
+                provider_name="spacy_linguistic",
+                execution_time_ms=execution_time_ms,
+                error_message="No linguistic features found or provider returned no result"
+            )
+        
+        return ProviderResponse(
+            success=result.success,
+            provider_name="spacy_linguistic",
+            execution_time_ms=execution_time_ms,
+            result=result.enhanced_data if result.success else None,
+            error_message=result.error_message if not result.success else None,
+            metadata={
+                "confidence_score": result.confidence_score.overall if result.success else None,
+                "token_count": result.enhanced_data.get("token_count", 0) if result.success else 0,
+                "sentence_count": result.enhanced_data.get("sentence_count", 0) if result.success else 0,
+                "model_used": result.enhanced_data.get("model") if result.success else None
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        provider_manager.error_count += 1
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        logger.error(f"Error analyzing linguistic features with SpaCy: {e}")
+        
+        return ProviderResponse(
+            success=False,
+            provider_name="spacy_linguistic",
+            execution_time_ms=execution_time_ms,
+            error_message=str(e)
+        )
+
+
+@app.post("/providers/spacy/similarity", response_model=ProviderResponse)
+async def compute_similarity(request: SimilarityRequest):
+    """Compute text similarity using SpaCy."""
+    start_time = asyncio.get_event_loop().time()
+    
+    try:
+        provider = provider_manager.get_provider()
+        provider_manager.request_count += 1
+        
+        # Set extraction type to similarity
+        options = request.options.copy()
+        options["extraction_type"] = "similarity"
+        options["reference_text"] = request.text2
+        
+        from src.providers.nlp.base_provider import ExpansionRequest
+        
+        expansion_request = ExpansionRequest(
+            concept=request.text1,
+            media_context="general",
+            max_concepts=1,
+            field_name="similarity",
+            options=options
+        )
+        
+        result = await provider.expand_concept(expansion_request)
+        
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        if result is None:
+            return ProviderResponse(
+                success=False,
+                provider_name="spacy_similarity",
+                execution_time_ms=execution_time_ms,
+                error_message="Could not compute similarity or provider returned no result"
+            )
+        
+        return ProviderResponse(
+            success=result.success,
+            provider_name="spacy_similarity",
+            execution_time_ms=execution_time_ms,
+            result=result.enhanced_data if result.success else None,
+            error_message=result.error_message if not result.success else None,
+            metadata={
+                "similarity_score": result.enhanced_data.get("similarity_score") if result.success else None,
+                "has_vectors": result.enhanced_data.get("has_vector", False) if result.success else False,
+                "model_used": result.enhanced_data.get("model") if result.success else None
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        provider_manager.error_count += 1
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        logger.error(f"Error computing similarity with SpaCy: {e}")
+        
+        return ProviderResponse(
+            success=False,
+            provider_name="spacy_similarity",
+            execution_time_ms=execution_time_ms,
+            error_message=str(e)
+        )
 
 
 

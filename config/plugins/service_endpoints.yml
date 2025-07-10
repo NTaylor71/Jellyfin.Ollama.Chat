@@ -12,6 +12,10 @@ gensim_endpoints:
 # SpaCy Service Endpoints (spacy-service:8007)
 spacy_endpoints:
   spacy_temporal: "providers/spacy_temporal/expand"
+  spacy_ner: "providers/spacy/entities"
+  spacy_linguistic: "providers/spacy/linguistic"
+  spacy_similarity: "providers/spacy/similarity"
+  spacy_pattern: "providers/spacy_temporal/expand"  # Pattern plugin uses temporal endpoint for now
 
 # HeidelTime Service Endpoints (heideltime-service:8008)
 heideltime_endpoints:
@@ -37,6 +41,18 @@ plugin_routing:
     - pattern: "gensim"
       service: "gensim"
       endpoint: "gensim"
+    - pattern: "spacy_ner"
+      service: "spacy"
+      endpoint: "spacy_ner"
+    - pattern: "spacy_linguistic"
+      service: "spacy"
+      endpoint: "spacy_linguistic"
+    - pattern: "spacy_similarity"
+      service: "spacy"
+      endpoint: "spacy_similarity"
+    - pattern: "spacy_pattern"
+      service: "spacy"
+      endpoint: "spacy_pattern"
     - pattern: "spacy"
       service: "spacy"
       endpoint: "spacy_temporal"

@@ -110,8 +110,24 @@ fields:
                 max_similar: 15
                 model: "word2vec"
                 
+            - plugin: spacy_ner
+              id: spacy_entities
+              plugin_weight: 1.5
+              config:
+                model: "en_core_web_sm"
+                entity_types: ["PERSON", "ORG", "GPE", "WORK_OF_ART", "EVENT"]
+                confidence_threshold: 0.7
+                group_by_type: true
+                
+            - plugin: spacy_pattern
+              id: spacy_patterns
+              plugin_weight: 1.2
+              config:
+                pattern_categories: ["awards", "critical_reception", "technical_specs", "creators"]
+                case_sensitive: false
+                
             - plugin: merge_keywords
-              inputs: [cn_overview, llm_overview, gensim_overview]
+              inputs: [cn_overview, llm_overview, gensim_overview, spacy_entities, spacy_patterns]
               config:
                 strategy: ranked
                 ranking_factors:
