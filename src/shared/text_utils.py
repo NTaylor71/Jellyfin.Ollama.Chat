@@ -211,7 +211,7 @@ def safe_string_conversion(value: Any) -> str:
         str_values = [safe_string_conversion(v) for v in value.values() if v is not None]
         return ' '.join(str_values)
     
-     and normalize
+    # Convert and normalize other types
     return to_ascii(str(value))
 
 

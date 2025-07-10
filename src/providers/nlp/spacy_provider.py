@@ -179,7 +179,7 @@ class SpacyProvider(BaseProvider):
                 confidence_scores=confidence_scores,
                 plugin_name="SpacyProvider",
                 plugin_version="1.0.0",
-                cache_type=CacheType.SPACY_NLP,
+                cache_type=CacheType.SPACY_NER,
                 execution_time_ms=total_time_ms,
                 media_context=request.media_context,
                 plugin_type=PluginType.CONCEPT_EXPANSION,
