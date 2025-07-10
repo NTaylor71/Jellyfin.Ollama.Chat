@@ -8,12 +8,12 @@ import logging
 import sys
 import os
 
-# Add project root to path
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.shared.concept_expander import ConceptExpander, ExpansionMethod
 
-# Set up detailed logging
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ async def debug_concept_expander():
             for i, concept in enumerate(concepts):
                 logger.info(f"  [{i}]: '{concept}' (type: {type(concept)}, len: {len(concept)})")
                 
-                # Show character-by-character for debugging
+
                 logger.info(f"       chars: {[c for c in concept[:50]]}")
         else:
             logger.error("❌ No result returned")

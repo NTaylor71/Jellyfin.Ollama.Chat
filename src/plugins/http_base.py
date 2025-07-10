@@ -61,22 +61,22 @@ class HTTPBasePlugin(BasePlugin):
         Returns:
             Data structure with all Unicode strings converted to ASCII
         """
-        # Handle None and basic immutable types that don't need processing
+
         if data is None or isinstance(data, (bool, int, float, complex)):
             return data
         
-        # Handle strings - the core normalization
+
         if isinstance(data, str):
             try:
-                # Normalize Unicode characters to ASCII
+
                 normalized = unicodedata.normalize("NFKD", data)
                 ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
                 return ascii_text
             except (UnicodeError, TypeError):
-                # Fallback for problematic strings
+
                 return str(data)
         
-        # Handle bytes - convert to string then normalize
+
         if isinstance(data, bytes):
             try:
                 decoded = data.decode('utf-8', errors='ignore')
@@ -84,38 +84,38 @@ class HTTPBasePlugin(BasePlugin):
             except UnicodeError:
                 return data.decode('ascii', errors='ignore')
         
-        # Handle lists - recursively process all elements
+
         if isinstance(data, list):
             return [self.normalize_text(item) for item in data]
         
-        # Handle tuples - recursively process all elements, preserve immutability
+
         if isinstance(data, tuple):
             return tuple(self.normalize_text(item) for item in data)
         
-        # Handle sets - recursively process all elements
+
         if isinstance(data, set):
             return {self.normalize_text(item) for item in data}
         
-        # Handle dictionaries - recursively process both keys and values
+
         if isinstance(data, dict):
             normalized_dict = {}
             for key, value in data.items():
-                # Normalize both keys and values
+
                 normalized_key = self.normalize_text(key)
                 normalized_value = self.normalize_text(value)
                 normalized_dict[normalized_key] = normalized_value
             return normalized_dict
         
-        # Handle other iterables (but not strings/bytes which are handled above)
+
         if hasattr(data, '__iter__') and not isinstance(data, (str, bytes)):
             try:
-                # Try to reconstruct the same type
+
                 return type(data)(self.normalize_text(item) for item in data)
             except (TypeError, ValueError):
-                # If reconstruction fails, return as list
+
                 return [self.normalize_text(item) for item in data]
         
-        # For any other type, return as-is (custom objects, functions, etc.)
+
         return data
     
     @property
@@ -162,17 +162,17 @@ class HTTPBasePlugin(BasePlugin):
         start_time = time.time()
         
         try:
-            # Handle different data types
+
             if isinstance(data, dict):
                 logger.info(f"🔍 HTTP_BASE_PLUGIN.execute: Processing dict data with {len(data)} keys")
-                # Process each field in the dictionary
+
                 enriched_data = data.copy()
                 
-                # Add enriched_fields section if not present
+                
                 if "enriched_fields" not in enriched_data:
                     enriched_data["enriched_fields"] = {}
                 
-                # Process fields that need enrichment
+
                 fields_to_enrich = getattr(context, 'fields_to_enrich', ['name', 'overview', 'description'])
                 logger.info(f"🔍 HTTP_BASE_PLUGIN.execute: fields_to_enrich={fields_to_enrich}")
                 
@@ -195,7 +195,7 @@ class HTTPBasePlugin(BasePlugin):
                 )
             
             else:
-                # For non-dict data, try to enrich directly
+
                 field_config = getattr(context, 'config', {})
                 enrichment = await self.enrich_field("data", data, field_config)
                 
@@ -228,7 +228,7 @@ class HTTPBasePlugin(BasePlugin):
     async def initialize(self, config: Dict[str, Any]) -> bool:
         """Initialize HTTP client."""
         try:
-            # Initialize HTTP session with reasonable defaults for plugins
+            
             connector = aiohttp.TCPConnector(
                 limit=50,
                 limit_per_host=20,
@@ -248,7 +248,7 @@ class HTTPBasePlugin(BasePlugin):
                 }
             )
             
-            # Initialize circuit breakers for known services
+            
             self._init_circuit_breakers()
             
             self._logger.info(f"Initialized HTTP plugin: {self.metadata.name}")
@@ -261,11 +261,11 @@ class HTTPBasePlugin(BasePlugin):
     def _init_circuit_breakers(self):
         """Initialize circuit breakers for actual docker services."""
         services = [
-            "conceptnet_service",  # Port 8001: ConceptNet
-            "gensim_service",      # Port 8006: Gensim similarity
-            "spacy_service",       # Port 8007: SpaCy NLP
-            "heideltime_service",  # Port 8008: HeidelTime temporal
-            "llm_service",         # Port 8002: LLM/Ollama operations  
+            "conceptnet_service",
+            "gensim_service",    
+            "spacy_service",     
+            "heideltime_service",
+            "llm_service",       
         ]
         
         for service_name in services:
@@ -332,16 +332,16 @@ class HTTPBasePlugin(BasePlugin):
         
         parsed = urlparse(url)
         
-        # Extract service name from hostname if present
+
         if parsed.hostname and parsed.hostname != "localhost":
-            # Remove common suffixes and extract service name
+            
             hostname = parsed.hostname
             if hostname.endswith("-service"):
                 return hostname.replace("-", "_")
             else:
                 return f"{hostname.replace('-', '_')}_service"
         
-        # Extract from port if localhost
+
         if parsed.port:
             return f"service_port_{parsed.port}"
         
@@ -357,7 +357,7 @@ class HTTPBasePlugin(BasePlugin):
         """Call service with circuit breaker and retry logic."""
         circuit_breaker = self.circuit_breakers.get(service_name)
         
-        # Check circuit breaker
+        
         if circuit_breaker and not circuit_breaker.can_execute():
             return HTTPResponse(
                 success=False,
@@ -367,7 +367,7 @@ class HTTPBasePlugin(BasePlugin):
                 service_name=service_name
             )
         
-        # Execute request with retries
+
         start_time = time.time()
         retry_attempts = 3
         retry_delay = 1.0
@@ -377,7 +377,7 @@ class HTTPBasePlugin(BasePlugin):
             try:
                 response = await self._execute_http_request(url, method, data)
                 
-                # Record success
+
                 if circuit_breaker:
                     circuit_breaker.record_success()
                 
@@ -391,7 +391,7 @@ class HTTPBasePlugin(BasePlugin):
                 if attempt < retry_attempts - 1:
                     await asyncio.sleep(retry_delay * (2 ** attempt))
         
-        # All attempts failed
+
         if circuit_breaker:
             circuit_breaker.record_failure()
         
@@ -427,7 +427,7 @@ class HTTPBasePlugin(BasePlugin):
                     timeout=timeout
                 ) as response:
                     return await self._process_response(response, start_time, url)
-            else:  # POST
+            else:
                 async with self.session.post(
                     url=url,
                     json=data,
@@ -547,13 +547,13 @@ class HTTPBasePlugin(BasePlugin):
         Returns:
             Complete service URL
         """
-        # Use configuration-based URL generation as fallback
-        # since this is a synchronous method and dynamic discovery is async
+        
+
         from src.shared.config import get_settings
         
         settings = get_settings()
         
-        # Map service names to settings properties
+
         service_url_mapping = {
             "conceptnet": settings.conceptnet_service_url,
             "gensim": settings.gensim_service_url,
@@ -567,7 +567,7 @@ class HTTPBasePlugin(BasePlugin):
             self._logger.error(f"No service URL configured for {service_name}")
             return None
             
-        # Construct full URL with endpoint
+
         if endpoint:
             return f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
         return base_url
@@ -585,6 +585,6 @@ class HTTPBasePlugin(BasePlugin):
         if plugin_name is None:
             plugin_name = self.metadata.name
             
-        # Use async configuration to determine service and endpoint
+        
         service_name, endpoint_path = await self.endpoint_mapper.get_service_and_endpoint(plugin_name)
         return self.get_service_url(service_name, endpoint_path)

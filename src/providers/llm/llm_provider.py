@@ -108,18 +108,18 @@ class LLMProvider(BaseProvider):
         start_time = datetime.now()
         
         try:
-            # Ensure provider is initialized
+
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("LLM provider not available", "LLM")
             
-            # Build context-aware prompt
+            
             prompt = self._build_concept_prompt(
                 request.concept,
                 request.media_context,
                 request.max_concepts
             )
             
-            # Create LLM request
+            
             llm_request = LLMRequest(
                 prompt=prompt,
                 concept=request.concept,
@@ -129,14 +129,14 @@ class LLMProvider(BaseProvider):
                 system_prompt=self._build_system_prompt(request.media_context)
             )
             
-            # Call LLM backend
+
             llm_response: LLMResponse = await self.client.generate_completion(llm_request)
             
             if not llm_response.success:
                 logger.warning(f"LLM completion failed: {llm_response.error_message}")
                 return None
             
-            # Parse concepts from LLM response
+
             concepts = self._parse_concepts_from_response(
                 llm_response.text,
                 request.max_concepts
@@ -146,17 +146,17 @@ class LLMProvider(BaseProvider):
                 logger.warning(f"No concepts extracted from LLM response for: {request.concept}")
                 return None
             
-            # Generate confidence scores
+
             confidence_scores = self._generate_confidence_scores(
                 concepts,
                 request.concept,
                 llm_response
             )
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create PluginResult using helper function
+            
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -203,7 +203,7 @@ class LLMProvider(BaseProvider):
                     "error": "No backend client"
                 }
             
-            # Check backend health
+            
             backend_health = await self.client.health_check()
             
             return {
@@ -231,18 +231,18 @@ class LLMProvider(BaseProvider):
         - Context-dependent concepts
         - Domain-specific terms
         """
-        # LLM handles most concepts well, especially complex ones
+
         if len(concept.split()) > 1:
-            # Compound terms - LLM's strength
+
             return True
         
         if media_context in ["movie", "book", "music", "tv"] and concept.lower() in [
             "action", "comedy", "drama", "horror", "thriller", "romance", "sci-fi", "fantasy"
         ]:
-            # Genre terms need context - LLM's strength
+
             return True
         
-        # LLM can handle most single concepts too
+
         return True
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
@@ -252,16 +252,16 @@ class LLMProvider(BaseProvider):
             "temperature": 0.3
         }
         
-        # Adjust based on concept complexity
+
         if " " in concept:
-            # Compound terms - can return more diverse results
+
             params["max_concepts"] = 12
             params["temperature"] = 0.4
         
-        # Genre concepts often have rich semantic networks
+
         if concept.lower() in ["action", "comedy", "drama", "horror", "thriller", "romance"]:
             params["max_concepts"] = 15
-            params["temperature"] = 0.2  # More focused for genres
+            params["temperature"] = 0.2
         
         return params
     
@@ -278,8 +278,8 @@ class LLMProvider(BaseProvider):
         Returns:
             Backend name to use
         """
-        # For now, default to Ollama (only implementation)
-        # Future: Check config for LLM_BACKEND setting
+
+
         return "ollama"
     
     def _create_backend_client(self, backend: str) -> Optional[BaseLLMClient]:
@@ -300,10 +300,10 @@ class LLMProvider(BaseProvider):
                 logger.error(f"Could not import Ollama backend: {e}")
                 return None
         
-        # Future backends:
-        # elif backend == "openai":
-        #     from src.providers.llm.openai_backend_client import OpenAIBackendClient
-        #     return OpenAIBackendClient()
+
+
+
+
         
         else:
             logger.error(f"Unknown LLM backend: {backend}")
@@ -330,12 +330,12 @@ Be specific to {media_context} content and avoid generic terms."""
     ) -> str:
         """Build context-aware prompt for concept expansion."""
         if self.client:
-            # Use backend-specific prompt building if available
+            
             return self.client.build_concept_expansion_prompt(
                 concept, media_context, max_concepts
             )
         
-        # Fallback generic prompt
+
         return f"""For the {media_context} concept "{concept}", provide {max_concepts} related concepts that would help users discover similar content.
 
 Focus on {media_context}-specific elements that share themes, mood, or appeal with "{concept}".
@@ -347,8 +347,8 @@ Related concepts:"""
     
     def _calculate_max_tokens(self, max_concepts: int) -> int:
         """Calculate maximum tokens needed for response."""
-        # Estimate: ~10 tokens per concept (including commas and spaces)
-        # Add buffer for potential longer concept names
+
+        
         return max_concepts * 15 + 50
     
     def _parse_concepts_from_response(
@@ -366,10 +366,10 @@ Related concepts:"""
         Returns:
             List of cleaned concept strings
         """
-        # Clean up the response
+
         text = response_text.strip()
         
-        # Remove common prefixes/suffixes that LLMs might add
+        
         prefixes_to_remove = [
             "Related concepts:", "Concepts:", "Related terms:", "Related movies:",
             "Similar concepts:", "Here are", "The related concepts are:"
@@ -379,19 +379,19 @@ Related concepts:"""
             if text.lower().startswith(prefix.lower()):
                 text = text[len(prefix):].strip()
         
-        # Split by commas and clean each concept
+
         concepts = []
         
-        # First try comma separation
+
         if "," in text:
             raw_concepts = text.split(",")
         else:
-            # Try newline separation as fallback
+
             raw_concepts = text.split("\n")
         
         for concept in raw_concepts:
             cleaned = self._clean_concept(concept)
-            if cleaned and len(cleaned) > 1:  # Skip very short concepts
+            if cleaned and len(cleaned) > 1:
                 concepts.append(cleaned)
                 
                 if len(concepts) >= max_concepts:
@@ -409,22 +409,22 @@ Related concepts:"""
         Returns:
             Cleaned concept string
         """
-        # Basic cleaning
+
         cleaned = concept.strip()
         
-        # Remove numbering (1., 2., etc.)
+        
         cleaned = re.sub(r'^\d+\.?\s*', '', cleaned)
         
-        # Remove bullet points
+        
         cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
         
-        # Remove quotes
+        
         cleaned = cleaned.strip('"\'')
         
-        # Remove extra whitespace
+        
         cleaned = re.sub(r'\s+', ' ', cleaned)
         
-        # Capitalize properly
+
         cleaned = cleaned.lower().strip()
         
         return cleaned
@@ -447,29 +447,29 @@ Related concepts:"""
             Dictionary mapping concept to confidence score
         """
         confidence_scores = {}
-        base_confidence = 0.8  # LLMs generally provide relevant concepts
+        base_confidence = 0.8
         
-        # Adjust base confidence based on response quality
+
         if llm_response.response_time_ms > 5000:
-            base_confidence *= 0.9  # Slightly lower for slow responses
+            base_confidence *= 0.9
         
         for i, concept in enumerate(concepts):
-            # Earlier concepts typically have higher confidence
-            position_factor = 1.0 - (i * 0.05)  # Decrease by 5% per position
-            position_factor = max(position_factor, 0.5)  # Minimum 50%
+
+            position_factor = 1.0 - (i * 0.05)
+            position_factor = max(position_factor, 0.5)
             
-            # Longer concepts might be more specific (good)
-            length_factor = min(len(concept) / 20.0, 1.2)  # Bonus for longer, cap at 20%
-            length_factor = max(length_factor, 0.8)  # Minimum 80%
+
+            length_factor = min(len(concept) / 20.0, 1.2)
+            length_factor = max(length_factor, 0.8)
             
-            # Similarity to original concept (very basic check)
+
             similarity_factor = 1.0
             if original_concept.lower() in concept.lower() or concept.lower() in original_concept.lower():
-                similarity_factor = 1.1  # Slight bonus for related terms
+                similarity_factor = 1.1
             
             final_confidence = base_confidence * position_factor * length_factor * similarity_factor
-            final_confidence = min(final_confidence, 0.95)  # Cap at 95%
-            final_confidence = max(final_confidence, 0.3)   # Floor at 30%
+            final_confidence = min(final_confidence, 0.95)
+            final_confidence = max(final_confidence, 0.3) 
             
             confidence_scores[concept] = round(final_confidence, 3)
         

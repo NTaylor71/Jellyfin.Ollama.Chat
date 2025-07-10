@@ -42,43 +42,26 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
         field_value: Any, 
         config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Enrich a field with ConceptNet keyword expansion.
-        
-        Args:
-            field_name: Name of the field being enriched
-            field_value: Value of the field
-            config: Plugin configuration
-            
-        Returns:
-            Dict containing ConceptNet expansion results
-        """
+        """Enrich a field with ConceptNet keyword expansion."""
         try:
-            # Extract keywords from field value
             if isinstance(field_value, str):
                 keywords = extract_key_concepts(field_value)
             elif isinstance(field_value, list):
-                # Handle list fields (e.g., genres, tags)
                 keywords = [str(item).strip() for item in field_value if str(item).strip()]
             else:
-                # Convert other types to string
                 keywords = extract_key_concepts(str(field_value))
             
             if not keywords:
                 self._logger.debug(f"No keywords found in field {field_name}")
                 return {"conceptnet_keywords": []}
             
-            # Limit keywords for API efficiency
             max_keywords = config.get("max_keywords", 5)
             keywords = keywords[:max_keywords]
             
             self._logger.debug(f"Expanding {len(keywords)} keywords using ConceptNet")
             
-            # Call ConceptNet service using direct HTTPBasePlugin routing
             service_url = await self.get_plugin_service_url()
             
-            # ConceptNet provider expects single concept string, not keywords array
-            # Convert keywords list to a single concept string
             concept_text = ", ".join(keywords)
             
             request_data = {
@@ -94,7 +77,6 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from ProviderResponse format
             if response.get("success", False):
                 result_data = response.get("result", {})
                 expanded_keywords = result_data.get("concepts", [])
@@ -120,12 +102,10 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"ConceptNet keyword expansion failed for field {field_name}: {e}")
-            # Return empty result on error
             return {
                 "conceptnet_keywords": [],
                 "original_keywords": [],
@@ -142,20 +122,10 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
         keywords: List[str], 
         config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """
-        Direct keyword expansion method for backwards compatibility.
-        
-        Args:
-            keywords: List of keywords to expand
-            config: Expansion configuration
-            
-        Returns:
-            Expansion results
-        """
+        """Direct keyword expansion method for backwards compatibility."""
         if config is None:
             config = {}
             
-        # Use enrich_field with dummy field info
         result = await self.enrich_field("keywords", keywords, config)
         return {
             "expanded_keywords": result.get("conceptnet_keywords", []),
@@ -163,25 +133,20 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
         }
     
     def _extract_keywords_from_text(self, text: str, max_keywords: int = 5) -> List[str]:
-        """Extract keywords from text using text utilities."""
         try:
             keywords = extract_key_concepts(text)
             return keywords[:max_keywords]
         except Exception as e:
             self._logger.warning(f"Failed to extract keywords: {e}")
-            # Fallback to simple word extraction
             words = text.lower().split()
-            # Filter out common stop words and short words
             stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
             keywords = [word for word in words if len(word) > 2 and word not in stop_words]
             return keywords[:max_keywords]
     
     async def health_check(self) -> Dict[str, Any]:
-        """Check plugin and service health."""
         base_health = await super().health_check()
         
         try:
-            # Test ConceptNet service connectivity
             service_url = self.get_service_url("keyword", "health")
             health_response = await self.http_get(service_url)
             

@@ -19,7 +19,7 @@ from src.providers.llm.base_llm_client import (
 from src.shared.config import get_settings
 from src.shared.hardware_config import get_resource_limits
 
-# Import will be added when config loader is stable
+
 try:
     from src.shared.model_config_loader import get_model_config_loader
     CONFIG_LOADER_AVAILABLE = True
@@ -44,16 +44,16 @@ class OllamaBackendClient(BaseLLMClient):
         self.model = self._get_ingestion_model()
         self.timeout = self.settings.OLLAMA_INGESTION_TIMEOUT
         
-        # HTTP client for API calls
+
         self._client: Optional[httpx.AsyncClient] = None
         
-        # Hardware awareness
+
         self._hardware_limits: Optional[Dict[str, Any]] = None
         self._model_info_cache: Optional[Dict[str, Any]] = None
         
-        # Rate limiting
+
         self._last_request_time = 0.0
-        self._min_request_interval = 0.1  # 10 requests per second max
+        self._min_request_interval = 0.1
         
         logger.info(f"Initialized Ollama client: {self.base_url}, model: {self.model}")
     
@@ -64,7 +64,7 @@ class OllamaBackendClient(BaseLLMClient):
                 config_loader = get_model_config_loader()
                 ollama_models = config_loader.get_models_for_service('ollama')
                 
-                # Look for chat model in YAML config
+
                 chat_model_config = ollama_models.get('chat_model')
                 if chat_model_config:
                     logger.info(f"Using ingestion model from YAML config: {chat_model_config.name}")
@@ -73,13 +73,13 @@ class OllamaBackendClient(BaseLLMClient):
             except Exception as e:
                 logger.warning(f"Failed to load ingestion model from YAML config: {e}")
         
-        # Fallback to environment variable or default
+
         try:
             model_name = self.settings.OLLAMA_INGESTION_MODEL
             logger.info(f"Using ingestion model from environment variable: {model_name}")
             return model_name
         except AttributeError:
-            # Final fallback if env var is not defined
+
             default_model = "mistral:latest"
             logger.info(f"Using default ingestion model: {default_model}")
             return default_model
@@ -87,22 +87,21 @@ class OllamaBackendClient(BaseLLMClient):
     async def initialize(self) -> bool:
         """Initialize the Ollama client and check availability."""
         try:
-            # Create HTTP client
+            
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout),
                 limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
             )
             
-            # Load hardware limits for optimization
+
             self._hardware_limits = await get_resource_limits()
             
-            # Test connection and load model info
             health_status = await self.health_check()
             if health_status.get("status") != "healthy":
                 logger.error(f"Ollama health check failed: {health_status}")
                 return False
             
-            # Cache model information
+
             self._model_info_cache = await self._fetch_model_info()
             
             logger.info("Ollama client initialized successfully")
@@ -128,23 +127,23 @@ class OllamaBackendClient(BaseLLMClient):
         start_time = datetime.now()
         
         try:
-            # Ensure client is initialized
+
             if not await self._ensure_initialized():
                 raise LLMClientNotAvailableError("Ollama client not available", "Ollama")
             
-            # Rate limiting
+
             await self._enforce_rate_limit()
             
-            # Build request payload
+            
             payload = self._build_request_payload(request)
             
-            # Make API call
+
             response_data = await self._make_api_call(payload)
             
-            # Parse response
+
             completion_text = self._extract_completion_text(response_data)
             
-            # Calculate execution time
+
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
             
             return LLMResponse(
@@ -187,7 +186,7 @@ class OllamaBackendClient(BaseLLMClient):
                     "error": "Client not initialized"
                 }
             
-            # Check if Ollama is running
+            
             response = await self._client.get(f"{self.base_url}/api/tags")
             
             if response.status_code != 200:
@@ -197,7 +196,7 @@ class OllamaBackendClient(BaseLLMClient):
                     "error": f"Ollama API returned status {response.status_code}"
                 }
             
-            # Check if our model is available
+            
             models_data = response.json()
             available_models = [model.get("name", "") for model in models_data.get("models", [])]
             model_available = any(self.model in model_name for model_name in available_models)
@@ -210,7 +209,7 @@ class OllamaBackendClient(BaseLLMClient):
                     "available_models": available_models
                 }
             
-            # Test a simple completion
+
             test_response = await self._test_completion()
             
             return {
@@ -261,19 +260,19 @@ class OllamaBackendClient(BaseLLMClient):
     
     def get_max_tokens(self) -> Optional[int]:
         """Get maximum token limit for the model."""
-        # Most Ollama models have context limits around 2048-4096 tokens
-        # Return a conservative estimate
+
+
         return 2048
     
     def get_recommended_temperature(self, concept_type: str) -> float:
         """Get recommended temperature for concept expansion."""
-        # Lower temperature for more focused concept expansion
+
         if concept_type in ["genre", "tag", "category"]:
-            return 0.2  # Very focused for categorical concepts
+            return 0.2
         elif concept_type in ["description", "overview"]:
-            return 0.4  # Slightly more creative for descriptive concepts
+            return 0.4
         else:
-            return 0.3  # Default focused temperature
+            return 0.3
     
     def build_concept_expansion_prompt(
         self,
@@ -282,7 +281,7 @@ class OllamaBackendClient(BaseLLMClient):
         max_concepts: int = 10
     ) -> str:
         """Build Ollama-optimized prompt for concept expansion."""
-        # Ollama works well with clear, direct prompts
+
         return f"""You are a {media_context} expert. For the concept "{concept}", list {max_concepts} related concepts that would help users find similar {media_context}s.
 
 Guidelines:
@@ -312,19 +311,19 @@ Related {media_context} concepts:"""
         payload = {
             "model": self.model,
             "prompt": request.prompt,
-            "stream": False,  # Use non-streaming for concept expansion
+            "stream": False,  
             "options": {
                 "temperature": request.temperature,
-                "num_predict": request.max_tokens or 200,  # Reasonable default for concept lists
-                "stop": ["\n\n", "Explanation:", "Note:"]  # Stop at explanations
+                "num_predict": request.max_tokens or 200,
+                "stop": ["\n\n", "Explanation:", "Note:"]
             }
         }
         
-        # Add system prompt if provided
+        
         if request.system_prompt:
             payload["system"] = request.system_prompt
         
-        # Add any extra parameters
+        
         if request.extra_params:
             payload["options"].update(request.extra_params)
         
@@ -388,7 +387,7 @@ Related {media_context} concepts:"""
     async def _test_completion(self) -> bool:
         """Test a simple completion to verify model functionality."""
         try:
-            # Direct API call to avoid recursion with generate_completion
+
             payload = {
                 "model": self.model,
                 "prompt": "Complete this: The sky is",

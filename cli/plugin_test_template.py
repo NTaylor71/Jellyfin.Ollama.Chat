@@ -11,7 +11,7 @@ import sys
 import time
 from typing import Dict, Any, Optional
 
-# Add project root to path
+
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -29,7 +29,7 @@ class PluginTestCLI:
         self.task_type = task_type
         self.settings = get_settings()
         
-        # Create a minimal resource pool for CLI testing  
+
         resource_config = {
             "cpu_cores": 1,
             "gpu_count": 0,
@@ -49,18 +49,18 @@ class PluginTestCLI:
         Returns:
             Plugin result or error info
         """
-        # Check Redis connection
+
         if not await self.queue_manager.health_check():
             return {"error": "Redis connection failed"}
         
-        # Enqueue task - data will be wrapped by ResourceAwareQueueManager
+
         task_data = {
             "plugin_name": self.plugin_name,
-            "plugin_type": "concept_expansion",  # ConceptNet is concept expansion
-            "data": test_data  # The actual plugin data
+            "plugin_type": "concept_expansion",
+            "data": test_data
         }
         
-        # Validate task data  
+
         is_valid, error_msg = validate_task_data(self.task_type, task_data)
         if not is_valid:
             return {"error": f"Invalid task data: {error_msg}"}
@@ -71,7 +71,7 @@ class PluginTestCLI:
                 task_type=self.task_type,
                 data=task_data,
                 plugin_name=self.plugin_name,
-                priority=10  # High priority for testing
+                priority=10
             )
             
             print(f"✓ Task enqueued with ID: {task_id}")
@@ -79,7 +79,7 @@ class PluginTestCLI:
             print(f"✓ Task type: {self.task_type}")
             print(f"✓ Waiting for result (timeout: {timeout}s)...")
             
-            # Wait for result
+
             result = await self._wait_for_result(task_id, timeout)
             
             if result:
@@ -96,7 +96,7 @@ class PluginTestCLI:
         start_time = time.time()
         
         while time.time() - start_time < timeout:
-            # Check for result
+
             result_key = f"result:{task_id}"
             result_data = await self.queue_manager.redis_client.get(result_key)
             
@@ -107,12 +107,12 @@ class PluginTestCLI:
                 except json.JSONDecodeError:
                     return {"error": "Invalid result format"}
             
-            # Check queue stats
+
             stats = await self.queue_manager.get_queue_stats()
             total_pending = stats['queues']['total_pending']
             failed_tasks = stats['queues']['failed_tasks']
             
-            # More informative status message
+
             if total_pending > 0:
                 print(f"⏳ Waiting... (queued: {total_pending}, failed: {failed_tasks})")
             else:
@@ -185,14 +185,14 @@ def format_result(result: Dict[str, Any], verbose: bool = False) -> str:
     if verbose:
         return f"✅ Success:\n{json.dumps(result, indent=2)}"
     else:
-        # Show key fields only - check nested data field first
+
         data = result.get("data", result)
         
         if "expanded_concepts" in data:
-            concepts = data["expanded_concepts"][:5]  # Show first 5
+            concepts = data["expanded_concepts"][:5]
             return f"✅ Success: {len(data['expanded_concepts'])} concepts: {concepts}"
         elif "expanded_keywords" in data:
-            keywords = data["expanded_keywords"][:5]  # Show first 5
+            keywords = data["expanded_keywords"][:5]
             return f"✅ Success: {len(data['expanded_keywords'])} keywords: {keywords}"
         elif "temporal_expressions" in data:
             return f"✅ Success: {len(data['temporal_expressions'])} temporal expressions found"
@@ -203,5 +203,5 @@ def format_result(result: Dict[str, Any], verbose: bool = False) -> str:
 
 
 if __name__ == "__main__":
-    # Example usage - this would be customized per plugin
+
     print("This is a template. Use specific plugin test scripts.")

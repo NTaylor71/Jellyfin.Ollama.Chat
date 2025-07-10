@@ -40,21 +40,21 @@ class ServiceProcess:
         try:
             logger.info(f"Starting {self.name} on port {self.port}...")
             
-            # Prepare environment
+
             env = dict(os.environ)
             env.update(self.env)
             
-            # Start process
+
             self.process = subprocess.Popen([
                 sys.executable, "-m", self.module
             ], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             self.start_time = time.time()
             
-            # Give it a moment to start
+
             await asyncio.sleep(2)
             
-            # Check if it's still running
+            
             if self.process.poll() is None:
                 logger.info(f"✅ {self.name} started successfully (PID: {self.process.pid})")
                 return True
@@ -78,15 +78,15 @@ class ServiceProcess:
         try:
             logger.info(f"Stopping {self.name}...")
             
-            # Send SIGTERM
+
             self.process.terminate()
             
-            # Wait for graceful shutdown
+
             try:
                 self.process.wait(timeout=10)
                 logger.info(f"✅ {self.name} stopped gracefully")
             except subprocess.TimeoutExpired:
-                # Force kill if necessary
+
                 logger.warning(f"Force killing {self.name}...")
                 self.process.kill()
                 self.process.wait()
@@ -128,10 +128,10 @@ class ServiceRunner:
         """Configure all services."""
         logger.info("Configuring services...")
         
-        # Split NLP Provider Services - ports from environment or defaults
+
         import os
         
-        # Use centralized configuration
+        
         from src.shared.config import get_settings
         settings = get_settings()
         
@@ -154,7 +154,7 @@ class ServiceRunner:
                 env={"PORT": str(port)}
             )
         
-        # LLM Provider Service  
+
         self.services["llm_provider"] = ServiceProcess(
             name="LLM Provider Service",
             module="src.services.provider_services.llm_provider_service",
@@ -209,7 +209,7 @@ class ServiceRunner:
         
         service = self.services[service_name]
         await service.stop()
-        await asyncio.sleep(1)  # Brief pause
+        await asyncio.sleep(1)
         return await service.start()
     
     def get_status(self) -> Dict[str, any]:
@@ -233,7 +233,7 @@ class ServiceRunner:
         """Run services until shutdown signal."""
         self.setup_signal_handlers()
         
-        # Start services
+
         if not await self.start_all(services):
             logger.error("Failed to start all services, exiting")
             return
@@ -241,15 +241,15 @@ class ServiceRunner:
         logger.info("All services started. Running until shutdown signal...")
         
         try:
-            # Monitor services
+
             while not self.shutdown_requested:
                 await asyncio.sleep(5)
                 
-                # Check for failed services
+                
                 for name, service in self.services.items():
                     if not service.is_running():
                         logger.warning(f"Service {name} has stopped unexpectedly")
-                        # Could implement auto-restart here
+
         
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received")
@@ -259,7 +259,7 @@ class ServiceRunner:
             await self.stop_all()
 
 
-# CLI interface
+
 async def main():
     """Main CLI entry point."""
     import argparse
@@ -277,13 +277,13 @@ async def main():
     
     args = parser.parse_args()
     
-    # Setup logging
+    
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     
-    # Create runner
+    
     runner = ServiceRunner()
     runner.configure_services()
     

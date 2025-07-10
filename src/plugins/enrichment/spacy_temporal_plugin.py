@@ -53,7 +53,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             Dict containing SpaCy temporal extraction results
         """
         try:
-            # Convert field value to text
+
             if isinstance(field_value, str):
                 text = field_value
             elif isinstance(field_value, list):
@@ -64,13 +64,13 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             if not text.strip():
                 self._logger.debug(f"No text found in field {field_name}")
                 result = {"spacy_temporal": []}
-                # Normalize all Unicode text in the result
+                
                 return self.normalize_text(result)
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using SpaCy")
             
-            # Call SpaCy temporal provider via dedicated SpaCy service
-            # SpaCy temporal provider expects ProviderRequest format
+            
+
             service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
@@ -89,10 +89,10 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from ProviderResponse format
+            
             if response.get("success", False):
                 result_data = response.get("result", {})
-                # SpaCy provider returns expanded_concepts containing temporal entities
+
                 temporal_entities = result_data.get("expanded_concepts", [])
                 metadata = response.get("metadata", {})
                 metadata.update(result_data.get("analysis", {}))
@@ -117,12 +117,12 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"SpaCy temporal extraction failed for field {field_name}: {e}")
-            # Return empty result on error
+            
             result = {
                 "spacy_temporal": [],
                 "original_text": "",
@@ -134,7 +134,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
     
     async def extract_temporal_entities(
@@ -155,14 +155,14 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
         if config is None:
             config = {}
             
-        # Use enrich_field with dummy field info
+        
         result = await self.enrich_field("text", text, config)
         response = {
             "temporal_entities": result.get("spacy_temporal", []),
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def extract_dates_only(
@@ -190,7 +190,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
         
         result = await self.enrich_field("text", text, config)
         
-        # Filter to only date entities
+
         temporal_entities = result.get("spacy_temporal", [])
         date_entities = [
             entity for entity in temporal_entities 
@@ -202,7 +202,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def normalize_temporal_expressions(
@@ -236,7 +236,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def health_check(self) -> Dict[str, Any]:
@@ -244,7 +244,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
         base_health = await super().health_check()
         
         try:
-            # Test SpaCy temporal service connectivity
+            
             service_url = self.get_service_url("temporal", "health")
             health_response = await self.http_get(service_url)
             

@@ -134,7 +134,7 @@ class HeidelTimeProviderManager(BaseService):
                 "error": self.initialization_error
             }
         
-        # Service status based on provider availability
+
         if self.initialization_state == "ready" and self.provider:
             service_status = "healthy"
         elif self.initialization_state == "initializing":
@@ -151,21 +151,21 @@ class HeidelTimeProviderManager(BaseService):
         )
 
 
-# Global provider manager
+
 provider_manager = HeidelTimeProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup
+
     await provider_manager.initialize_provider()
     yield
-    # Shutdown
+
     await provider_manager.cleanup_provider()
 
 
-# Create FastAPI app
+
 settings = get_settings()
 app = FastAPI(
     title="HeidelTime Provider Service",
@@ -174,7 +174,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -184,7 +184,7 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
-# Prometheus metrics
+
 if settings.ENABLE_METRICS:
     Instrumentator().instrument(app).expose(app)
 
@@ -238,10 +238,10 @@ async def expand_concept(request: ProviderRequest):
         provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Import ExpansionRequest
+
         from src.providers.nlp.base_provider import ExpansionRequest
         
-        # Create expansion request
+        
         expansion_request = ExpansionRequest(
             concept=request.concept,
             media_context=request.media_context,
@@ -250,7 +250,7 @@ async def expand_concept(request: ProviderRequest):
             options=request.options
         )
         
-        # Execute expansion
+
         result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -345,7 +345,7 @@ async def get_java_info():
     }
     
     try:
-        # Check Java version
+        
         result = subprocess.run(
             ["java", "-version"],
             capture_output=True,
@@ -372,7 +372,7 @@ async def get_java_info():
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.heideltime_service:app",
         host="0.0.0.0",

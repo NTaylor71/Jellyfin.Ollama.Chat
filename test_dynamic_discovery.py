@@ -15,10 +15,8 @@ async def test_dynamic_discovery():
     print("🔍 Testing Dynamic Service Discovery...")
     
     try:
-        # Initialize discovery
         discovery = await get_service_discovery()
         
-        # Test 1: Discover all services
         print("\n📡 Discovering all services...")
         services = await discovery.discover_all_services()
         
@@ -28,16 +26,14 @@ async def test_dynamic_discovery():
             print(f"     Type: {service.service_type}")
             print(f"     Capabilities: {service.capabilities}")
             
-            # Show discovered endpoints
             endpoints = service.metadata.get("available_endpoints", [])
             print(f"     Endpoints: {len(endpoints)} discovered")
-            for endpoint in endpoints[:5]:  # Show first 5
+            for endpoint in endpoints[:5]:
                 print(f"       - {endpoint}")
             if len(endpoints) > 5:
                 print(f"       ... and {len(endpoints) - 5} more")
             print()
         
-        # Test 2: Plugin routing
         print("\n🔌 Testing plugin routing...")
         test_plugins = [
             "ConceptNetKeywordPlugin",
@@ -56,7 +52,6 @@ async def test_dynamic_discovery():
             else:
                 print(f"  ❌ {plugin_name} -> No service found")
         
-        # Test 3: Capability queries
         print("\n🎯 Testing capability queries...")
         capabilities_to_test = ["conceptnet", "gensim", "llm_provider", "keywords"]
         
@@ -66,7 +61,6 @@ async def test_dynamic_discovery():
             for service in services_with_cap:
                 print(f"     - {service.service_name} ({service.status})")
         
-        # Test 4: Summary
         print("\n📊 Discovery Summary:")
         summary = discovery.get_discovery_summary()
         print(f"  Total services: {summary['total_services']}")
@@ -85,7 +79,6 @@ async def test_dynamic_discovery():
         return False
     
     finally:
-        # Cleanup
         try:
             await discovery.cleanup()
         except:

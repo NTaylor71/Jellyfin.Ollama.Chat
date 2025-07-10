@@ -30,10 +30,10 @@ class PluginLoader:
         try:
             logger.info("Initializing Plugin Loader...")
             
-            # Discover all plugin classes
+
             self._discover_plugin_classes()
             
-            # Instantiate and initialize all plugins
+
             await self._instantiate_plugins()
             
             logger.info(f"✅ Plugin Loader initialized. {len(self.plugins)} plugins available.")
@@ -47,7 +47,7 @@ class PluginLoader:
         """Cleanup resources."""
         logger.info("Cleaning up plugins...")
         
-        # Cleanup all plugin instances
+
         for plugin_name, plugin in self.plugins.items():
             try:
                 await plugin.cleanup()
@@ -63,7 +63,7 @@ class PluginLoader:
         """Discover all available plugin classes."""
         logger.info("Discovering plugin classes...")
         
-        # Find enrichment plugins by reading actual class names from files
+
         enrichment_dir = Path("src/plugins/enrichment")
         if not enrichment_dir.exists():
             logger.error(f"Plugin directory not found: {enrichment_dir}")
@@ -73,7 +73,7 @@ class PluginLoader:
             class_name = self._extract_class_name_from_file(plugin_file)
             if class_name:
                 self.discovered_plugins.add(class_name)
-                # Load the actual plugin class
+
                 plugin_class = self._load_plugin_class(plugin_file, class_name)
                 if plugin_class:
                     self.plugin_classes[class_name] = plugin_class
@@ -86,10 +86,10 @@ class PluginLoader:
         
         for class_name, plugin_class in self.plugin_classes.items():
             try:
-                # Create plugin instance
+                
                 plugin_instance = plugin_class()
                 
-                # Initialize the plugin
+                
                 if await plugin_instance.initialize({}):
                     self.plugins[class_name] = plugin_instance
                     logger.debug(f"Initialized plugin: {class_name}")
@@ -106,7 +106,7 @@ class PluginLoader:
         try:
             with open(plugin_file, 'r') as f:
                 content = f.read()
-                # Find class definition that inherits from HTTPBasePlugin
+
                 import re
                 match = re.search(r'class\s+(\w+Plugin)\s*\(HTTPBasePlugin\)', content)
                 if match:
@@ -121,18 +121,18 @@ class PluginLoader:
     def _load_plugin_class(self, plugin_file: Path, class_name: str) -> Optional[Type[HTTPBasePlugin]]:
         """Load a plugin class from file."""
         try:
-            # Convert file path to module path
+
             module_path = str(plugin_file).replace('/', '.').replace('\\', '.').replace('.py', '')
             
-            # Import the module
+
             spec = importlib.util.spec_from_file_location(module_path, plugin_file)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             
-            # Get the plugin class
+            
             plugin_class = getattr(module, class_name)
             
-            # Verify it's a HTTPBasePlugin subclass
+
             if issubclass(plugin_class, HTTPBasePlugin):
                 logger.debug(f"Loaded plugin class: {class_name}")
                 return plugin_class
@@ -163,11 +163,11 @@ class PluginLoader:
             )
         
         try:
-            # Get the plugin instance
+            
             plugin = self.plugins[plugin_name]
             logger.info(f"🔍 EXECUTE_PLUGIN: Found plugin instance: {plugin.__class__.__name__}")
             
-            # Execute the plugin directly
+
             logger.info(f"🔍 EXECUTE_PLUGIN: About to call plugin.execute() with data type {type(data)}")
             result = await plugin.execute(data, context)
             
@@ -201,7 +201,7 @@ class PluginLoader:
         logger.info(f"🔍 PLUGIN_LOADER: route_task_to_plugin called with task_type={task_type}")
         logger.info(f"🔍 PLUGIN_LOADER: task_data keys: {list(task_data.keys())}")
         
-        # Extract plugin info from task data
+
         inner_data = task_data.get("data", {})
         plugin_name = inner_data.get("plugin_name")
         plugin_type = inner_data.get("plugin_type")
@@ -216,7 +216,7 @@ class PluginLoader:
                 error_message="Missing plugin_name or plugin_type"
             )
         
-        # Create execution context
+        
         context = PluginExecutionContext(
             user_id=inner_data.get("user_id"),
             session_id=inner_data.get("session_id"),
@@ -224,7 +224,7 @@ class PluginLoader:
             execution_timeout=inner_data.get("timeout", 30.0)
         )
         
-        # Execute plugin directly (no routing layers)
+
         logger.info(f"🔍 PLUGIN_LOADER: About to call execute_plugin with data keys: {list(inner_data.get('data', {}).keys())}")
         result = await self.execute_plugin(
             plugin_name=plugin_name,

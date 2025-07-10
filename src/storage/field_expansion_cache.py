@@ -80,34 +80,34 @@ class FieldExpansionCache:
         try:
             collection = await self.collection
             
-            # Define indexes
+
             indexes = [
-                # Primary unique index for cache key lookups
+
                 IndexModel([("cache_key", ASCENDING)], unique=True, name="cache_key_unique"),
                 
-                # Compound index for field-based queries
+
                 IndexModel([("field_name", ASCENDING), ("input_value", ASCENDING)], name="field_value_idx"),
                 
-                # Compound index for field + media type queries
+
                 IndexModel([("field_name", ASCENDING), ("media_type", ASCENDING)], name="field_media_idx"),
                 
-                # Index for expansion type queries (plugin-specific)
+
                 IndexModel([("expansion_type", ASCENDING)], name="expansion_type_idx"),
                 
-                # TTL index for automatic expiration
+
                 IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0, name="ttl_idx"),
                 
-                # Index for created_at (monitoring, cleanup)
+
                 IndexModel([("created_at", ASCENDING)], name="created_at_idx"),
                 
-                # Text index for fuzzy search on expansion results
+
                 IndexModel([("expansion_result", TEXT)], name="expansion_result_text"),
                 
-                # Compound index for confidence-based queries
+
                 IndexModel([("overall_confidence", ASCENDING)], name="confidence_idx")
             ]
             
-            # Create indexes
+            
             await collection.create_indexes(indexes)
             logger.info(f"FieldExpansionCache collection initialized with {len(indexes)} indexes")
             return True
@@ -130,7 +130,7 @@ class FieldExpansionCache:
             collection = await self.collection
             cache_doc = result.to_cache_document()
             
-            # Insert or update the cache document
+
             await collection.replace_one(
                 {"cache_key": cache_doc["cache_key"]},
                 cache_doc,
@@ -157,22 +157,22 @@ class FieldExpansionCache:
         try:
             collection = await self.collection
             
-            # Convert CacheKey to string if needed
+
             key_str = cache_key.generate_key() if isinstance(cache_key, CacheKey) else cache_key
             
-            # Find document
+
             doc = await collection.find_one({"cache_key": key_str})
             
             if not doc:
                 logger.debug(f"No cached result found for key: {key_str}")
                 return None
             
-            # Check if expired (fallback check if TTL didn't clean up yet)
+            
             if doc.get("expires_at") and doc["expires_at"] < datetime.utcnow().timestamp():
                 logger.debug(f"Cached result expired for key: {key_str}")
                 return None
             
-            # Convert back to PluginResult
+
             result = PluginResult.from_cache_document(doc)
             logger.debug(f"Retrieved cached result for key: {key_str}")
             return result
@@ -194,10 +194,10 @@ class FieldExpansionCache:
         try:
             collection = await self.collection
             
-            # Convert CacheKey to string if needed
+
             key_str = cache_key.generate_key() if isinstance(cache_key, CacheKey) else cache_key
             
-            # Check existence with minimal data transfer
+            
             doc = await collection.find_one(
                 {"cache_key": key_str},
                 {"_id": 1, "expires_at": 1}
@@ -206,7 +206,7 @@ class FieldExpansionCache:
             if not doc:
                 return False
             
-            # Check if expired
+            
             if doc.get("expires_at") and doc["expires_at"] < datetime.utcnow().timestamp():
                 return False
             
@@ -226,10 +226,10 @@ class FieldExpansionCache:
         try:
             collection = await self.collection
             
-            # Basic stats
+
             total_docs = await collection.count_documents({})
             
-            # Stats by expansion type
+
             pipeline = [
                 {"$group": {
                     "_id": "$expansion_type",
@@ -245,7 +245,7 @@ class FieldExpansionCache:
                     "avg_confidence": doc.get("avg_confidence", 0.0)
                 }
             
-            # Recent activity (last 24 hours)
+
             recent_cutoff = datetime.utcnow() - timedelta(hours=24)
             recent_docs = await collection.count_documents({
                 "created_at": {"$gte": recent_cutoff}
@@ -272,7 +272,7 @@ class FieldExpansionCache:
         try:
             collection = await self.collection
             
-            # Find expired entries
+
             current_time = datetime.utcnow().timestamp()
             result = await collection.delete_many({
                 "expires_at": {"$lt": current_time}
@@ -298,8 +298,8 @@ class FieldExpansionCache:
         Returns:
             Dictionary of term -> success status
         """
-        # This is a placeholder for future cache warming implementation
-        # Will be implemented when we have concept expansion plugins
+
+
         logger.info(f"Cache warming requested for {len(terms)} terms (not implemented yet)")
         return {term: False for term in terms}
     
@@ -308,7 +308,7 @@ class FieldExpansionCache:
         return self.client.get_collection_info(self.COLLECTION_NAME)
 
 
-# Global cache instance
+
 _field_expansion_cache: Optional[FieldExpansionCache] = None
 
 
@@ -320,7 +320,7 @@ def get_field_expansion_cache() -> FieldExpansionCache:
     return _field_expansion_cache
 
 
-# Backward compatibility alias
+
 def get_concept_cache() -> FieldExpansionCache:
     """Backward compatibility alias. Use get_field_expansion_cache() for new code."""
     return get_field_expansion_cache()

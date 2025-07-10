@@ -64,7 +64,7 @@ class CacheAdmin:
         try:
             collection = await self.cache.collection
             
-            # Use regex to match cache keys
+            
             query = {"cache_key": {"$regex": pattern, "$options": "i"}}
             result = await collection.delete_many(query)
             
@@ -126,10 +126,10 @@ class CacheAdmin:
         try:
             collection = await self.cache.collection
             
-            # Basic counts
+
             total_docs = await collection.count_documents({})
             
-            # Count by expansion type
+
             pipeline = [
                 {"$group": {
                     "_id": "$expansion_type",
@@ -145,7 +145,7 @@ class CacheAdmin:
                     "avg_concepts": round(doc.get("avg_concepts", 0), 2)
                 }
             
-            # Recent entries
+
             recent_docs = []
             async for doc in collection.find({}, {
                 "cache_key": 1, 
@@ -190,10 +190,10 @@ class CacheAdmin:
         try:
             collection = await self.cache.collection
             
-            # Get entries with pagination
+            
             entries = []
             async for doc in collection.find({}).skip(skip).limit(limit).sort("created_at", -1):
-                # Convert ObjectId to string for JSON serialization
+
                 doc["_id"] = str(doc["_id"])
                 entries.append(doc)
             
@@ -218,7 +218,7 @@ class CacheAdmin:
             }
 
 
-# Global admin instance
+
 _cache_admin: Optional[CacheAdmin] = None
 
 
@@ -230,7 +230,7 @@ def get_cache_admin() -> CacheAdmin:
     return _cache_admin
 
 
-# Convenience functions for testing
+
 async def clear_test_cache():
     """Clear all cache for fresh testing. Use at start of test suites."""
     admin = get_cache_admin()
@@ -263,18 +263,18 @@ async def print_cache_summary():
 
 
 if __name__ == "__main__":
-    # Example usage
+
     async def main():
         print("🧹 Cache Admin Demo")
         
-        # Show current cache
+
         await print_cache_summary()
         
-        # Clear all cache
+
         result = await clear_test_cache()
         print(f"\n🗑️  {result['message']}")
         
-        # Show empty cache
+
         await print_cache_summary()
     
     asyncio.run(main())

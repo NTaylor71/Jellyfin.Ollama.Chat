@@ -32,7 +32,7 @@ class LLMResponse:
         if not self.success and not self.error_message:
             self.error_message = "Unknown error occurred"
         
-        # Ensure metadata is not None
+
         if self.metadata is None:
             self.metadata = {}
 
@@ -60,7 +60,7 @@ class LLMRequest:
         if not self.concept.strip():
             raise ValueError("Concept cannot be empty")
         
-        # Ensure extra_params is not None
+
         if self.extra_params is None:
             self.extra_params = {}
 
@@ -170,7 +170,7 @@ class BaseLLMClient(ABC):
         Returns:
             Recommended temperature value (0.0-1.0)
         """
-        # Default: Lower temperature for more focused concept expansion
+
         return 0.3
     
     def build_concept_expansion_prompt(

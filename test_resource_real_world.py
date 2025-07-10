@@ -10,7 +10,7 @@ import time
 import httpx
 from typing import Dict, Any
 
-# Setup logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ async def test_real_plugin_execution():
     
     async with httpx.AsyncClient(timeout=60.0) as client:
         
-        # Test 1: Submit CPU tasks (should run up to 3 in parallel)
+
         logger.info("\n📋 Test 1: CPU Tasks (ConceptNet, Gensim, SpaCy)")
         cpu_tasks = []
         
@@ -61,7 +61,7 @@ async def test_real_plugin_execution():
         
         logger.info(f"📊 CPU Tasks: {len(cpu_tasks)}/{len(test_concepts)} successful")
         
-        # Test 2: Submit GPU task (LLM - should run exclusively)
+
         logger.info("\n📋 Test 2: GPU Task (LLM Keyword Expansion)")
         
         gpu_task_data = {
@@ -87,7 +87,7 @@ async def test_real_plugin_execution():
                 logger.info(f"✅ GPU task completed in {execution_time:.2f}s: {result.get('success', False)}")
                 if result.get('success'):
                     logger.info(f"   Result: {len(result.get('result', {}))} LLM-generated keywords")
-                    # Log actual keywords to prove it's real
+
                     keywords = result.get('result', {}).get('expanded_concepts', [])
                     if keywords:
                         logger.info(f"   Keywords: {', '.join(keywords[:5])}...")
@@ -97,7 +97,7 @@ async def test_real_plugin_execution():
         except Exception as e:
             logger.error(f"❌ GPU task error: {e}")
         
-        # Test 3: Mixed workload to test resource management
+
         logger.info("\n📋 Test 3: Mixed CPU/GPU Workload")
         
         mixed_tasks = [
@@ -130,10 +130,10 @@ async def test_real_plugin_execution():
                     results.append((plugin_name, success, execution_time))
                     
                     if success and result.get('result'):
-                        # Log actual results to prove it's real
+
                         result_data = result.get('result', {})
                         if isinstance(result_data, dict):
-                            for key, value in list(result_data.items())[:2]:  # First 2 keys
+                            for key, value in list(result_data.items())[:2]:
                                 logger.info(f"   {key}: {str(value)[:60]}...")
                 else:
                     logger.error(f"❌ {description} failed: {response.status_code}")
@@ -161,7 +161,7 @@ async def monitor_worker_resources():
             if response.status_code == 200:
                 metrics = response.text
                 
-                # Extract key metrics
+
                 task_processed = 0
                 task_failed = 0
                 
@@ -188,7 +188,7 @@ async def test_queue_behavior():
     
     logger.info("\n📋 Testing queue resource behavior...")
     
-    # Check queue stats via Redis
+
     try:
         import redis.asyncio as redis
         
@@ -198,7 +198,7 @@ async def test_queue_behavior():
             decode_responses=True
         )
         
-        # Check current queue state
+
         cpu_queue_size = await redis_client.zcard("ingestion:queue:cpu")
         gpu_queue_size = await redis_client.zcard("ingestion:queue:gpu")
         dead_letter_size = await redis_client.llen("ingestion:dead_letter")
@@ -220,7 +220,7 @@ async def main():
     logger.info("🚀 Starting REAL-WORLD resource-aware queue test")
     logger.info("📋 Testing with actual service calls, real data, no mocking!")
     
-    # Check all services are healthy first
+
     services = [
         ("Router", "http://localhost:8003/health"),
         ("ConceptNet", "http://localhost:8001/health"),
@@ -251,11 +251,11 @@ async def main():
         logger.error("❌ Some services are unhealthy. Cannot proceed with tests.")
         return
     
-    # Run the actual tests
+
     await test_queue_behavior()
     await test_real_plugin_execution()
     await monitor_worker_resources()
-    await test_queue_behavior()  # Check final state
+    await test_queue_behavior()
     
     logger.info("\n🎉 REAL-WORLD test completed!")
     logger.info("📊 Resource-aware queue system working with actual services and data!")

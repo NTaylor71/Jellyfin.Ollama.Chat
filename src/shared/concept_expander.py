@@ -33,14 +33,14 @@ logger = logging.getLogger(__name__)
 
 class ExpansionMethod(Enum):
     """Available concept expansion methods with their capabilities."""
-    CONCEPTNET = "conceptnet"      # Literal/linguistic relationships, context-unaware
-    LLM = "llm"                    # Semantic understanding, context-aware
-    GENSIM = "gensim"              # Statistical similarity, corpus-based
-    SPACY_TEMPORAL = "spacy_temporal"  # Temporal parsing, time-aware
-    HEIDELTIME = "heideltime"      # Temporal extraction, context-aware
-    SUTIME = "sutime"              # Temporal understanding, rule-based
-    MULTI_SOURCE = "multi_source"  # Combined semantic + literal + temporal
-    AUTO = "auto"                  # Choose best method automatically
+    CONCEPTNET = "conceptnet"    
+    LLM = "llm"                  
+    GENSIM = "gensim"            
+    SPACY_TEMPORAL = "spacy_temporal"
+    HEIDELTIME = "heideltime"    
+    SUTIME = "sutime"            
+    MULTI_SOURCE = "multi_source"
+    AUTO = "auto"                
 
 
 class ConceptExpander:
@@ -58,7 +58,7 @@ class ConceptExpander:
     Example Usage:
         expander = ConceptExpander()
         concepts = await expander.expand_concept("action", "movie")
-        # Returns: ["fight", "combat", "battle", "intense", "fast-paced"]
+
     """
     
     def __init__(self, cache_strategy: CacheStrategy = CacheStrategy.CACHE_FIRST):
@@ -71,7 +71,7 @@ class ConceptExpander:
         self.cache_strategy = cache_strategy
         self.cache_manager = get_cache_manager()
         
-        # Initialize providers
+        
         self.conceptnet_provider = ConceptNetProvider()
         self.llm_provider = LLMProvider()
         self.gensim_provider = GensimProvider()
@@ -79,7 +79,7 @@ class ConceptExpander:
         self.heideltime_provider = HeidelTimeProvider()
         self.sutime_provider = SUTimeProvider()
         
-        # Initialize procedural temporal intelligence
+        
         self.temporal_concept_generator = TemporalConceptGenerator(cache_strategy)
         
         self.providers = {
@@ -91,7 +91,7 @@ class ConceptExpander:
             ExpansionMethod.SUTIME: self.sutime_provider
         }
         
-        # Method capabilities for intelligent selection
+
         self.method_capabilities = {
             ExpansionMethod.CONCEPTNET: {
                 "type": "literal",
@@ -162,12 +162,12 @@ class ConceptExpander:
             result = await expander.expand_concept("action", "movie")
             if result and result.success:
                 expanded = result.enhanced_data["expanded_concepts"]
-                # ["fight", "combat", "battle", "intense", "fast-paced"]
+
         """
         start_time = datetime.now()
         
         try:
-            # Generate cache key based on expansion method
+
             cache_type = self._method_to_cache_type(method)
             cache_key = self.cache_manager.generate_cache_key(
                 cache_type=cache_type,
@@ -176,7 +176,7 @@ class ConceptExpander:
                 media_context=media_context
             )
             
-            # Use cache manager's get_or_compute pattern
+            
             result = await self.cache_manager.get_or_compute(
                 cache_key=cache_key,
                 compute_func=lambda: self._compute_expansion(
@@ -235,11 +235,11 @@ class ConceptExpander:
                 concept, media_context, field_name, max_concepts, start_time
             )
         elif method == ExpansionMethod.MULTI_SOURCE:
-            # Placeholder for Stage 3.3 - Multi-source fusion
+
             logger.info(f"Multi-source expansion not implemented yet (Stage 3.3)")
             return None
         elif method == ExpansionMethod.AUTO:
-            # For now, default to ConceptNet. In Stage 3.3, choose best method
+
             return await self._expand_with_conceptnet(
                 concept, media_context, field_name, max_concepts, start_time
             )
@@ -261,12 +261,12 @@ class ConceptExpander:
         Returns PluginResult in the standard format for caching.
         """
         try:
-            # Ensure provider is initialized
+
             if not await self.conceptnet_provider._ensure_initialized():
                 logger.error("ConceptNet provider not available")
                 return None
             
-            # Create expansion request
+            
             request = ExpansionRequest(
                 concept=concept,
                 media_context=media_context,
@@ -274,7 +274,7 @@ class ConceptExpander:
                 field_name=field_name
             )
             
-            # Call ConceptNet provider
+
             result = await self.conceptnet_provider.expand_concept(request)
             
             if result is None:
@@ -301,12 +301,12 @@ class ConceptExpander:
         Returns PluginResult in the standard format for caching.
         """
         try:
-            # Ensure provider is initialized
+
             if not await self.llm_provider._ensure_initialized():
                 logger.error("LLM provider not available")
                 return None
             
-            # Create expansion request
+            
             request = ExpansionRequest(
                 concept=concept,
                 media_context=media_context,
@@ -314,7 +314,7 @@ class ConceptExpander:
                 field_name=field_name
             )
             
-            # Call LLM provider
+
             result = await self.llm_provider.expand_concept(request)
             
             if result is None:
@@ -341,12 +341,12 @@ class ConceptExpander:
         Returns PluginResult in the standard format for caching.
         """
         try:
-            # Ensure provider is initialized
+
             if not await self.gensim_provider._ensure_initialized():
                 logger.error("Gensim provider not available")
                 return None
             
-            # Create expansion request
+            
             request = ExpansionRequest(
                 concept=concept,
                 media_context=media_context,
@@ -354,7 +354,7 @@ class ConceptExpander:
                 field_name=field_name
             )
             
-            # Call Gensim provider
+
             result = await self.gensim_provider.expand_concept(request)
             
             if result is None:
@@ -384,12 +384,12 @@ class ConceptExpander:
             all_concepts = []
             all_confidence_scores = {}
             
-            # Try pure SpaCy temporal parsing first
+
             if await self.spacy_temporal_provider._ensure_initialized():
                 request = ExpansionRequest(
                     concept=concept,
                     media_context=media_context,
-                    max_concepts=max_concepts // 2,  # Reserve half for intelligence
+                    max_concepts=max_concepts // 2,
                     field_name=field_name
                 )
                 
@@ -401,7 +401,7 @@ class ConceptExpander:
                     all_confidence_scores.update(parsed_scores)
                     logger.debug(f"SpaCy parsed {len(parsed_concepts)} temporal concepts")
             
-            # Add procedural temporal intelligence
+            
             temporal_request = TemporalConceptRequest(
                 temporal_term=concept,
                 media_context=media_context,
@@ -420,7 +420,7 @@ class ConceptExpander:
                 logger.warning(f"No temporal concepts found for: {concept}")
                 return None
             
-            # Remove duplicates while preserving order
+            
             unique_concepts = []
             seen = set()
             for concept_item in all_concepts:
@@ -428,14 +428,14 @@ class ConceptExpander:
                     unique_concepts.append(concept_item)
                     seen.add(concept_item)
             
-            # Limit to max_concepts
+
             final_concepts = unique_concepts[:max_concepts]
             final_scores = {c: all_confidence_scores.get(c, 0.7) for c in final_concepts}
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create combined result
+            
             return create_field_expansion_result(
                 field_name=field_name,
                 input_value=concept,
@@ -479,7 +479,7 @@ class ConceptExpander:
             all_concepts = []
             all_confidence_scores = {}
             
-            # Try pure HeidelTime parsing first
+
             if await self.heideltime_provider._ensure_initialized():
                 request = ExpansionRequest(
                     concept=concept,
@@ -496,7 +496,7 @@ class ConceptExpander:
                     all_confidence_scores.update(parsed_scores)
                     logger.debug(f"HeidelTime extracted {len(parsed_concepts)} temporal concepts")
             
-            # Add procedural temporal intelligence
+            
             temporal_request = TemporalConceptRequest(
                 temporal_term=concept,
                 media_context=media_context,
@@ -515,7 +515,7 @@ class ConceptExpander:
                 logger.warning(f"No temporal concepts found for: {concept}")
                 return None
             
-            # Remove duplicates and limit
+            
             unique_concepts = []
             seen = set()
             for concept_item in all_concepts:
@@ -526,10 +526,10 @@ class ConceptExpander:
             final_concepts = unique_concepts[:max_concepts]
             final_scores = {c: all_confidence_scores.get(c, 0.7) for c in final_concepts}
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create combined result
+            
             return create_field_expansion_result(
                 field_name=field_name,
                 input_value=concept,
@@ -571,7 +571,7 @@ class ConceptExpander:
             all_concepts = []
             all_confidence_scores = {}
             
-            # Try pure SUTime parsing first
+
             if await self.sutime_provider._ensure_initialized():
                 request = ExpansionRequest(
                     concept=concept,
@@ -594,7 +594,7 @@ class ConceptExpander:
                 else:
                     logger.info("🔍 SUTime parsing failed or returned no results")
             
-            # Add procedural temporal intelligence
+            
             temporal_request = TemporalConceptRequest(
                 temporal_term=concept,
                 media_context=media_context,
@@ -619,7 +619,7 @@ class ConceptExpander:
                 logger.warning(f"No temporal concepts found for: {concept}")
                 return None
             
-            # Remove duplicates and limit
+            
             unique_concepts = []
             seen = set()
             for concept_item in all_concepts:
@@ -630,10 +630,10 @@ class ConceptExpander:
             final_concepts = unique_concepts[:max_concepts]
             final_scores = {c: all_confidence_scores.get(c, 0.7) for c in final_concepts}
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create combined result
+            
             return create_field_expansion_result(
                 field_name=field_name,
                 input_value=concept,
@@ -668,7 +668,7 @@ class ConceptExpander:
             ExpansionMethod.HEIDELTIME: CacheType.HEIDELTIME,
             ExpansionMethod.SUTIME: CacheType.SUTIME,
             ExpansionMethod.MULTI_SOURCE: CacheType.CUSTOM,
-            ExpansionMethod.AUTO: CacheType.CONCEPTNET  # Default for now
+            ExpansionMethod.AUTO: CacheType.CONCEPTNET
         }
         return mapping.get(method, CacheType.CONCEPTNET)
     
@@ -695,8 +695,8 @@ class ConceptExpander:
         """
         results = {}
         
-        # Process concepts sequentially to respect rate limits
-        # In future, could batch cache checks then parallelize API calls
+
+
         for concept in concepts:
             result = await self.expand_concept(
                 concept=concept,
@@ -738,29 +738,29 @@ class ConceptExpander:
         Returns:
             Recommended ExpansionMethod
         """
-        # Simple heuristics for method selection
+
         if " " in concept or len(concept.split()) > 1:
-            # Compound terms - LLM is better for context
+
             return ExpansionMethod.LLM
         elif media_context in ["movie", "book", "music"] and concept in ["action", "comedy", "drama", "horror", "thriller"]:
-            # Genre terms need context - LLM is better
+
             return ExpansionMethod.LLM
         else:
-            # Single words, factual lookup - ConceptNet is fine
+
             return ExpansionMethod.CONCEPTNET
     
     async def close(self) -> None:
         """Clean up resources."""
-        # Close all providers
+
         for provider in self.providers.values():
             await provider.close()
         
-        # Close temporal concept generator
+
         if self.temporal_concept_generator:
             await self.temporal_concept_generator.close()
 
 
-# Global expander instance for reuse
+
 _concept_expander: Optional[ConceptExpander] = None
 
 

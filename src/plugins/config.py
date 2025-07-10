@@ -24,7 +24,7 @@ class ConfigSource(str, Enum):
     FILE = "file"
     ENVIRONMENT = "environment"
     RUNTIME = "runtime"
-    MONGODB = "mongodb"  # For future use
+    MONGODB = "mongodb"
 
 
 @dataclass
@@ -45,7 +45,7 @@ class ConfigValue:
 class BasePluginConfig(BaseModel):
     """Base class for plugin configuration models."""
     
-    # Common configuration fields
+
     enabled: bool = Field(default=True, description="Whether the plugin is enabled")
     debug: bool = Field(default=False, description="Enable debug logging for this plugin")
     timeout_seconds: float = Field(default=30.0, ge=0.1, le=300.0, description="Plugin execution timeout")
@@ -53,7 +53,7 @@ class BasePluginConfig(BaseModel):
     
     class Config:
         """Pydantic configuration."""
-        extra = "allow"  # Allow additional fields
+        extra = "allow"
         validate_assignment = True
         use_enum_values = True
 
@@ -70,20 +70,20 @@ class PluginConfigManager:
         self._config_file_path: Optional[Path] = None
         self._env_prefix = f"PLUGIN_{plugin_name.upper().replace('-', '_')}_"
         
-        # Create config directory if it doesn't exist
+        
         self.config_dir.mkdir(parents=True, exist_ok=True)
     
     def _get_config_file_path(self) -> Path:
         """Get the path to the plugin's config file."""
         if self._config_file_path is None:
-            # Try multiple formats
+
             for ext in ['.yml', '.yaml', '.json']:
                 path = self.config_dir / f"{self.plugin_name}{ext}"
                 if path.exists():
                     self._config_file_path = path
                     break
             else:
-                # Default to yaml
+
                 self._config_file_path = self.config_dir / f"{self.plugin_name}.yml"
         
         return self._config_file_path
@@ -92,10 +92,10 @@ class PluginConfigManager:
         """Load default configuration from the config class."""
         config_dict = {}
         
-        # Get field defaults from Pydantic model (compatible with Pydantic 2.x)
+        
         for field_name, field_info in self.config_class.model_fields.items():
             default_value = field_info.default
-            if default_value is not ...:  # Ellipsis means no default
+            if default_value is not ...:
                 config_dict[field_name] = default_value
                 self.config_values[field_name] = ConfigValue(
                     value=default_value,
@@ -119,7 +119,7 @@ class PluginConfigManager:
                 else:
                     file_config = yaml.safe_load(f)
             
-            # Update config values with file source
+            
             for key, value in file_config.items():
                 self.config_values[key] = ConfigValue(
                     value=value,
@@ -138,15 +138,15 @@ class PluginConfigManager:
         """Load configuration from environment variables."""
         env_config = {}
         
-        # Get type hints for proper type conversion
+        
         type_hints = get_type_hints(self.config_class)
         
         for env_var, value in os.environ.items():
             if env_var.startswith(self._env_prefix):
-                # Remove prefix and convert to lowercase
+                
                 config_key = env_var[len(self._env_prefix):].lower()
                 
-                # Convert value to appropriate type
+
                 if config_key in type_hints:
                     try:
                         target_type = type_hints[config_key]
@@ -179,14 +179,14 @@ class PluginConfigManager:
     async def _load_mongodb_config(self) -> Dict[str, Any]:
         """Load configuration from MongoDB."""
         try:
-            # Import here to avoid circular imports
+
             from src.plugins.mongo_manager import get_plugin_manager
             
             plugin_manager = await get_plugin_manager()
             plugin_doc = await plugin_manager.get_plugin(self.plugin_name)
             
             if plugin_doc and plugin_doc.default_config:
-                # Update config values with MongoDB source
+                
                 for key, value in plugin_doc.default_config.items():
                     self.config_values[key] = ConfigValue(
                         value=value,
@@ -205,61 +205,61 @@ class PluginConfigManager:
     
     async def load_config_async(self) -> BasePluginConfig:
         """Load configuration from all sources in priority order (async version)."""
-        # Load in order: defaults -> file -> MongoDB -> environment -> runtime
+
         config_dict = {}
         
-        # 1. Load defaults
+
         config_dict.update(self._load_default_config())
         
-        # 2. Load from file (overrides defaults)
+
         config_dict.update(self._load_file_config())
         
-        # 3. Load from MongoDB (overrides file)
+
         config_dict.update(await self._load_mongodb_config())
         
-        # 4. Load from environment (overrides MongoDB)
+
         config_dict.update(self._load_env_config())
         
-        # 5. Runtime values are handled separately via update_config()
+
         
         try:
-            # Validate and create config instance
+
             self._current_config = self.config_class(**config_dict)
             logger.info(f"Successfully loaded configuration for plugin {self.plugin_name}")
             return self._current_config
             
         except ValidationError as e:
             logger.error(f"Configuration validation failed for plugin {self.plugin_name}: {e}")
-            # Return config with just defaults
+
             default_config = self._load_default_config()
             self._current_config = self.config_class(**default_config)
             return self._current_config
     
     def load_config(self) -> BasePluginConfig:
         """Load configuration from all sources in priority order (sync version)."""
-        # Load in order: defaults -> file -> environment -> runtime
+
         config_dict = {}
         
-        # 1. Load defaults
+
         config_dict.update(self._load_default_config())
         
-        # 2. Load from file (overrides defaults)
+
         config_dict.update(self._load_file_config())
         
-        # 3. Load from environment (overrides file)
+
         config_dict.update(self._load_env_config())
         
-        # 4. Runtime values are handled separately via update_config()
+
         
         try:
-            # Validate and create config instance
+
             self._current_config = self.config_class(**config_dict)
             logger.info(f"Successfully loaded configuration for plugin {self.plugin_name}")
             return self._current_config
             
         except ValidationError as e:
             logger.error(f"Configuration validation failed for plugin {self.plugin_name}: {e}")
-            # Return config with just defaults
+
             default_config = self._load_default_config()
             self._current_config = self.config_class(**default_config)
             return self._current_config
@@ -271,14 +271,14 @@ class PluginConfigManager:
             return False
         
         try:
-            # Create updated config dict
+            
             current_dict = self._current_config.model_dump()
             current_dict.update(updates)
             
-            # Validate new config
+
             new_config = self.config_class(**current_dict)
             
-            # Update config values tracking
+            
             for key, value in updates.items():
                 self.config_values[key] = ConfigValue(
                     value=value,
@@ -286,7 +286,7 @@ class PluginConfigManager:
                     description=f"Runtime update from {source.value}"
                 )
             
-            # Apply new config
+
             self._current_config = new_config
             logger.info(f"Updated configuration for plugin {self.plugin_name}: {list(updates.keys())}")
             return True
@@ -347,7 +347,7 @@ class PluginConfigManager:
                 logger.error(f"Plugin {self.plugin_name} not found in MongoDB")
                 return False
             
-            # Update plugin document with new config
+            
             from pymongo import UpdateOne
             update_doc = {
                 "default_config": config_dict,
@@ -439,7 +439,7 @@ class GlobalPluginConfigManager:
         return results
 
 
-# Global instance
+
 _global_config_manager: Optional[GlobalPluginConfigManager] = None
 
 

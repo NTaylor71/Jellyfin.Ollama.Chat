@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -19,7 +19,7 @@ async def test_real_computed_fields():
     print("🧪 TESTING COMPUTED FIELDS WITH REAL DATA")
     print("=" * 60)
     
-    # Real Jellyfin movie data structure
+
     real_movie_data = {
         "Name": "Samurai Rauni",
         "OriginalTitle": "Samurai Rauni Reposaarelainen", 
@@ -58,7 +58,7 @@ async def test_real_computed_fields():
             print(f"   Extract: {computed_from.get('extract')}")
             print(f"   Multiple: {computed_from.get('multiple')}")
         
-        # Test validation and computed fields
+
         print(f"\n🔍 BEFORE computed fields:")
         validated_item = manager.dynamic_model(**real_movie_data)
         before_dict = validated_item.model_dump()
@@ -74,7 +74,7 @@ async def test_real_computed_fields():
         if 'Director' in before_dict:
             print(f"   Director value: '{before_dict['Director']}'")
         
-        # Test with book data to show it's truly generic
+
         print(f"\n📚 TESTING BOOK COMPUTED FIELDS")
         print("-" * 40)
         
@@ -101,7 +101,7 @@ async def test_real_computed_fields():
             print(f"   Extract: {computed_from.get('extract')}")
             print(f"   Multiple: {computed_from.get('multiple')}")
         
-        # Test book computed fields
+
         book_validated = book_manager.dynamic_model(**book_data)
         book_dict = book_validated.model_dump()
         

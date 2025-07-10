@@ -19,7 +19,7 @@ from src.shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# SUTime imports - fail fast if not available
+
 from sutime import SUTime
 
 
@@ -36,7 +36,7 @@ class SUTimeProvider(BaseProvider):
         self.sutime: Optional[SUTime] = None
         self._sutime_initialized = False
         
-        # Pure SUTime temporal parser - no hard-coded patterns
+
     
     @property
     def metadata(self) -> ProviderMetadata:
@@ -75,10 +75,10 @@ class SUTimeProvider(BaseProvider):
             if not self._sutime_initialized:
                 logger.info("Initializing SUTime temporal parser")
                 
-                # Initialize SUTime with JVM settings
+                
                 self.sutime = SUTime(jvm_flags=['-Xmx4g'])
                 
-                # Test the initialization
+
                 test_text = "The movie was released on December 25th, 2020."
                 test_result = self.sutime.parse(test_text)
                 
@@ -104,7 +104,7 @@ class SUTimeProvider(BaseProvider):
         start_time = datetime.now()
         
         try:
-            # Ensure provider is initialized
+
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("SUTime provider not available", "SUTime")
             
@@ -114,19 +114,19 @@ class SUTimeProvider(BaseProvider):
             
             concept = request.concept.strip()
             
-            # Create enriched text for better temporal parsing
+            
             enriched_text = await self._create_temporal_context(concept, request.media_context)
             
-            # Pure SUTime temporal parsing - no rule expansion
+
             temporal_concepts = []
             confidence_scores = {}
             
-            # Direct SUTime parsing only
+
             sutime_results = self._parse_with_sutime(enriched_text, concept)
             if sutime_results:
                 temporal_concepts.extend(sutime_results)
             
-            # Remove duplicates while preserving order
+            
             unique_concepts = []
             seen = set()
             for concept_item in temporal_concepts:
@@ -134,26 +134,26 @@ class SUTimeProvider(BaseProvider):
                     unique_concepts.append(concept_item)
                     seen.add(concept_item)
             
-            # Limit to max_concepts
+
             final_concepts = unique_concepts[:request.max_concepts]
             
             if not final_concepts:
                 logger.warning(f"No temporal concepts found for: {concept}")
                 return None
             
-            # Generate confidence scores based on parsing method
+
             for i, concept_item in enumerate(final_concepts):
-                # Higher confidence for SUTime-parsed results
+
                 if i < len(sutime_results):
                     confidence = max(0.8, 0.95 - (i * 0.03))
                 else:
                     confidence = max(0.5, 0.8 - (i * 0.05))
                 confidence_scores[concept_item] = confidence
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create PluginResult using helper function
+            
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -194,7 +194,7 @@ class SUTimeProvider(BaseProvider):
             return await self._generate_temporal_context_via_llm(concept, media_context)
         except Exception as e:
             logger.debug(f"LLM context generation failed: {e}")
-            # Fallback to basic template
+
             return f"The {concept} {media_context} content was created and has been available for some time."
     
     def _parse_with_sutime(self, text: str, original_concept: str) -> List[str]:
@@ -212,13 +212,13 @@ class SUTimeProvider(BaseProvider):
             return []
         
         try:
-            # Parse with SUTime
+
             parsed_results = self.sutime.parse(text)
             
             temporal_concepts = []
             
             for result in parsed_results:
-                # Extract temporal type and value
+
                 if 'type' in result:
                     temporal_type = result['type']
                     temporal_concepts.append(f"temporal-{temporal_type.lower()}")
@@ -226,7 +226,7 @@ class SUTimeProvider(BaseProvider):
                 if 'value' in result:
                     value = result['value']
                     
-                    # Extract year information
+
                     if isinstance(value, str):
                         year_match = re.search(r'(\d{4})', value)
                         if year_match:
@@ -234,7 +234,7 @@ class SUTimeProvider(BaseProvider):
                             decade = f"{year[:3]}0s"
                             temporal_concepts.extend([f"year-{year}", decade])
                     
-                    # Extract temporal patterns
+
                     if 'PRESENT_REF' in str(value):
                         temporal_concepts.extend(["current", "present", "now"])
                     elif 'PAST_REF' in str(value):
@@ -242,7 +242,7 @@ class SUTimeProvider(BaseProvider):
                     elif 'FUTURE_REF' in str(value):
                         temporal_concepts.extend(["future", "upcoming", "forthcoming"])
                 
-                # Extract text from result
+
                 if 'text' in result:
                     text_value = result['text'].lower()
                     if text_value != original_concept.lower():
@@ -273,7 +273,7 @@ class SUTimeProvider(BaseProvider):
                     "error": "SUTime instance is None"
                 }
             
-            # Try a simple test parse
+
             try:
                 test_text = "The movie premiered on January 1st, 2020."
                 test_result = self.sutime.parse(test_text)
@@ -311,7 +311,7 @@ class SUTimeProvider(BaseProvider):
         """
         concept_lower = concept.lower()
         
-        # Use fallback temporal detection for quick support check
+        
         return self._fallback_temporal_detection(concept_lower)
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
@@ -320,7 +320,7 @@ class SUTimeProvider(BaseProvider):
             "max_concepts": 12
         }
         
-        # SUTime can provide precise temporal analysis
+
         if self.supports_concept(concept, media_context):
             params["max_concepts"] = 15
         
@@ -329,7 +329,7 @@ class SUTimeProvider(BaseProvider):
     async def close(self) -> None:
         """Clean up SUTime provider resources."""
         if self.sutime:
-            # SUTime cleanup if needed
+
             self.sutime = None
             self._sutime_initialized = False
             logger.info("SUTime provider closed")
@@ -351,10 +351,10 @@ class SUTimeProvider(BaseProvider):
             
             llm_provider = LLMProvider()
             if not await llm_provider._ensure_initialized():
-                # Fallback if LLM unavailable
+
                 return f"The {concept} {media_context} content was created and released."
             
-            # Create LLM request for context generation
+            
             prompt = f'''Generate 2-3 natural sentences that provide temporal context for SUTime parsing.
 
 The sentences should:
@@ -384,7 +384,7 @@ Generated temporal context:'''
                 logger.debug(f"Generated temporal context for '{concept}': {context[:50]}...")
                 return context
             else:
-                # Fallback if LLM fails
+
                 return f"The {concept} {media_context} content was created and has been available."
                 
         except Exception as e:
@@ -408,10 +408,10 @@ Generated temporal context:'''
             
             llm_provider = LLMProvider()
             if not await llm_provider._ensure_initialized():
-                # Fallback to pattern detection if LLM unavailable
+
                 return self._fallback_temporal_detection(concept)
             
-            # Create LLM request for temporal analysis
+            
             prompt = f'''Does the concept "{concept}" have temporal characteristics in {media_context} contexts?
 
 Consider:
@@ -463,18 +463,18 @@ Is temporal:'''
         try:
             from src.shared.temporal_concept_generator import TemporalConceptGenerator
             
-            # Use TemporalConceptGenerator for intelligent temporal detection
+            
             generator = TemporalConceptGenerator()
             
-            # Quick temporal classification request
+
             temporal_result = generator.classify_temporal_concept(concept)
             
-            # Consider temporal if confidence > 0.3
+
             return temporal_result.confidence_score.overall > 0.3
             
         except Exception as e:
             logger.warning(f"LLM temporal detection failed: {e}")
             
-            # Ultimate fallback: only numeric years as temporal
+
             import re
             return bool(re.search(r'\b\d{4}s?\b', concept))

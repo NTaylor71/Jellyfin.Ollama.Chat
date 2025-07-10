@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from src.shared.media_fields import MediaEntity, FieldType, AnalysisWeight
 
 
-# Raw Jellyfin data samples extracted from data/example_movie_data.py
+
 RAW_JELLYFIN_SAMURAI_RAUNI = {
     "Name": "Samurai Rauni",
     "OriginalTitle": "Samurai Rauni Reposaarelainen",
@@ -92,7 +92,7 @@ RAW_JELLYFIN_REMOTE_CONTROL = {
     "Overview": "A video store clerk stumbles onto an alien plot to take over earth by brainwashing people with a bad '50s science fiction movie. He and his friends race to stop the aliens before the tapes can be distributed world-wide.",
     "Taglines": ["Your future is in their hands."],
     "Genres": ["Horror", "Science Fiction", "Comedy"],
-    "Tags": [],  # Empty tags list for testing
+    "Tags": [],
     "ProductionYear": 1988,
     "ProductionLocations": ["United States of America"],
     "CommunityRating": 5.5,
@@ -304,16 +304,16 @@ def get_cache_key_test_cases() -> List[Dict[str, Any]]:
         },
         {
             "input": {"cache_type": "conceptnet", "input_term": "Café", "media_context": "movie"}, 
-            "expected_key": "conceptnet:cafe:movie"  # ASCII normalization
+            "expected_key": "conceptnet:cafe:movie"
         },
         {
             "input": {"cache_type": "gensim", "input_term": "Sci-Fi", "media_context": "movie"},
-            "expected_key": "gensim:sci-fi:movie"  # Case normalization
+            "expected_key": "gensim:sci-fi:movie"
         }
     ]
 
 
-# Helper functions for testing
+
 
 def validate_media_entity_completeness(entity: MediaEntity) -> List[str]:
     """
@@ -329,12 +329,12 @@ def validate_media_entity_completeness(entity: MediaEntity) -> List[str]:
     if not entity.entity_id:
         issues.append("Missing entity ID")
     
-    # Check for text fields suitable for NLP
+    
     text_fields = entity.get_text_fields()
     if not text_fields:
         issues.append("No text fields available for NLP analysis")
     
-    # Check field type distribution
+    
     field_summary = entity.get_field_summary()
     if field_summary['text_fields'] == 0:
         issues.append("No TEXT_CONTENT fields detected")
@@ -365,7 +365,7 @@ def simulate_plugin_processing(entity: MediaEntity) -> Dict[str, Any]:
         "entity_name": entity.entity_name,
         "media_type": entity.media_type,
         "text_fields": text_fields,
-        "weighted_fields": {k: f"{v[1]:.1f}" for k, v in weighted_fields.items()},  # Show weights
+        "weighted_fields": {k: f"{v[1]:.1f}" for k, v in weighted_fields.items()},
         "expandable_fields": list(expandable_fields.keys()),
         "cache_context": cache_context,
         "field_summary": field_summary,
@@ -375,21 +375,21 @@ def simulate_plugin_processing(entity: MediaEntity) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    # Test Field-Class architecture
+
     print("Testing Field-Class MediaEntity architecture...")
     
     entities = get_test_media_entities()
     for entity in entities:
         print(f"\n🎬 Movie: {entity.entity_name}")
         
-        # Validate completeness
+
         issues = validate_media_entity_completeness(entity)
         if issues:
             print(f"  ⚠️  Issues: {issues}")
         else:
             print("  ✅ All required field types present")
         
-        # Show intelligent processing capabilities
+
         processing_info = simulate_plugin_processing(entity)
         print(f"  📝 Text fields: {list(processing_info['text_fields'].keys())}")
         print(f"  ⚖️  Weighted fields: {processing_info['weighted_fields']}")

@@ -34,30 +34,30 @@ class MicroservicesValidator:
         print("🚀 Microservices Architecture Validation")
         print("=" * 50)
         
-        # Infrastructure tests
+
         await self._test("Redis Connection", self._test_redis)
         
-        # Split Architecture Service Tests
+
         await self._test("ConceptNet Service", self._test_conceptnet_service)
         await self._test("Gensim Service", self._test_gensim_service)
         await self._test("SpaCy Service", self._test_spacy_service)
         await self._test("HeidelTime Service", self._test_heideltime_service)
         await self._test("LLM Service", self._test_llm_service)
         
-        # Provider tests
+
         await self._test("Gensim Provider", self._test_gensim_provider)
         await self._test("SpaCy Provider", self._test_spacy_provider)
         await self._test("HeidelTime Provider", self._test_heideltime_provider)
         await self._test("Ollama LLM Provider", self._test_ollama_provider)
         
-        # Routing tests
+
         await self._test("ConceptExpansion Direct", self._test_concept_expansion_direct)
         await self._test("QuestionExpansion Direct", self._test_question_expansion_direct)
         
-        # Queue tests
+
         await self._test("Queue Submission", self._test_queue_submission)
         
-        # Generate report
+
         return self._generate_report()
     
     async def _test(self, name: str, test_func):
@@ -89,7 +89,7 @@ class MicroservicesValidator:
         if health_data.get("status") != "healthy":
             raise Exception(f"Service unhealthy: {health_data}")
         
-        # Check providers
+
         response = await self.client.get("http://localhost:8001/providers")
         if response.status_code != 200:
             raise Exception(f"Providers endpoint failed: {response.status_code}")
@@ -114,7 +114,7 @@ class MicroservicesValidator:
         if health_data.get("status") != "healthy":
             raise Exception(f"Service unhealthy: {health_data}")
         
-        # Check providers
+
         response = await self.client.get("http://localhost:8006/providers")
         if response.status_code != 200:
             raise Exception(f"Providers endpoint failed: {response.status_code}")
@@ -139,7 +139,7 @@ class MicroservicesValidator:
         if health_data.get("status") != "healthy":
             raise Exception(f"Service unhealthy: {health_data}")
         
-        # Check providers
+
         response = await self.client.get("http://localhost:8007/providers")
         if response.status_code != 200:
             raise Exception(f"Providers endpoint failed: {response.status_code}")
@@ -164,7 +164,7 @@ class MicroservicesValidator:
         if health_data.get("status") != "healthy":
             raise Exception(f"Service unhealthy: {health_data}")
         
-        # Check providers
+
         response = await self.client.get("http://localhost:8008/providers")
         if response.status_code != 200:
             raise Exception(f"Providers endpoint failed: {response.status_code}")
@@ -414,7 +414,7 @@ class MicroservicesValidator:
         if not task_id:
             raise Exception("Failed to enqueue task")
         
-        # Give worker a moment to process
+
         await asyncio.sleep(3)
         
         return {"task_id": task_id, "status": "submitted"}

@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QPixmap, QPalette, QColor
 
-# Import our existing Redis and resource monitoring code
 import redis
 import psutil
 import GPUtil
@@ -68,11 +67,9 @@ class ResourceMonitorThread(QThread):
         """Monitor resources every second"""
         while self.running:
             try:
-                # CPU and Memory
                 cpu_percent = psutil.cpu_percent(interval=0.1)
                 memory = psutil.virtual_memory()
                 
-                # GPU (if available)
                 gpu_percent = 0.0
                 gpu_memory_percent = 0.0
                 try:
@@ -83,11 +80,9 @@ class ResourceMonitorThread(QThread):
                 except:
                     pass
                 
-                # Disk
                 disk = psutil.disk_usage('/')
                 disk_usage = (disk.used / disk.total) * 100
                 
-                # Network
                 network = psutil.net_io_counters()
                 
                 usage = ResourceUsage(
@@ -104,7 +99,7 @@ class ResourceMonitorThread(QThread):
             except Exception as e:
                 logging.error(f"Resource monitoring error: {e}")
                 
-            self.msleep(1000)  # Update every second
+            self.msleep(1000)
     
     def stop(self):
         """Stop the monitoring thread"""
@@ -134,21 +129,18 @@ class QueueMonitorThread(QThread):
             
         while self.running:
             try:
-                # Get queue info
                 tasks = self._get_queue_tasks()
                 self.queue_updated.emit(tasks)
                 
             except Exception as e:
                 logging.error(f"Queue monitoring error: {e}")
                 
-            self.msleep(2000)  # Update every 2 seconds
+            self.msleep(2000)
     
     def _get_queue_tasks(self) -> List[QueueTask]:
         """Get current tasks from Redis queue"""
         tasks = []
         try:
-            # Direct Redis connection to check queue sizes
-            # Use docker environment settings to match the worker
             settings = get_settings_for_environment("docker")
             redis_client = redis.Redis(
                 host='localhost', 
@@ -156,33 +148,28 @@ class QueueMonitorThread(QThread):
                 decode_responses=True
             )
             
-            # Check queue sizes (using ZCARD for sorted sets)
-            # Use the same queue names as the Docker worker
             cpu_queue_size = redis_client.zcard("ingestion:queue:cpu")
             gpu_queue_size = redis_client.zcard("ingestion:queue:gpu") 
             dead_letter_size = redis_client.llen("rag:dead_letter")
             
-            # Also check for completed tasks (check recent results)
             completed_count = 0
             try:
-                # Look for result keys that were created recently (last 60 seconds)
                 import time
                 current_time = time.time()
                 result_keys = redis_client.keys("result:*")
                 for key in result_keys:
                     try:
                         ttl = redis_client.ttl(key)
-                        if ttl > (24*3600 - 60):  # Created in last 60 seconds
+                        if ttl > (24*3600 - 60):
                             completed_count += 1
                     except:
                         pass
             except:
                 pass
             
-            # Create representative tasks for display
             total_pending = cpu_queue_size + gpu_queue_size
             
-            for i in range(min(total_pending, 15)):  # Show max 15 pending tasks
+            for i in range(min(total_pending, 15)):
                 queue_type = "CPU" if i < cpu_queue_size else "GPU"
                 task = QueueTask(
                     id=f'{queue_type.lower()}_{i+1}',
@@ -192,7 +179,7 @@ class QueueMonitorThread(QThread):
                 )
                 tasks.append(task)
             
-            for i in range(min(dead_letter_size, 5)):  # Show max 5 failed tasks
+            for i in range(min(dead_letter_size, 5)):
                 task = QueueTask(
                     id=f'failed_{i+1}',
                     status='error',
@@ -202,8 +189,7 @@ class QueueMonitorThread(QThread):
                 )
                 tasks.append(task)
             
-            # Add recently completed tasks for display
-            for i in range(min(completed_count, 10)):  # Show max 10 completed tasks
+            for i in range(min(completed_count, 10)):
                 task = QueueTask(
                     id=f'completed_{i+1}',
                     status='completed',
@@ -233,19 +219,15 @@ class QueueMonitorApp(QMainWindow):
         self.setWindowTitle("Queue & Resource Monitor")
         self.setGeometry(100, 100, 1200, 800)
         
-        # Initialize monitoring threads
         self.resource_thread = ResourceMonitorThread()
         self.queue_thread = QueueMonitorThread()
         
-        # Setup UI
         self.setup_ui()
         self.setup_dark_theme()
         
-        # Connect signals
         self.resource_thread.resource_updated.connect(self.update_resource_display)
         self.queue_thread.queue_updated.connect(self.update_queue_display)
         
-        # Start monitoring
         self.resource_thread.start()
         self.queue_thread.start()
     
@@ -254,37 +236,28 @@ class QueueMonitorApp(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Main layout
         main_layout = QVBoxLayout(central_widget)
         
-        # Create splitter for resizable panels
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left panel - Queue Monitor
         queue_panel = self.create_queue_panel()
         splitter.addWidget(queue_panel)
         
-        # Right panel - Resource Monitor
         resource_panel = self.create_resource_panel()
         splitter.addWidget(resource_panel)
         
-        # Set splitter proportions
         splitter.setSizes([600, 600])
         
         main_layout.addWidget(splitter)
         
-        # Bottom panel - Controls
         controls_layout = QHBoxLayout()
         
-        # Add Tasks button
         self.add_tasks_btn = QPushButton("Add Test Tasks")
         self.add_tasks_btn.clicked.connect(self.add_test_tasks)
         controls_layout.addWidget(self.add_tasks_btn)
         
-        # Stretch to push Exit button to right
         controls_layout.addStretch()
         
-        # Exit button
         self.exit_btn = QPushButton("Exit")
         self.exit_btn.clicked.connect(self.close)
         controls_layout.addWidget(self.exit_btn)
@@ -296,19 +269,16 @@ class QueueMonitorApp(QMainWindow):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         
-        # Title
         title = QLabel("Queue Monitor")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         layout.addWidget(title)
         
-        # Queue table
         self.queue_table = QTableWidget()
         self.queue_table.setColumnCount(6)
         self.queue_table.setHorizontalHeaderLabels([
             "ID", "Status", "Plugin", "Created", "Progress", "Error"
         ])
         
-        # Configure table
         header = self.queue_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -319,7 +289,6 @@ class QueueMonitorApp(QMainWindow):
         
         layout.addWidget(self.queue_table)
         
-        # Queue stats
         self.queue_stats_label = QLabel("Queue Stats: Loading...")
         layout.addWidget(self.queue_stats_label)
         
@@ -330,12 +299,10 @@ class QueueMonitorApp(QMainWindow):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         
-        # Title
         title = QLabel("Resource Monitor")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         layout.addWidget(title)
         
-        # Resource widgets
         self.cpu_bar = self.create_resource_bar("CPU Usage", "rgb(52, 152, 219)")
         self.memory_bar = self.create_resource_bar("Memory Usage", "rgb(46, 204, 113)")
         self.gpu_bar = self.create_resource_bar("GPU Usage", "rgb(155, 89, 182)")
@@ -348,7 +315,6 @@ class QueueMonitorApp(QMainWindow):
         layout.addWidget(self.gpu_memory_bar)
         layout.addWidget(self.disk_bar)
         
-        # Add stretch to push everything to top
         layout.addStretch()
         
         return panel
@@ -358,7 +324,6 @@ class QueueMonitorApp(QMainWindow):
         group = QGroupBox(name)
         layout = QVBoxLayout(group)
         
-        # Progress bar
         progress_bar = QProgressBar()
         progress_bar.setMaximum(100)
         progress_bar.setStyleSheet(f"""
@@ -378,7 +343,6 @@ class QueueMonitorApp(QMainWindow):
         
         layout.addWidget(progress_bar)
         
-        # Store reference for updates
         setattr(self, f"{name.lower().replace(' ', '_')}_progress", progress_bar)
         
         return group
@@ -463,44 +427,35 @@ class QueueMonitorApp(QMainWindow):
     
     def update_queue_display(self, tasks: List[QueueTask]):
         """Update the queue display with new data"""
-        # Clear existing rows
         self.queue_table.setRowCount(0)
         
-        # Add tasks to table
         for i, task in enumerate(tasks):
             self.queue_table.insertRow(i)
             
-            # ID
             self.queue_table.setItem(i, 0, QTableWidgetItem(task.id[:8]))
             
-            # Status
             status_item = QTableWidgetItem(task.status)
             if task.status == 'running':
-                status_item.setBackground(QColor(241, 196, 15))  # Yellow/Orange
+                status_item.setBackground(QColor(241, 196, 15))
             elif task.status == 'pending':
-                status_item.setBackground(QColor(52, 152, 219))  # Blue
+                status_item.setBackground(QColor(52, 152, 219))
             elif task.status == 'completed':
-                status_item.setBackground(QColor(46, 204, 113))  # Green
+                status_item.setBackground(QColor(46, 204, 113))
             elif task.status == 'error':
-                status_item.setBackground(QColor(231, 76, 60))   # Red
+                status_item.setBackground(QColor(231, 76, 60))
             self.queue_table.setItem(i, 1, status_item)
             
-            # Plugin
             self.queue_table.setItem(i, 2, QTableWidgetItem(task.plugin_name))
             
-            # Created
             created_str = task.created_at.strftime("%H:%M:%S")
             self.queue_table.setItem(i, 3, QTableWidgetItem(created_str))
             
-            # Progress
             progress_str = f"{task.progress:.1f}%" if task.progress > 0 else "-"
             self.queue_table.setItem(i, 4, QTableWidgetItem(progress_str))
             
-            # Error
             error_str = task.error if task.error else "-"
             self.queue_table.setItem(i, 5, QTableWidgetItem(error_str))
         
-        # Update stats
         pending_count = len([t for t in tasks if t.status == 'pending'])
         running_count = len([t for t in tasks if t.status == 'running'])
         completed_count = len([t for t in tasks if t.status == 'completed'])
@@ -518,24 +473,19 @@ class QueueMonitorApp(QMainWindow):
             import time
             
             def add_tasks_sync():
-                # Use a simple Redis connection instead of ResourceAwareQueueManager
-                # to avoid Docker networking issues
                 import redis
                 import json
                 import uuid
                 
                 try:
-                    # Direct Redis connection using localhost
                     redis_client = redis.Redis(
                         host='localhost', 
                         port=6379, 
                         decode_responses=True
                     )
                     
-                    # Create real-world CPU and GPU intensive test tasks
                     timestamp = int(time.time() * 1000)
                     test_tasks = [
-                        # GPU-intensive LLM tasks
                         {
                             'task_id': str(uuid.uuid4()),
                             'task_type': 'plugin_execution',
@@ -578,7 +528,6 @@ class QueueMonitorApp(QMainWindow):
                                 'memory_mb': 2048
                             }
                         },
-                        # CPU-intensive NLP tasks
                         {
                             'task_id': str(uuid.uuid4()),
                             'task_type': 'plugin_execution',
@@ -623,9 +572,7 @@ class QueueMonitorApp(QMainWindow):
                         }
                     ]
                     
-                    # Add tasks directly to the Redis queue that the worker monitors
                     for task in test_tasks:
-                        # Route LLM tasks to GPU queue, others to CPU queue
                         if 'llm_' in task['plugin_name']:
                             queue_name = "ingestion:queue:gpu"
                             queue_type = "GPU"
@@ -634,7 +581,7 @@ class QueueMonitorApp(QMainWindow):
                             queue_type = "CPU"
                         
                         task_json = json.dumps(task)
-                        score = time.time()  # Use current timestamp as score
+                        score = time.time()
                         redis_client.zadd(queue_name, {task_json: score})
                         logging.info(f"Added {queue_type} task {task['task_id'][:8]}... ({task['plugin_name']}) to {queue_name}")
                     
@@ -643,7 +590,6 @@ class QueueMonitorApp(QMainWindow):
                 except Exception as e:
                     logging.error(f"Error in add_tasks_sync: {e}")
             
-            # Run in separate thread to avoid blocking GUI
             thread = threading.Thread(target=add_tasks_sync)
             thread.daemon = True
             thread.start()
@@ -653,7 +599,6 @@ class QueueMonitorApp(QMainWindow):
     
     def closeEvent(self, event):
         """Handle application close event"""
-        # Stop monitoring threads
         if hasattr(self, 'resource_thread'):
             self.resource_thread.stop()
         if hasattr(self, 'queue_thread'):
@@ -664,20 +609,16 @@ class QueueMonitorApp(QMainWindow):
 
 def main():
     """Main application entry point"""
-    # Setup logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Create application
     app = QApplication(sys.argv)
     
-    # Create and show main window
     window = QueueMonitorApp()
     window.show()
     
-    # Run application
     sys.exit(app.exec())
 
 

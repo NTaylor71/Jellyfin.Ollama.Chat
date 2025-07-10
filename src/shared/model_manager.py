@@ -18,7 +18,7 @@ import json
 import httpx
 from src.shared.config import get_settings
 
-# Import will be added when config loader is stable
+
 try:
     from src.shared.model_config_loader import get_model_config_loader
     CONFIG_LOADER_AVAILABLE = True
@@ -64,27 +64,27 @@ class ModelManager:
         self.models_base_path = Path(models_base_path)
         self.models_base_path.mkdir(parents=True, exist_ok=True)
         
-        # Set up package-specific paths
+        
         self.nltk_data_path = self.models_base_path / "nltk_data"
         self.gensim_data_path = self.models_base_path / "gensim_data"
         self.spacy_data_path = self.models_base_path / "spacy_data"
         
-        # Ensure directories exist
+
         for path in [self.nltk_data_path, self.gensim_data_path, self.spacy_data_path]:
             path.mkdir(parents=True, exist_ok=True)
         
-        # Set environment variables for packages
+        
         os.environ['NLTK_DATA'] = str(self.nltk_data_path)
         os.environ['GENSIM_DATA_DIR'] = str(self.gensim_data_path)
         
-        # Load models from configuration
+
         self.models = self._load_models_from_config()
         self.ollama_base_url = self.settings.OLLAMA_INGESTION_BASE_URL
     
     def _define_required_models(self) -> Dict[str, ModelInfo]:
         """Define all required models and their properties."""
         return {
-            # NLTK Models
+
             "nltk_punkt": ModelInfo(
                 name="punkt",
                 package="nltk",
@@ -107,7 +107,7 @@ class ModelManager:
                 required=True
             ),
             
-            # Gensim Models
+
             "gensim_word2vec": ModelInfo(
                 name="word2vec-google-news-300",
                 package="gensim",
@@ -116,7 +116,7 @@ class ModelManager:
                 required=True
             ),
             
-            # SpaCy Models
+
             "spacy_en_core": ModelInfo(
                 name="en_core_web_sm",
                 package="spacy",
@@ -125,11 +125,11 @@ class ModelManager:
                 required=True
             ),
             
-            # Ollama Models (external, check-only)
-            # NOTE: These are fallback values when YAML config is not available
-            # Primary configuration should come from config/models/ollama_models.yaml
+
+
+
             "ollama_ingestion": ModelInfo(
-                name="mistral:latest",  # Updated to match current YAML config
+                name="mistral:latest",  
                 package="ollama",
                 storage_path="external",
                 size_mb=2000,
@@ -140,7 +140,7 @@ class ModelManager:
                 package="ollama",
                 storage_path="external",
                 size_mb=500,
-                required=False  # Optional for now
+                required=False
             )
         }
     
@@ -154,7 +154,7 @@ class ModelManager:
             config_loader = get_model_config_loader()
             all_models = {}
             
-            # Load models for each service type
+
             for service_type in config_loader.get_service_types():
                 service_models = config_loader.convert_to_model_info(service_type, str(self.models_base_path))
                 all_models.update(service_models)
@@ -208,11 +208,11 @@ class ModelManager:
         try:
             import nltk
             
-            # Set NLTK data path
+            
             nltk.data.path.clear()
             nltk.data.path.append(str(self.nltk_data_path))
             
-            # Try to find the resource using NLTK's own mechanism
+
             if model_info.name == "punkt":
                 nltk.data.find('tokenizers/punkt')
                 logger.debug(f"✅ NLTK model '{model_info.name}' found at tokenizers/punkt")
@@ -223,7 +223,7 @@ class ModelManager:
                 nltk.data.find('corpora/wordnet')
                 logger.debug(f"✅ NLTK model '{model_info.name}' found at corpora/wordnet")
             else:
-                # Fallback to path check for unknown models
+
                 if Path(model_info.storage_path).exists():
                     logger.debug(f"✅ NLTK model '{model_info.name}' found at {model_info.storage_path}")
                     return ModelStatus.AVAILABLE
@@ -246,11 +246,11 @@ class ModelManager:
         """Check if SpaCy model is available."""
         try:
             import spacy
-            # Try to load the model
+
             spacy.load(model_info.name)
             return ModelStatus.AVAILABLE
         except OSError:
-            # Model not found
+
             return ModelStatus.MISSING
         except Exception:
             return ModelStatus.ERROR
@@ -268,18 +268,18 @@ class ModelManager:
                 models_data = response.json()
                 available_models = [model["name"] for model in models_data.get("models", [])]
                 
-                # Check for exact match first
+                
                 if model_name in available_models:
                     logger.debug(f"✅ Ollama model '{model_name}' found and available")
                     return ModelStatus.AVAILABLE
                 
-                # Check for model with :latest tag
+                
                 model_with_latest = f"{model_name}:latest"
                 if model_with_latest in available_models:
                     logger.debug(f"✅ Ollama model '{model_name}' found as '{model_with_latest}'")
                     return ModelStatus.AVAILABLE
                 
-                # Check if any available model starts with our model name
+                
                 for available in available_models:
                     if available.startswith(f"{model_name}:"):
                         logger.debug(f"✅ Ollama model '{model_name}' found as '{available}'")
@@ -310,7 +310,7 @@ class ModelManager:
                 continue
             
             if model_info.package == "ollama":
-                # Don't download Ollama models, just report status
+
                 status = await self._check_ollama_model(model_info.name)
                 if status == ModelStatus.AVAILABLE:
                     logger.debug(f"✅ Ollama model '{model_info.name}' is available")
@@ -359,22 +359,22 @@ class ModelManager:
         try:
             import nltk
             
-            # Set NLTK data path
+            
             nltk.data.path.clear()
             nltk.data.path.append(str(self.nltk_data_path))
             
-            # Check if model already exists before downloading
+            
             existing_status = self._check_nltk_model(model_info)
             if existing_status == ModelStatus.AVAILABLE:
                 logger.info(f"📁 NLTK model '{model_info.name}' already exists and is accessible, skipping download")
                 return True
             
             logger.info(f"📥 Downloading NLTK model '{model_info.name}' to {self.nltk_data_path}")
-            # Download the model - this should extract automatically
+
             success = nltk.download(model_info.name, download_dir=str(self.nltk_data_path), quiet=False)
             
             if success:
-                # For wordnet, check if we need to manually extract the ZIP
+
                 if model_info.name == "wordnet":
                     wordnet_zip = self.nltk_data_path / "corpora" / "wordnet.zip"
                     wordnet_dir = self.nltk_data_path / "corpora" / "wordnet"
@@ -385,7 +385,7 @@ class ModelManager:
                         with zipfile.ZipFile(wordnet_zip, 'r') as zip_ref:
                             zip_ref.extractall(self.nltk_data_path / "corpora")
                 
-                # Verify the model is properly extracted and accessible
+
                 try:
                     if model_info.name == "punkt":
                         nltk.data.find('tokenizers/punkt')
@@ -410,14 +410,14 @@ class ModelManager:
         try:
             import gensim.downloader as api
             
-            # Gensim doesn't support custom download directories easily
-            # We'll download to default location and then move
+
+
             logger.info(f"Downloading {model_info.name} via Gensim API...")
             
-            # This downloads to the default gensim-data directory
+
             model = api.load(model_info.name)
             
-            # The model is now available through gensim's caching system
+
             logger.info(f"Gensim model {model_info.name} loaded successfully")
             return True
             
@@ -431,7 +431,7 @@ class ModelManager:
             import subprocess
             import sys
             
-            # Use spacy download command
+            
             cmd = [sys.executable, "-m", "spacy", "download", model_info.name]
             
             process = await asyncio.create_subprocess_exec(
@@ -457,10 +457,10 @@ class ModelManager:
         """Ensure all required models are available. Main entrypoint method."""
         logger.info("🚀 Starting Model Manager - ensuring all models are available")
         
-        # Check current status
+        
         status_results = await self.check_all_models()
         
-        # Count missing required models
+
         missing_required = [
             model_id for model_id, status in status_results.items()
             if status != ModelStatus.AVAILABLE and self.models[model_id].required
@@ -472,7 +472,7 @@ class ModelManager:
         
         logger.info(f"📥 Found {len(missing_required)} missing required models")
         
-        # Download missing models
+
         download_success = await self.download_missing_models()
         
         if download_success:
@@ -513,20 +513,20 @@ class ModelManager:
         
         cleanup_paths = []
         
-        # Find orphaned model files
+
         for path in [self.nltk_data_path, self.gensim_data_path, self.spacy_data_path]:
             if path.exists():
-                # Look for .tmp, .download, backup files
+
                 for pattern in ["*.tmp", "*.download", "*.bak", "*~"]:
                     cleanup_paths.extend(path.rglob(pattern))
         
         if cleanup_cache:
-            # Also cleanup package caches
+
             for path in [self.models_base_path / ".cache", self.models_base_path / "tmp"]:
                 if path.exists():
                     cleanup_paths.extend(path.rglob("*"))
         
-        # Calculate size and remove files
+
         for file_path in cleanup_paths:
             if file_path.is_file():
                 size_mb = file_path.stat().st_size / (1024 * 1024)
@@ -607,10 +607,10 @@ class ModelManager:
         try:
             import gensim.downloader as api
             
-            # Try to load the model
+
             model = api.load(model_info.name)
             
-            # Test basic functionality
+
             if hasattr(model, 'similarity'):
                 sim = model.similarity('computer', 'technology')
                 return True, f"Word2Vec model functional (computer-technology similarity: {sim:.3f})"
@@ -625,10 +625,10 @@ class ModelManager:
         try:
             import spacy
             
-            # Load the model
+
             nlp = spacy.load(model_info.name)
             
-            # Test basic functionality
+
             doc = nlp("Hello world! This is a test sentence.")
             tokens = [token.text for token in doc]
             
@@ -641,7 +641,7 @@ class ModelManager:
         """Verify Ollama model is accessible and responsive."""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # Try a simple generation request
+
                 response = await client.post(
                     f"{self.ollama_base_url}/api/generate",
                     json={
@@ -668,7 +668,7 @@ class ModelManager:
         
         for model_id, model_info in self.models.items():
             if model_info.package == "ollama":
-                # Ollama models are managed externally
+
                 results[model_id] = {
                     "updated": False,
                     "message": "Ollama models managed externally"
@@ -682,7 +682,7 @@ class ModelManager:
                         "message": "Would re-download to get latest version"
                     }
                 else:
-                    # For now, "update" means re-download
+
                     success = await self._download_model(model_info)
                     results[model_id] = {
                         "updated": success,
@@ -711,32 +711,32 @@ async def main():
     
     args = parser.parse_args()
     
-    # Set up logging
+    
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Create model manager
+    
     manager = ModelManager(models_base_path=args.models_path)
     
     if args.check:
-        # Just check status
+
         await manager.check_all_models()
         summary = manager.get_model_summary()
         print(json.dumps(summary, indent=2))
         
     elif args.download or args.force:
-        # Download missing models
+
         success = await manager.download_missing_models(force_download=args.force)
         sys.exit(0 if success else 1)
         
     else:
-        # Default: ensure all models (check + download if needed)
+
         success = await manager.ensure_all_models()
         
-        # Print summary
+
         summary = manager.get_model_summary()
         logger.info(f"Model Summary: {summary['available_models']}/{summary['required_models']} required models available")
         logger.info(f"Total model storage: {summary['total_size_mb']} MB")

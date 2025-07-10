@@ -18,7 +18,7 @@ from src.shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# Gensim imports - fail fast if not available
+
 from gensim.models import Word2Vec, KeyedVectors
 from gensim.models.keyedvectors import KeyedVectors as KV
 from gensim.downloader import load as gensim_load
@@ -81,7 +81,7 @@ class GensimProvider(BaseProvider):
                 logger.info(f"Loading Gensim model: {self.model_name}")
                 logger.info("This may take several minutes for large models...")
                 
-                # Load pre-trained model from gensim-data
+
                 self.model = gensim_load(self.model_name)
                 self._model_loaded = True
                 
@@ -107,7 +107,7 @@ class GensimProvider(BaseProvider):
         start_time = datetime.now()
         
         try:
-            # Ensure provider is initialized
+
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("Gensim provider not available", "Gensim")
             
@@ -115,15 +115,15 @@ class GensimProvider(BaseProvider):
                 logger.error("Gensim model not loaded")
                 return None
             
-            # Clean and prepare concept for lookup
+
             concept = request.concept.lower().strip()
             
-            # Handle multi-word concepts
+
             similar_concepts = []
             confidence_scores = {}
             
             if " " in concept:
-                # Multi-word concept - try each word and combine results
+
                 words = concept.split()
                 all_similarities = []
                 
@@ -131,16 +131,16 @@ class GensimProvider(BaseProvider):
                     word_similarities = self._get_word_similarities(word, request.max_concepts)
                     all_similarities.extend(word_similarities)
                 
-                # Remove duplicates and sort by similarity
+                
                 unique_similarities = {}
                 for word, similarity in all_similarities:
                     if word not in unique_similarities:
                         unique_similarities[word] = similarity
                     else:
-                        # Keep highest similarity
+
                         unique_similarities[word] = max(unique_similarities[word], similarity)
                 
-                # Sort by similarity and take top results
+
                 sorted_similarities = sorted(
                     unique_similarities.items(),
                     key=lambda x: x[1], 
@@ -151,7 +151,7 @@ class GensimProvider(BaseProvider):
                 confidence_scores = {word: float(sim) for word, sim in sorted_similarities}
                 
             else:
-                # Single word concept
+
                 word_similarities = self._get_word_similarities(concept, request.max_concepts)
                 similar_concepts = [word for word, _ in word_similarities]
                 confidence_scores = {word: float(sim) for word, sim in word_similarities}
@@ -160,10 +160,10 @@ class GensimProvider(BaseProvider):
                 logger.warning(f"No similar concepts found for: {concept}")
                 return None
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create PluginResult using helper function
+            
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -205,34 +205,34 @@ class GensimProvider(BaseProvider):
             return []
         
         try:
-            # Check if word is in vocabulary
+            
             if word not in self.model.key_to_index:
                 logger.debug(f"Word '{word}' not in vocabulary")
                 return []
             
-            # Get most similar words
+            
             similarities = self.model.most_similar(
                 word, 
-                topn=max_results * 2  # Get extra to filter
+                topn=max_results * 2  
             )
             
-            # Filter and clean results
+
             filtered_similarities = []
             seen_words = set()
             
             for similar_word, similarity in similarities:
-                # Clean the word
+
                 clean_word = similar_word.lower().strip()
                 
-                # Skip if already seen or too similar to original
+
                 if clean_word in seen_words or clean_word == word:
                     continue
                 
-                # Skip words with underscores or numbers (often noise)
+
                 if "_" in clean_word or any(char.isdigit() for char in clean_word):
                     continue
                 
-                # Skip very short words
+
                 if len(clean_word) < 2:
                     continue
                 
@@ -266,14 +266,14 @@ class GensimProvider(BaseProvider):
                     "error": "Model is None"
                 }
             
-            # Try a simple similarity check
+
             try:
                 test_word = "test"
                 if test_word in self.model.key_to_index:
                     similarities = self.model.most_similar(test_word, topn=1)
                     success = len(similarities) > 0
                 else:
-                    # Try with a common word
+
                     common_words = ["movie", "film", "good", "action", "the"]
                     success = False
                     for word in common_words:
@@ -319,26 +319,26 @@ class GensimProvider(BaseProvider):
         - Proper nouns not in training data
         - Very new slang or terminology
         """
-        # Note: If Gensim not available, import would have failed at module load
+
             
-        # If model not loaded yet, assume it can support basic English words
-        # This prevents chicken-and-egg problem during initialization testing
+
+
         if not self.model:
-            # Basic heuristic: support common English words
+
             words = concept.lower().split()
-            # Very basic check - reject obviously unsupported patterns
+
             for word in words:
-                # Skip very short words, numbers, special chars
+
                 if len(word) < 2 or word.isdigit() or not word.isalpha():
                     continue
-                # If we have at least one reasonable word, assume we can support it
+
                 return True
             return False
         
-        # Model is loaded - check vocabulary directly
+
         words = concept.lower().split()
         
-        # At least one word should be in vocabulary
+
         for word in words:
             if word in self.model.key_to_index:
                 return True
@@ -351,12 +351,12 @@ class GensimProvider(BaseProvider):
             "max_concepts": 10
         }
         
-        # Adjust based on concept complexity
+
         if " " in concept:
-            # Multi-word concepts can return more diverse results
+
             params["max_concepts"] = 15
         
-        # Single words often have many good similarities
+
         if len(concept.split()) == 1:
             params["max_concepts"] = 20
         
@@ -369,7 +369,7 @@ class GensimProvider(BaseProvider):
     async def close(self) -> None:
         """Clean up Gensim provider resources."""
         if self.model:
-            # Gensim models don't need explicit cleanup
+
             self.model = None
             self._model_loaded = False
             logger.info("Gensim model unloaded")

@@ -8,7 +8,7 @@ import argparse
 import sys
 from typing import Dict, Any
 
-# Add project root to path
+
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -54,10 +54,10 @@ async def main_async():
     
     args = parser.parse_args()
     
-    # Initialize test client
+
     test_client = ConceptNetKeywordTest()
     
-    # Handle info requests
+
     if args.stats:
         stats = await test_client.get_queue_stats()
         print(f"Queue Statistics:")
@@ -81,17 +81,17 @@ async def main_async():
                 print(f"  Service type: {definition['service_type']}")
         return
     
-    # Require keyword for testing
+
     if not args.keyword:
         print("❌ Error: keyword required for testing")
         print("Usage: python conceptnet_keyword_endpoint_test.py 'science fiction'")
         return
     
-    # Prepare test data - map to router service format
+
     test_data = {
-        "concept": args.keyword,  # Router expects 'concept' field
+        "concept": args.keyword,
         "field_name": args.field_name,
-        "max_concepts": args.max_keywords  # Router expects 'max_concepts'
+        "max_concepts": args.max_keywords
     }
     
     print(f"🧪 Testing ConceptNetKeywordPlugin")
@@ -100,13 +100,13 @@ async def main_async():
     print(f"   Max keywords: {args.max_keywords}")
     print()
     
-    # Run test
+
     result = await test_client.test_plugin(test_data, timeout=args.timeout)
     
-    # Display result
+
     print(format_result(result, verbose=args.verbose))
     
-    # Exit with appropriate code
+
     sys.exit(0 if "error" not in result else 1)
 
 

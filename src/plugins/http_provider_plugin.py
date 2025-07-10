@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 class CircuitBreakerState(str, Enum):
     """Circuit breaker states."""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Service is down, failing fast
-    HALF_OPEN = "half_open"  # Testing if service is back up
+    CLOSED = "closed"    
+    OPEN = "open"        
+    HALF_OPEN = "half_open"
 
 
 @dataclass
@@ -96,13 +96,13 @@ class CircuitBreakerInfo:
         if self.state == CircuitBreakerState.CLOSED:
             return True
         elif self.state == CircuitBreakerState.OPEN:
-            # Check if timeout has elapsed
+            
             if time.time() - self.last_failure_time > self.timeout_seconds:
                 self.state = CircuitBreakerState.HALF_OPEN
                 logger.info(f"Circuit breaker for {self.service_name} half-open - testing service")
                 return True
             return False
-        else:  # HALF_OPEN
+        else:
             return True
     
     def get_status(self) -> Dict[str, Any]:
@@ -167,7 +167,7 @@ class HTTPProviderPlugin(BasePlugin):
     async def initialize(self, config: Dict[str, Any]) -> bool:
         """Initialize HTTP client and service endpoints."""
         try:
-            # Initialize HTTP session
+            
             connector = aiohttp.TCPConnector(
                 limit=100,
                 limit_per_host=30,
@@ -187,7 +187,7 @@ class HTTPProviderPlugin(BasePlugin):
                 }
             )
             
-            # Initialize service endpoints
+            
             endpoints = self.get_service_endpoints()
             for endpoint in endpoints:
                 self.services[endpoint.name] = endpoint
@@ -200,7 +200,7 @@ class HTTPProviderPlugin(BasePlugin):
             
             self._logger.info(f"Initialized HTTP provider with {len(self.services)} services")
             
-            # Test service connectivity
+            
             healthy_services = await self._check_all_services_health()
             if not healthy_services:
                 self._logger.warning("No services are healthy - plugin may have limited functionality")
@@ -238,7 +238,7 @@ class HTTPProviderPlugin(BasePlugin):
         service = self.services[service_name]
         circuit_breaker = self.circuit_breakers.get(service_name)
         
-        # Check circuit breaker
+        
         if circuit_breaker and not circuit_breaker.can_execute():
             return HTTPResponse(
                 success=False,
@@ -248,7 +248,7 @@ class HTTPProviderPlugin(BasePlugin):
                 service_name=service_name
             )
         
-        # Execute request with retries
+
         start_time = time.time()
         last_error = None
         
@@ -256,7 +256,7 @@ class HTTPProviderPlugin(BasePlugin):
             try:
                 response = await self._execute_http_request(service, request)
                 
-                # Record success
+
                 if circuit_breaker:
                     circuit_breaker.record_success()
                 
@@ -270,7 +270,7 @@ class HTTPProviderPlugin(BasePlugin):
                 if attempt < service.retry_attempts - 1:
                     await asyncio.sleep(service.retry_delay_seconds * (2 ** attempt))
         
-        # All attempts failed
+
         if circuit_breaker:
             circuit_breaker.record_failure()
         

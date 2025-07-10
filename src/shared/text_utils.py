@@ -37,7 +37,7 @@ def to_ascii(text: str) -> str:
     if not isinstance(text, str):
         text = str(text)
     
-    # Unicode normalization and ASCII conversion
+
     normalized = unicodedata.normalize("NFKD", text)
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     
@@ -67,16 +67,16 @@ def clean_for_cache_key(text: str) -> str:
         >>> clean_for_cache_key("release_date")
         'release_date'
     """
-    # Apply ASCII normalization
+
     ascii_text = to_ascii(text.lower())
     
-    # Remove non-alphanumeric characters except spaces, hyphens, and underscores
+    
     cleaned = re.sub(r'[^a-z0-9\s\-_]', '', ascii_text)
     
-    # Replace spaces and hyphens with underscores, but preserve existing underscores
+
     cleaned = re.sub(r'[\s\-]+', '_', cleaned)
     
-    # Collapse multiple underscores but preserve single ones
+
     cleaned = re.sub(r'_{2,}', '_', cleaned).strip('_')
     
     return cleaned
@@ -101,10 +101,10 @@ def normalize_text_for_analysis(text: str) -> str:
         >>> normalize_text_for_analysis("Café & Restaurant")
         'Cafe & Restaurant'
     """
-    # Apply ASCII normalization
+
     ascii_text = to_ascii(text)
     
-    # Clean up whitespace
+
     cleaned = re.sub(r'\s+', ' ', ascii_text).strip()
     
     return cleaned
@@ -131,27 +131,27 @@ def extract_key_concepts(text: str, max_concepts: int = 10) -> List[str]:
         import nltk
         from nltk.corpus import stopwords
         
-        # Use stopwords if available (Model Manager Service handles downloads)
+        
         try:
             stop_words = set(stopwords.words('english'))
         except LookupError:
             logger.warning("NLTK stopwords not available - falling back to simple word splitting")
-            # Fallback to simple word splitting without stopwords
+
             words = re.split(r'[,\.\!\?\;\:\s\-\(\)]+', normalize_text_for_analysis(text).lower())
             return [w for w in words if len(w) >= 3 and not w.isdigit()][:max_concepts]
             
     except ImportError:
-        # Fallback if NLTK not available - return simple word split without filtering
+
         words = re.split(r'[,\.\!\?\;\:\s\-\(\)]+', normalize_text_for_analysis(text).lower())
         return [w for w in words if len(w) >= 3 and not w.isdigit()][:max_concepts]
     
-    # Normalize text
+
     normalized = normalize_text_for_analysis(text)
     
-    # Simple concept extraction - split on common delimiters and filter using NLTK stopwords
+
     words = re.split(r'[,\.\!\?\;\:\s\-\(\)]+', normalized.lower())
     
-    # Filter using proper NLP stopwords list
+
     concepts = []
     for word in words:
         if (len(word) >= 3 and 
@@ -159,7 +159,7 @@ def extract_key_concepts(text: str, max_concepts: int = 10) -> List[str]:
             not word.isdigit()):
             concepts.append(word)
     
-    # Remove duplicates while preserving order
+    
     unique_concepts = []
     seen = set()
     for concept in concepts:
@@ -170,8 +170,8 @@ def extract_key_concepts(text: str, max_concepts: int = 10) -> List[str]:
     return unique_concepts[:max_concepts]
 
 
-# NOTE: More sophisticated term extraction is available in Stage 3 plugins
-# This is a basic fallback for simple use cases
+
+
 
 
 def safe_string_conversion(value: Any) -> str:
@@ -202,16 +202,16 @@ def safe_string_conversion(value: Any) -> str:
         return to_ascii(value)
     
     if isinstance(value, (list, tuple)):
-        # Join list items
+
         str_items = [safe_string_conversion(item) for item in value if item is not None]
         return ' '.join(str_items)
     
     if isinstance(value, dict):
-        # Extract values from dictionary
+
         str_values = [safe_string_conversion(v) for v in value.values() if v is not None]
         return ' '.join(str_values)
     
-    # Convert other types to string and normalize
+     and normalize
     return to_ascii(str(value))
 
 
@@ -234,7 +234,7 @@ def validate_ascii_text(text: str) -> bool:
         return False
 
 
-# Pre-compiled regex patterns for performance
+
 _CACHE_KEY_PATTERN = re.compile(r'[^a-z0-9\s\-]')
 _WHITESPACE_PATTERN = re.compile(r'\s+')
 _UNDERSCORE_PATTERN = re.compile(r'_+')
@@ -254,7 +254,7 @@ def fast_cache_key_clean(text: str) -> str:
 
 
 if __name__ == "__main__":
-    # Test the text utilities
+
     test_cases = [
         "Café & Restaurant",
         "Naïve résumé", 

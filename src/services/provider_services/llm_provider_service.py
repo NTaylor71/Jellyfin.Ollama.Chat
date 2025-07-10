@@ -57,7 +57,7 @@ class LLMProviderManager:
         self.request_count = 0
         self.error_count = 0
         self.start_time = asyncio.get_event_loop().time()
-        self.initialization_state = "starting"  # starting -> connecting_ollama -> ready
+        self.initialization_state = "starting"
         self.initialization_progress = {}
     
     async def initialize_provider(self):
@@ -133,7 +133,7 @@ class LLMProviderManager:
                     "initialized": getattr(self.provider, '_initialized', False)
                 }
                 
-                # Get available models if possible
+                
                 if hasattr(self.provider, 'get_available_models'):
                     models_available = self.provider.get_available_models()
                 
@@ -148,7 +148,7 @@ class LLMProviderManager:
                 "error": self.initialization_error or "Unknown error"
             }
         
-        # Determine overall service status based on initialization state
+
         service_status = "starting"
         if self.initialization_state == "ready":
             service_status = "healthy" if self.provider else "degraded"
@@ -167,21 +167,21 @@ class LLMProviderManager:
         )
 
 
-# Global provider manager
+
 provider_manager = LLMProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup
+
     await provider_manager.initialize_provider()
     yield
-    # Shutdown
+
     await provider_manager.cleanup_provider()
 
 
-# Create FastAPI app
+
 settings = get_settings()
 app = FastAPI(
     title="LLM Provider Service",
@@ -190,7 +190,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -263,10 +263,10 @@ async def expand_concept(
         provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Import ExpansionRequest here to avoid import issues
+
         from src.providers.nlp.base_provider import ExpansionRequest
         
-        # Create expansion request
+        
         expansion_request = ExpansionRequest(
             concept=request.concept,
             media_context=request.media_context,
@@ -275,7 +275,7 @@ async def expand_concept(
             options=request.options
         )
         
-        # Execute expansion
+
         result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -397,9 +397,9 @@ async def load_model(model_name: str):
         }
 
 
-# ============================================================================
-# NEW ENDPOINTS FOR HTTP-ONLY PLUGIN ARCHITECTURE
-# ============================================================================
+
+
+
 
 class KeywordExpansionRequest(BaseModel):
     """Request for LLM keyword expansion."""
@@ -428,16 +428,16 @@ async def expand_keywords(request: KeywordExpansionRequest):
         
         start_time = asyncio.get_event_loop().time()
         
-        # Build prompt for keyword expansion
+        
         if request.prompt_template:
-            # Use custom prompt template
+            
             keywords_text = ", ".join(request.keywords)
             if request.context:
                 prompt = request.prompt_template.format(value=f"{keywords_text} (Context: {request.context})")
             else:
                 prompt = request.prompt_template.format(value=keywords_text)
         else:
-            # Default prompt based on field name and expansion style
+
             keywords_text = ", ".join(request.keywords)
             if request.expansion_style == "semantic_related":
                 prompt = f"Given these keywords: {keywords_text}, provide {request.max_concepts} semantically related concepts, themes, and terms that would help categorize and find similar content. Return as a simple list."
@@ -449,7 +449,7 @@ async def expand_keywords(request: KeywordExpansionRequest):
             if request.context:
                 prompt += f" Context: {request.context}"
         
-        # Create expansion request for provider
+        
         from src.providers.nlp.base_provider import ExpansionRequest
         expansion_request = ExpansionRequest(
             concept=prompt,
@@ -458,21 +458,21 @@ async def expand_keywords(request: KeywordExpansionRequest):
             field_name=request.field_name
         )
         
-        # Call LLM provider
+
         result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Extract concepts from result
+
         if isinstance(result, dict) and "concepts" in result:
             concepts = result["concepts"]
         elif isinstance(result, list):
             concepts = result
         else:
-            # Fallback: try to parse as text
+
             concepts = str(result).split("\n") if result else []
         
-        # Clean up concepts
+
         cleaned_concepts = []
         for concept in concepts:
             if isinstance(concept, str):
@@ -484,7 +484,7 @@ async def expand_keywords(request: KeywordExpansionRequest):
                 if clean and len(clean) > 1:
                     cleaned_concepts.append(clean)
         
-        # Limit results
+
         cleaned_concepts = cleaned_concepts[:request.max_concepts]
         
         return KeywordExpansionResponse(
@@ -505,9 +505,9 @@ async def expand_keywords(request: KeywordExpansionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============================================================================
-# WEB SEARCH ENDPOINTS FOR LLM WRAPPED WEB SEARCH
-# ============================================================================
+
+
+
 
 class WebSearchRequest(BaseModel):
     """Request for web search with template substitution."""
@@ -569,21 +569,21 @@ async def perform_web_search(query: str, max_results: int = 10, domains: Optiona
     logger.info(f"Performing web search: '{query}' (max_results: {max_results})")
     
     try:
-        # Use SearXNG running in Docker container
+        
         searxng_url = settings.SEARXNG_URL
         
-        # Build search query with domain restrictions if specified
+        
         search_query = query
         if domains:
             domain_restriction = " site:" + " OR site:".join(domains)
             search_query = query + domain_restriction
         
-        # SearXNG JSON API endpoint
+
         search_params = {
             'q': search_query,
             'format': 'json',
             'categories': 'general',
-            'engines': 'bing,google,duckduckgo',  # Use multiple engines for better results
+            'engines': 'bing,google,duckduckgo',  
             'pageno': 1
         }
         
@@ -603,11 +603,11 @@ async def perform_web_search(query: str, max_results: int = 10, domains: Optiona
             search_data = response.json()
             raw_results = search_data.get('results', [])
             
-            # Process and limit results
+
             results = []
             for result in raw_results[:max_results]:
                 try:
-                    # SearXNG provides clean, structured data
+
                     processed_result = {
                         "title": result.get('title', 'No title'),
                         "url": result.get('url', ''),
@@ -629,7 +629,7 @@ async def perform_web_search(query: str, max_results: int = 10, domains: Optiona
             
     except Exception as e:
         logger.error(f"Web search failed for query '{query}': {e}")
-        # Return empty results rather than mocks - fail fast for production
+
         return []
 
 
@@ -643,30 +643,30 @@ async def web_search_only(request: WebSearchRequest):
         all_results = []
         
         for template in request.search_templates:
-            # Substitute template variables
+
             try:
                 query = template.format(**request.template_variables)
             except KeyError as e:
                 logger.warning(f"Template variable missing: {e}, using template as-is")
                 query = template
             
-            # Perform search
+
             results = await perform_web_search(
                 query=query,
                 max_results=request.max_results_per_template,
                 domains=request.domains
             )
             
-            # Add metadata to results
+            
             for result in results:
                 result['query'] = query
                 result['template'] = template
             
             all_results.extend(results)
             
-            # Rate limiting between searches
+
             if len(request.search_templates) > 1:
-                await asyncio.sleep(2.0)  # 2 second delay between searches
+                await asyncio.sleep(2.0)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
@@ -705,7 +705,7 @@ async def process_search_results(request: WebSearchProcessRequest):
         provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Prepare search results text for LLM
+
         results_text = ""
         for i, result in enumerate(request.search_results, 1):
             results_text += f"\n--- Result {i} ---\n"
@@ -713,7 +713,7 @@ async def process_search_results(request: WebSearchProcessRequest):
             results_text += f"Source: {result.get('url', 'N/A')}\n"
             results_text += f"Content: {result.get('snippet', 'N/A')}\n"
         
-        # Substitute template variables in prompt
+
         try:
             prompt = request.processing_prompt.format(
                 search_results=results_text,
@@ -723,7 +723,7 @@ async def process_search_results(request: WebSearchProcessRequest):
             logger.warning(f"Template variable missing in prompt: {e}")
             prompt = request.processing_prompt.replace("{search_results}", results_text)
         
-        # For content analysis, we'll call the LLM directly rather than using concept expansion
+
         result = await _perform_content_analysis(
             provider, 
             prompt, 
@@ -734,7 +734,7 @@ async def process_search_results(request: WebSearchProcessRequest):
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Extract processed content from result
+
         if result and result.get("success", False):
             processed_content = result.get("analysis", {})
         else:
@@ -775,7 +775,7 @@ async def web_search_and_process(request: WebSearchFullRequest):
     try:
         provider_manager.request_count += 1
         
-        # Step 1: Perform web search
+
         search_request = WebSearchRequest(
             search_templates=request.search_templates,
             template_variables=request.template_variables,
@@ -793,7 +793,7 @@ async def web_search_and_process(request: WebSearchFullRequest):
                 error_message="Web search failed or returned no results"
             )
         
-        # Step 2: Process with LLM
+
         process_request = WebSearchProcessRequest(
             search_results=search_response.search_results,
             processing_prompt=request.processing_prompt,
@@ -833,9 +833,9 @@ async def web_search_and_process(request: WebSearchFullRequest):
         )
 
 
-# ============================================================================
-# MODEL MANAGEMENT ENDPOINTS (Required by Model Manager Service)
-# ============================================================================
+
+
+
 
 class ModelStatusResponse(BaseModel):
     """Response for model status check."""
@@ -870,7 +870,7 @@ async def get_models_status():
         provider = provider_manager.get_provider()
         settings = get_settings()
         
-        # Get available models from Ollama
+        
         import httpx
         async with httpx.AsyncClient() as client:
             try:
@@ -880,13 +880,13 @@ async def get_models_status():
                 logger.warning(f"Failed to get Ollama models: {e}")
                 ollama_models = []
         
-        # Define required models for the system
+
         required_models = [
-            "llama3.2:1b",  # Small model for development/testing
-            "llama3.2:3b"   # Larger model for production
+            "llama3.2:1b",
+            "llama3.2:3b" 
         ]
         
-        # Build models info
+        
         models_info = {}
         available_count = 0
         required_count = len(required_models)
@@ -898,7 +898,7 @@ async def get_models_status():
                 "name": model_name,
                 "package": "ollama",
                 "storage_path": "/root/.ollama",
-                "size_mb": 0,  # Ollama doesn't report size easily
+                "size_mb": 0,
                 "required": True,
                 "status": "available" if model_available else "missing",
                 "error_message": None if model_available else "Model not downloaded"
@@ -907,7 +907,7 @@ async def get_models_status():
             if model_available:
                 available_count += 1
         
-        # Add any extra models that are available
+        
         for model in ollama_models:
             model_key = model["name"].replace(":", "_")
             if model_key not in models_info:
@@ -915,7 +915,7 @@ async def get_models_status():
                     "name": model["name"],
                     "package": "ollama", 
                     "storage_path": "/root/.ollama",
-                    "size_mb": model.get("size", 0) // (1024 * 1024),  # Convert to MB
+                    "size_mb": model.get("size", 0) // (1024 * 1024),
                     "required": False,
                     "status": "available",
                     "error_message": None
@@ -960,12 +960,12 @@ async def download_models(request: ModelDownloadRequest):
         provider = provider_manager.get_provider()
         settings = get_settings()
         
-        # Define required models
+
         required_models = ["llama3.2:1b", "llama3.2:3b"]
         
-        # Determine which models to download
+
         if request.model_ids:
-            # Convert model IDs back to Ollama format
+
             models_to_download = [mid.replace("_", ":") for mid in request.model_ids]
         else:
             models_to_download = required_models
@@ -973,7 +973,7 @@ async def download_models(request: ModelDownloadRequest):
         downloaded_models = []
         failed_models = []
         
-        # Get current models to check if download is needed
+        
         import httpx
         async with httpx.AsyncClient(timeout=600.0) as client:
             try:
@@ -985,7 +985,7 @@ async def download_models(request: ModelDownloadRequest):
         
         for model_name in models_to_download:
             try:
-                # Skip if already available and not forcing download
+
                 if model_name in current_models and not request.force_download:
                     downloaded_models.append(model_name.replace(":", "_"))
                     logger.info(f"Model {model_name} already available, skipping download")
@@ -993,7 +993,7 @@ async def download_models(request: ModelDownloadRequest):
                 
                 logger.info(f"Downloading model: {model_name}")
                 
-                # Pull model using Ollama API
+
                 async with httpx.AsyncClient(timeout=600.0) as client:
                     response = await client.post(
                         f"{settings.OLLAMA_INGESTION_BASE_URL}/api/pull",
@@ -1042,7 +1042,7 @@ async def models_ready_check():
     try:
         provider = provider_manager.get_provider()
         
-        # Get status and check if required models are available
+        
         status_response = await get_models_status()
         
         if status_response.success:
@@ -1073,7 +1073,7 @@ async def _perform_content_analysis(
     content analysis at the service level.
     """
     try:
-        # Build system prompt for content analysis
+        
         system_prompt = "You are an expert content analyzer. Your task is to analyze and synthesize information from web search results."
         
         if expected_format == "dict" and fields:
@@ -1090,7 +1090,7 @@ async def _perform_content_analysis(
         
         system_prompt += "\n\nBe factual, concise, and focus on extracting meaningful insights from the provided search results."
         
-        # Create LLM request for content analysis (bypassing concept expansion)
+        
         from src.providers.llm.base_llm_client import LLMRequest
         
         llm_request = LLMRequest(
@@ -1098,11 +1098,11 @@ async def _perform_content_analysis(
             concept="content_analysis",
             media_context="websearch",
             max_tokens=max_length or 2000,
-            temperature=0.2,  # Lower for more factual processing
+            temperature=0.2,
             system_prompt=system_prompt
         )
         
-        # Call LLM backend directly
+
         llm_response = await provider.client.generate_completion(llm_request)
         
         if not llm_response.success:
@@ -1112,7 +1112,7 @@ async def _perform_content_analysis(
                 "confidence": 0.0
             }
         
-        # Parse structured response for content analysis
+
         analysis_result = _parse_analysis_response(
             llm_response.text,
             expected_format,
@@ -1129,7 +1129,7 @@ async def _perform_content_analysis(
         return {
             "success": True,
             "analysis": analysis_result,
-            "confidence": 0.8,  # Default confidence for analysis
+            "confidence": 0.8,
             "model_used": llm_response.model
         }
         
@@ -1152,17 +1152,17 @@ def _parse_analysis_response(
         text = response_text.strip()
         
         if expected_format == "dict":
-            # Try to extract JSON from the response
+
             import json
             import re
             
-            # Look for JSON-like structure
+
             json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
             if json_match:
                 try:
                     result = json.loads(json_match.group())
                     
-                    # Validate that expected fields are present
+
                     if fields:
                         validated_result = {}
                         for field in fields:
@@ -1173,11 +1173,11 @@ def _parse_analysis_response(
                 except json.JSONDecodeError:
                     pass
             
-            # Fallback: try to parse field-by-field from text
+
             if fields:
                 result = {}
                 for field in fields:
-                    # Look for field patterns in text
+
                     field_pattern = rf'{field}[:\-]\s*([^\n]+)'
                     match = re.search(field_pattern, text, re.IGNORECASE)
                     if match:
@@ -1186,10 +1186,10 @@ def _parse_analysis_response(
                         result[field] = f"No {field} analysis found"
                 return result
             else:
-                # Return the whole text as a single analysis
+
                 return {"analysis": text}
         else:
-            # Return as plain text analysis
+
             return {"analysis": text}
         
     except Exception as e:
@@ -1200,11 +1200,11 @@ def _parse_analysis_response(
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.llm_provider_service:app",
         host="0.0.0.0",
         port=settings.LLM_SERVICE_PORT,
-        reload=False,  # Disable reload for testing
+        reload=False,
         log_level=settings.LOG_LEVEL.lower()
     )

@@ -57,12 +57,12 @@ class ModelConfigLoader:
         with open(config_file, 'r') as f:
             config_data = yaml.safe_load(f)
         
-        # Determine service type from filename
+
         service_type = config_file.stem.replace("_models", "")
         
         models_config = {}
         
-        # Handle simplified YAML format
+
         if service_type == "ollama":
             models_config = self._parse_ollama_config(config_data)
         elif service_type == "nltk":
@@ -86,7 +86,7 @@ class ModelConfigLoader:
             models["ingestion_model"] = ModelConfig(
                 name=config_data["ingestion_model"],
                 required=True,
-                size_mb=2000,  # Default size
+                size_mb=2000,
                 description="Main ingestion model",
                 storage_path="external",
                 service_type="ollama",
@@ -97,20 +97,20 @@ class ModelConfigLoader:
             models["embedding_model"] = ModelConfig(
                 name=config_data["embedding_model"],
                 required=False,
-                size_mb=500,  # Default size
+                size_mb=500,
                 description="Text embedding model",
                 storage_path="external",
                 service_type="ollama",
                 use_cases=["embeddings", "similarity"]
             )
         
-        # Handle any additional models
+
         for key, value in config_data.items():
             if key not in ["ingestion_model", "embedding_model"] and not key.startswith("#"):
                 models[key] = ModelConfig(
                     name=value,
                     required=False,
-                    size_mb=1000,  # Default size
+                    size_mb=1000,
                     description=f"Custom model: {key}",
                     storage_path="external",
                     service_type="ollama",
@@ -123,7 +123,7 @@ class ModelConfigLoader:
         """Parse simplified NLTK configuration."""
         models = {}
         
-        # Default model metadata
+
         model_defaults = {
             "punkt": {"size_mb": 20, "description": "Punkt sentence tokenizer", "storage_path": "nltk_data/tokenizers/punkt"},
             "stopwords": {"size_mb": 8, "description": "Stopwords corpus", "storage_path": "nltk_data/corpora/stopwords"},
@@ -149,7 +149,7 @@ class ModelConfigLoader:
         """Parse simplified Gensim configuration."""
         models = {}
         
-        # Default model metadata
+
         model_defaults = {
             "word2vec-google-news-300": {"size_mb": 1700, "description": "Google News Word2Vec model"},
             "glove-wiki-gigaword-300": {"size_mb": 1000, "description": "GloVe Wikipedia + Gigaword model"},
@@ -175,7 +175,7 @@ class ModelConfigLoader:
         """Parse simplified SpaCy configuration."""
         models = {}
         
-        # Default model metadata
+
         model_defaults = {
             "en_core_web_sm": {"size_mb": 15, "description": "English core model (small)", "language": "en"},
             "en_core_web_md": {"size_mb": 50, "description": "English core model (medium)", "language": "en"},
@@ -215,9 +215,9 @@ class ModelConfigLoader:
         model_info_dict = {}
         
         for model_id, config in models_config.items():
-            # Build storage path
+            
             if config.storage_path and not config.storage_path.startswith("/"):
-                # Relative path - make it relative to models base path
+
                 storage_path = str(Path(models_base_path) / config.storage_path)
             else:
                 storage_path = config.storage_path or "external"
@@ -228,7 +228,7 @@ class ModelConfigLoader:
                 storage_path=storage_path,
                 size_mb=config.size_mb,
                 required=config.required,
-                status=ModelStatus.UNKNOWN  # Will be checked later
+                status=ModelStatus.UNKNOWN
             )
             
             model_info_dict[model_id] = model_info
@@ -273,7 +273,7 @@ class ModelConfigLoader:
         return summary
 
 
-# Global instance
+
 _model_config_loader = None
 
 
@@ -286,7 +286,7 @@ def get_model_config_loader() -> ModelConfigLoader:
 
 
 if __name__ == "__main__":
-    # Test the configuration loader
+
     loader = ModelConfigLoader()
     
     print("=== Model Configuration Summary ===")
@@ -298,7 +298,7 @@ if __name__ == "__main__":
         print(f"  Total size: {info['total_size_mb']} MB")
         print(f"  Models: {', '.join(info['models'])}")
     
-    # Test use case lookup
+
     print("\n=== Use Case Examples ===")
     ingestion_model = loader.get_model_by_use_case("ollama", "ingestion")
     if ingestion_model:

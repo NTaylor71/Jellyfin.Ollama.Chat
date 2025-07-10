@@ -33,7 +33,7 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             author="System",
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["keyword", "merge", "fusion", "aggregation"],
-            execution_priority=ExecutionPriority.LOW  # Runs after other plugins
+            execution_priority=ExecutionPriority.LOW
         )
     
     async def enrich_field(
@@ -57,12 +57,12 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             Dict containing merged keyword results
         """
         try:
-            # Get input enrichments from config
+            
             input_enrichments = config.get("input_enrichments", [])
             if not input_enrichments:
                 self._logger.warning(f"No input enrichments provided for merging field {field_name}")
                 result = {"merged_keywords": []}
-                # Normalize all Unicode text in the result
+                
                 return self.normalize_text(result)
             
             merge_strategy = config.get("strategy", "union")
@@ -72,15 +72,15 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
                 f"Merging {len(input_enrichments)} enrichments using {merge_strategy} strategy"
             )
             
-            # Extract keywords from each enrichment
+
             keyword_sources = self._extract_keywords_from_enrichments(input_enrichments)
             
             if not keyword_sources:
                 result = {"merged_keywords": []}
-                # Normalize all Unicode text in the result
+                
                 return self.normalize_text(result)
             
-            # Merge based on strategy
+
             if merge_strategy == "union":
                 merged_keywords = self._merge_union(keyword_sources, max_results)
             elif merge_strategy == "intersection":
@@ -91,10 +91,10 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             elif merge_strategy == "ranked":
                 merged_keywords = self._merge_ranked(keyword_sources, max_results)
             else:
-                # Default to union
+
                 merged_keywords = self._merge_union(keyword_sources, max_results)
             
-            # Calculate merge statistics
+
             total_input_keywords = sum(len(source["keywords"]) for source in keyword_sources)
             
             self._logger.info(
@@ -114,7 +114,7 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
             
         except Exception as e:
@@ -129,7 +129,7 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
     
     def _extract_keywords_from_enrichments(self, enrichments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -140,28 +140,28 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             provider = "unknown"
             keywords = []
             
-            # Extract ConceptNet keywords
+
             if "conceptnet_keywords" in enrichment:
                 provider = "conceptnet"
                 keywords = enrichment["conceptnet_keywords"]
             
-            # Extract LLM keywords  
+
             elif "llm_keywords" in enrichment:
                 provider = "llm"
                 keywords = enrichment["llm_keywords"]
             
-            # Extract Gensim similar terms
+
             elif "gensim_similar" in enrichment:
                 provider = "gensim"
                 similar_terms = enrichment["gensim_similar"]
                 
-                # Handle both simple lists and score objects
+
                 if similar_terms and isinstance(similar_terms[0], dict):
                     keywords = [item.get("term", str(item)) for item in similar_terms]
                 else:
                     keywords = similar_terms
             
-            # Generic keyword extraction
+
             elif "keywords" in enrichment:
                 keywords = enrichment["keywords"]
                 provider = enrichment.get("metadata", {}).get("provider", "unknown")
@@ -182,7 +182,7 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
         for source in sources:
             all_keywords.update(source["keywords"])
         
-        # Convert to list and limit results
+
         result = list(all_keywords)[:max_results]
         return result
     
@@ -194,10 +194,10 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
         if len(sources) == 1:
             return sources[0]["keywords"][:max_results]
         
-        # Start with first source
+
         common_keywords = set(sources[0]["keywords"])
         
-        # Find intersection with other sources
+
         for source in sources[1:]:
             common_keywords &= set(source["keywords"])
         
@@ -213,11 +213,11 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
         """Merge using weighted strategy - weight keywords by provider importance."""
         keyword_scores = Counter()
         
-        # Default weights if not specified
+
         default_weights = {
-            "llm": 1.0,       # LLM gets highest weight (most semantic)
-            "conceptnet": 0.8, # ConceptNet gets high weight (linguistic)
-            "gensim": 0.6      # Gensim gets medium weight (statistical)
+            "llm": 1.0,     
+            "conceptnet": 0.8,
+            "gensim": 0.6    
         }
         
         for source in sources:
@@ -227,7 +227,7 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             for keyword in source["keywords"]:
                 keyword_scores[keyword] += weight
         
-        # Sort by score and return top results
+
         sorted_keywords = keyword_scores.most_common(max_results)
         result = [keyword for keyword, score in sorted_keywords]
         return result
@@ -240,7 +240,7 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             for keyword in source["keywords"]:
                 keyword_counts[keyword] += 1
         
-        # Sort by frequency (most common first)
+
         sorted_keywords = keyword_counts.most_common(max_results)
         result = [keyword for keyword, count in sorted_keywords]
         return result
@@ -273,21 +273,21 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
         if weights:
             config["weights"] = weights
         
-        # Use enrich_field with dummy field info
+        
         result = await self.enrich_field("merged", "", config)
         response = {
             "merged_keywords": result.get("merged_keywords", []),
             "metadata": result.get("merge_metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def health_check(self) -> Dict[str, Any]:
         """Check plugin health - no HTTP dependencies."""
         base_health = await super().health_check()
         
-        # This plugin doesn't depend on external services
+
         base_health["service_dependencies"] = "none"
         base_health["merge_strategies"] = ["union", "intersection", "weighted", "ranked"]
         

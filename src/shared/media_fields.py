@@ -15,22 +15,22 @@ if TYPE_CHECKING:
 
 class FieldType(Enum):
     """Types of fields in media entities for intelligent processing."""
-    TEXT_CONTENT = "text_content"       # Descriptive text suitable for NLP analysis
-    METADATA = "metadata"               # Factual information (year, rating, etc.)
-    PEOPLE = "people"                   # Person/organization information
-    IDENTIFIERS = "identifiers"         # IDs, URLs, provider references
-    TECHNICAL = "technical"             # File/streaming technical details
-    STRUCTURAL = "structural"           # Lists, nested objects, complex data
-    UNKNOWN = "unknown"                 # Unclassified fields
+    TEXT_CONTENT = "text_content"
+    METADATA = "metadata"
+    PEOPLE = "people"
+    IDENTIFIERS = "identifiers"
+    TECHNICAL = "technical"
+    STRUCTURAL = "structural"
+    UNKNOWN = "unknown"
 
 
 class AnalysisWeight(Enum):
     """Importance levels for NLP analysis and concept expansion."""
-    CRITICAL = 1.0      # Primary content (overview, description)
-    HIGH = 0.8          # Important content (taglines, themes)
-    MEDIUM = 0.6        # Useful content (tags, genres)
-    LOW = 0.3           # Supplementary content (technical details)
-    IGNORE = 0.0        # Not useful for intelligence (internal IDs)
+    CRITICAL = 1.0
+    HIGH = 0.8
+    MEDIUM = 0.6
+    LOW = 0.3
+    IGNORE = 0.0
 
 
 @dataclass
@@ -46,32 +46,24 @@ class MediaField:
     field_type: FieldType
     analysis_weight: AnalysisWeight
     
-    # Processing flags
-    cache_key_eligible: bool = True     # Can be used for cache key generation
-    nlp_ready: bool = False             # Text is ready for NLP processing
-    concept_expandable: bool = False    # Suitable for concept expansion
+    cache_key_eligible: bool = True
+    nlp_ready: bool = False
+    concept_expandable: bool = False
     
-    # Metadata
     original_type: type = field(default=str)
     processing_notes: List[str] = field(default_factory=list)
     
     def get_text_value(self) -> Optional[str]:
-        """
-        Extract text content suitable for NLP analysis.
-        
-        Handles various data types and converts to analyzable text.
-        """
+        """Extract text content suitable for NLP analysis."""
         if self.field_type != FieldType.TEXT_CONTENT:
             return None
         
         if isinstance(self.value, str):
             return self.value.strip()
         elif isinstance(self.value, list):
-            # Handle lists of strings (tags, genres, etc.)
             text_items = [str(item) for item in self.value if item]
             return " ".join(text_items) if text_items else None
         elif isinstance(self.value, dict):
-            # Extract text from dictionary values
             text_values = []
             for v in self.value.values():
                 if isinstance(v, str) and v.strip():
@@ -93,7 +85,7 @@ class MediaField:
         if not text:
             return None
         
-        # Use shared text normalization
+        
         from src.shared.text_utils import clean_for_cache_key
         return clean_for_cache_key(text)
 
@@ -117,7 +109,7 @@ class FieldAnalyzer:
             from src.shared.field_analysis_plugins import get_default_field_analysis_plugins
             plugins = get_default_field_analysis_plugins()
         
-        # Sort plugins by priority (highest first)
+
         self.plugins = sorted(plugins, key=lambda p: p.priority, reverse=True)
     
     def analyze_field(self, name: str, value: Any, media_type: str = "Unknown") -> MediaField:
@@ -134,19 +126,19 @@ class FieldAnalyzer:
         Returns:
             MediaField with intelligent classification
         """
-        # Try each plugin until one can handle the field
+
         for plugin in self.plugins:
             if plugin.can_analyze(name, value, media_type):
                 try:
                     field = plugin.analyze_field(name, value, media_type)
-                    # Add plugin info to processing notes
+                    
                     field.processing_notes.append(f"Classified by {plugin.plugin_name}")
                     return field
                 except Exception as e:
-                    # Plugin failed, try next one
+
                     continue
         
-        # Fallback if no plugin worked (shouldn't happen with FallbackPlugin)
+
         return MediaField(
             name=name,
             value=value,
@@ -167,15 +159,15 @@ class MediaEntity:
     music, or any future media type through intelligent field classification.
     """
     
-    # Only truly universal fields
+
     entity_id: str
     entity_name: str
-    media_type: str  # "Movie", "Series", "Book", "Album", etc.
+    media_type: str
     
-    # All fields stored as MediaField objects
+
     fields: Dict[str, MediaField] = field(default_factory=dict)
     
-    # Processing metadata
+
     created_at: datetime = field(default_factory=datetime.utcnow)
     processing_notes: List[str] = field(default_factory=list)
     
@@ -187,31 +179,31 @@ class MediaEntity:
         This replaces the hard-coded from_jellyfin_data approach with
         a generic analyzer that works for any media type.
         """
-        # Extract universal fields
+
         entity_id = raw_data.get('Id') or raw_data.get('id') or raw_data.get('ID') or 'unknown'
         entity_name = raw_data.get('Name') or raw_data.get('name') or raw_data.get('title') or 'Unknown'
         detected_type = raw_data.get('Type') or raw_data.get('type') or media_type
         
-        # Initialize field analyzer with default plugins
+        
         field_analyzer = FieldAnalyzer()
         
-        # Analyze all other fields
+
         fields = {}
         processing_notes = []
         
         for field_name, field_value in raw_data.items():
-            # Skip universal fields already processed
+
             if field_name.lower() in ['id', 'name', 'type']:
                 continue
             
-            # Skip empty/null values
+
             if field_value is None or field_value == '' or field_value == []:
                 continue
             
-            # Analyze field using plugins
+
             media_field = field_analyzer.analyze_field(field_name, field_value, detected_type)
             
-            # Set processing flags for text fields
+            
             if media_field.field_type == FieldType.TEXT_CONTENT:
                 media_field.nlp_ready = bool(media_field.get_text_value())
             
@@ -220,7 +212,7 @@ class MediaEntity:
             if media_field.field_type == FieldType.UNKNOWN:
                 processing_notes.append(f"Unknown field type: {field_name}")
         
-        # Combine processing notes from analyzer and fields
+
         all_processing_notes = processing_notes.copy()
         for field in fields.values():
             all_processing_notes.extend(field.processing_notes)
@@ -301,11 +293,11 @@ class MediaEntity:
         }
         
         for field_name, field in self.fields.items():
-            # Count by field type
+
             field_type_name = field.field_type.value
             summary['field_types'][field_type_name] = summary['field_types'].get(field_type_name, 0) + 1
             
-            # Count special categories
+
             if field.field_type == FieldType.TEXT_CONTENT:
                 summary['text_fields'] += 1
             if field.concept_expandable:

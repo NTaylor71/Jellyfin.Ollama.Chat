@@ -45,7 +45,7 @@ class HealthStatus:
             "error": error
         })
         
-        # Keep only recent errors
+
         if len(self.error_history) > 10:
             self.error_history = self.error_history[-10:]
     
@@ -61,7 +61,7 @@ class HealthStatus:
                 {
                     "timestamp": err["timestamp"].isoformat(),
                     "error": err["error"]
-                } for err in self.error_history[-3:]  # Only recent errors
+                } for err in self.error_history[-3:]
             ],
             "metadata": self.metadata
         }
@@ -81,7 +81,7 @@ class HealthMonitor:
     def __init__(self, plugin_loader: PluginLoader):
         self.plugin_loader = plugin_loader
         self.health_statuses: Dict[str, HealthStatus] = {}
-        self.check_interval = 60  # seconds
+        self.check_interval = 60
         self.monitor_task: Optional[asyncio.Task] = None
         self.running = False
     
@@ -123,24 +123,24 @@ class HealthMonitor:
                 break
             except Exception as e:
                 logger.error(f"Health monitor error: {e}")
-                await asyncio.sleep(10)  # Brief pause on error
+                await asyncio.sleep(10)
     
     async def _perform_health_checks(self):
         """Perform health checks on all plugins and services."""
         logger.debug("Performing health checks...")
         
-        # Get list of available plugins
+        
         plugins_info = await self.plugin_loader.list_available_plugins()
         
-        # Check local plugins
+        
         for plugin_name in plugins_info.get("local_plugins", {}):
             await self._check_plugin_health(plugin_name)
         
-        # Check service plugins
+        
         for plugin_name in plugins_info.get("service_plugins", {}):
             await self._check_service_plugin_health(plugin_name)
         
-        # Log summary
+
         healthy_count = len([h for h in self.health_statuses.values() if h.status == "healthy"])
         total_count = len(self.health_statuses)
         
@@ -196,11 +196,11 @@ class HealthMonitor:
         healthy_plugins = [h for h in self.health_statuses.values() if h.status == "healthy"]
         unhealthy_plugins = [h for h in self.health_statuses.values() if h.status == "unhealthy"]
         
-        # Calculate overall health score
+
         total_plugins = len(self.health_statuses)
         health_score = len(healthy_plugins) / total_plugins if total_plugins > 0 else 0
         
-        # Determine overall status
+
         if health_score >= 0.8:
             overall_status = "healthy"
         elif health_score >= 0.5:
@@ -243,7 +243,7 @@ class HealthMonitor:
         
         for name, status in self.health_statuses.items():
             if status.status == "unhealthy":
-                # Basic recovery recommendations
+
                 if status.consecutive_failures >= 5:
                     recommendations.append({
                         "plugin": name,
@@ -273,19 +273,19 @@ class HealthMonitor:
         logger.info(f"Attempting recovery for plugin: {plugin_name}")
         
         try:
-            # For local plugins, try reloading
+
             plugins_info = await self.plugin_loader.list_available_plugins()
             
             if plugin_name in plugins_info.get("local_plugins", {}):
-                # Try reloading the plugin
-                # This would require plugin loader to support reloading
+
+
                 logger.info(f"Would attempt to reload local plugin: {plugin_name}")
-                return False  # Not implemented yet
+                return False
             
             elif plugin_name in plugins_info.get("service_plugins", {}):
-                # For service plugins, the service itself needs to recover
+
                 logger.info(f"Service plugin {plugin_name} recovery depends on service health")
-                return False  # Service recovery not implemented here
+                return False
             
             else:
                 logger.warning(f"Unknown plugin type for recovery: {plugin_name}")

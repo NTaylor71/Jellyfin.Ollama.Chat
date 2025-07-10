@@ -16,7 +16,7 @@ from src.shared.plugin_contracts import (
 )
 from src.shared.config import get_settings
 
-# Set up logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -200,7 +200,7 @@ async def test_multiple_expansion_types():
         manager = get_cache_manager()
         await manager.initialize()
         
-        # Test cases: (field_name, input_value, expansion_type, compute_func)
+
         test_cases = [
             ("tags", "action", CacheType.CONCEPTNET, lambda: create_conceptnet_expansion("tags", "action")),
             ("genres", "thriller", CacheType.GENSIM_SIMILARITY, lambda: create_gensim_similarity("genres", "thriller")),
@@ -216,7 +216,7 @@ async def test_multiple_expansion_types():
             
             cache_key = manager.generate_cache_key(cache_type, field_name, input_value)
             
-            # First call - should compute and cache
+
             result1 = await manager.get_or_compute(cache_key, compute_func)
             if result1:
                 logger.info(f"✅ {cache_type.value} expansion computed and cached")
@@ -226,7 +226,7 @@ async def test_multiple_expansion_types():
                 results[f"{cache_type.value}_compute"] = False
                 continue
             
-            # Second call - should be cache hit
+
             result2 = await manager.get_or_compute(cache_key, compute_func)
             if result2:
                 logger.info(f"✅ {cache_type.value} expansion retrieved from cache")
@@ -235,7 +235,7 @@ async def test_multiple_expansion_types():
                 logger.error(f"❌ {cache_type.value} cache retrieval failed")
                 results[f"{cache_type.value}_cache_hit"] = False
         
-        # Check results
+        
         success_count = sum(1 for success in results.values() if success)
         total_count = len(results)
         
@@ -254,12 +254,12 @@ async def test_cache_key_format():
     try:
         manager = get_cache_manager()
         
-        # Test different key formats
+
         test_cases = [
             (CacheType.CONCEPTNET, "tags", "action", "movie", "conceptnet:tags:action:movie"),
             (CacheType.GENSIM_SIMILARITY, "genres", "thriller", "book", "gensim_similarity:genres:thriller:book"),
             (CacheType.SPACY_TEMPORAL, "release_date", "tomorrow", "movie", "spacy_temporal:release_date:tomorrow:movie"),
-            (CacheType.TAG_EXPANSION, "categories", "sci-fi", "book", "tag_expansion:categories:sci_fi:book")  # Note: "sci-fi" becomes "sci_fi"
+            (CacheType.TAG_EXPANSION, "categories", "sci-fi", "book", "tag_expansion:categories:sci_fi:book")
         ]
         
         for cache_type, field_name, input_value, media_context, expected_key in test_cases:
@@ -286,7 +286,7 @@ async def test_cache_warm_field_values():
     try:
         manager = get_cache_manager()
         
-        # Test warming tag values
+
         tag_values = ["action", "thriller", "comedy"]
         
         async def compute_tag_expansion(value: str) -> PluginResult:
@@ -319,15 +319,15 @@ async def test_actual_cache_documents():
     try:
         cache = get_field_expansion_cache()
         
-        # Create a test expansion
+        
         result = await create_conceptnet_expansion("tags", "horror")
         await cache.store_result(result)
         
-        # Retrieve and check structure
+
         retrieved = await cache.get_cached_result(result.cache_key)
         
         if retrieved:
-            # Verify structure
+
             cache_doc = retrieved.to_cache_document()
             required_fields = [
                 "cache_key", "field_name", "input_value", "media_type",
@@ -362,7 +362,7 @@ async def run_all_generic_cache_tests():
     logger.info("STARTING GENERIC FIELD EXPANSION CACHE TESTS")
     logger.info("=" * 60)
     
-    # Show environment info
+
     settings = get_settings()
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"MongoDB URL: {settings.mongodb_url}")
@@ -389,7 +389,7 @@ async def run_all_generic_cache_tests():
             logger.error(f"❌ {test_name} ERROR: {e}")
             results.append((test_name, False))
     
-    # Summary
+
     logger.info("\n" + "=" * 60)
     logger.info("GENERIC CACHE TEST SUMMARY")
     logger.info("=" * 60)

@@ -53,7 +53,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             Dict containing SUTime temporal extraction results
         """
         try:
-            # Convert field value to text
+
             if isinstance(field_value, str):
                 text = field_value
             elif isinstance(field_value, list):
@@ -67,8 +67,8 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using SUTime")
             
-            # Call SUTime provider via dedicated SUTime service  
-            # SUTime provider expects ProviderRequest format
+            
+
             service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
@@ -87,10 +87,10 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from ProviderResponse format
+            
             if response.get("success", False):
                 result_data = response.get("result", {})
-                # SUTime provider returns expanded_concepts containing temporal annotations
+
                 temporal_annotations = result_data.get("expanded_concepts", [])
                 metadata = response.get("metadata", {})
                 metadata.update(result_data.get("analysis", {}))
@@ -118,7 +118,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             
         except Exception as e:
             self._logger.error(f"SUTime temporal extraction failed for field {field_name}: {e}")
-            # Return empty result on error
+            
             return {
                 "sutime_temporal": [],
                 "original_text": "",
@@ -148,7 +148,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
         if config is None:
             config = {}
             
-        # Use enrich_field with dummy field info
+        
         result = await self.enrich_field("text", text, config)
         return {
             "temporal_annotations": result.get("sutime_temporal", []),
@@ -212,7 +212,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
         
         result = await self.enrich_field("ranges", text, config)
         
-        # Filter for range/duration expressions
+
         temporal_annotations = result.get("sutime_temporal", [])
         range_annotations = [
             annotation for annotation in temporal_annotations
@@ -266,7 +266,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
         base_health = await super().health_check()
         
         try:
-            # Test SUTime temporal service connectivity
+            
             service_url = self.get_service_url("temporal", "health")
             health_response = await self.http_get(service_url)
             

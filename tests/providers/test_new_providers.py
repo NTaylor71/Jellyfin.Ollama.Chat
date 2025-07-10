@@ -10,7 +10,7 @@ from typing import Dict, Any
 from src.shared.concept_expander import ConceptExpander, ExpansionMethod
 from src.shared.plugin_contracts import PluginResult
 
-# Configure logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ async def test_provider(
             
             print(f"✅ Success! Found {len(expanded)} concepts in {execution_time:.1f}ms")
             
-            for i, concept_item in enumerate(expanded[:5]):  # Show top 5
+            for i, concept_item in enumerate(expanded[:5]):
                 confidence = confidence_scores.get(concept_item, 0.0)
                 print(f"  {i+1}. {concept_item} (confidence: {confidence:.3f})")
             
@@ -88,12 +88,12 @@ async def test_all_new_providers():
     print("🚀 Testing Stage 3.2.5 New Concept Providers")
     print("=" * 60)
     
-    # Initialize expander
+
     expander = ConceptExpander()
     
-    # Test concepts for different provider types
+
     test_cases = [
-        # Gensim - statistical similarity
+
         {
             "method": ExpansionMethod.GENSIM,
             "concepts": [
@@ -103,7 +103,7 @@ async def test_all_new_providers():
             ]
         },
         
-        # SpaCy Temporal - temporal parsing
+
         {
             "method": ExpansionMethod.SPACY_TEMPORAL,
             "concepts": [
@@ -114,7 +114,7 @@ async def test_all_new_providers():
             ]
         },
         
-        # HeidelTime - context-aware temporal
+
         {
             "method": ExpansionMethod.HEIDELTIME,
             "concepts": [
@@ -125,7 +125,7 @@ async def test_all_new_providers():
             ]
         },
         
-        # SUTime - rule-based temporal
+
         {
             "method": ExpansionMethod.SUTIME,
             "concepts": [
@@ -155,7 +155,7 @@ async def test_all_new_providers():
         
         all_results.extend(provider_results)
     
-    # Summary
+
     print(f"\n📊 SUMMARY")
     print("=" * 60)
     
@@ -168,7 +168,7 @@ async def test_all_new_providers():
     print(f"💥 Error tests: {error_count}")
     print(f"📈 Success rate: {success_count / len(all_results) * 100:.1f}%")
     
-    # Provider-specific summary
+
     provider_stats = {}
     for result in all_results:
         provider = result["provider"]
@@ -183,7 +183,7 @@ async def test_all_new_providers():
         success_rate = stats["success"] / stats["total"] * 100
         print(f"  {provider.upper()}: {stats['success']}/{stats['total']} ({success_rate:.1f}%)")
     
-    # Cleanup
+
     await expander.close()
     
     return all_results
@@ -196,10 +196,10 @@ async def test_provider_integration():
     
     expander = ConceptExpander()
     
-    # Test concept with multiple suitable providers
+
     concept = "recent action movies"
     
-    # Test different methods with same concept
+
     methods_to_test = [
         ExpansionMethod.CONCEPTNET,
         ExpansionMethod.LLM,
@@ -223,7 +223,7 @@ async def test_provider_integration():
         else:
             print(f"  ❌ {result.get('error', 'Failed')}")
     
-    # Test method recommendation
+
     recommended = expander.get_recommended_method(concept, "movie")
     print(f"\n🎯 Recommended method for '{concept}': {recommended.value.upper()}")
     

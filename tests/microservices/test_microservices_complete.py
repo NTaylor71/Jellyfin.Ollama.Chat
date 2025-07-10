@@ -24,10 +24,10 @@ import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
-# Add project root to path
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-# Import project modules
+
 from src.worker.resource_queue_manager import ResourceAwareQueueManager
 from src.worker.resource_manager import create_resource_pool_from_config
 from src.worker.plugin_loader import PluginLoader
@@ -62,35 +62,35 @@ class MicroservicesArchitectureTest:
         print("🚀 Starting Complete Microservices Architecture Test")
         print("=" * 60)
         
-        # Test infrastructure health
+
         await self._test_infrastructure_health()
         
-        # Test direct service endpoints
+
         await self._test_service_endpoints()
         
-        # Test provider functionality
+
         await self._test_providers()
         
-        # Test queue and worker flow
+
         await self._test_queue_worker_flow()
         
-        # Test complete end-to-end flows
+
         await self._test_end_to_end_flows()
         
-        # Generate report
+
         return self._generate_report()
     
     async def _test_infrastructure_health(self):
         """Test basic infrastructure health."""
         print("\n🔍 Testing Infrastructure Health...")
         
-        # Test Redis
+
         await self._run_test(
             "Redis Connection",
             self._test_redis_health
         )
         
-        # Test Docker services
+
         services = [
             ("ConceptNet Service", "http://localhost:8001/health"),
             ("Gensim Service", "http://localhost:8006/health"),
@@ -98,7 +98,7 @@ class MicroservicesArchitectureTest:
             ("HeidelTime Service", "http://localhost:8008/health"),
             ("LLM Service", "http://localhost:8002/health"), 
             ("Router Service", "http://localhost:8003/health"),
-            ("Worker Service", "http://localhost:8004/metrics")  # Prometheus endpoint
+            ("Worker Service", "http://localhost:8004/metrics")
         ]
         
         for service_name, url in services:
@@ -111,13 +111,13 @@ class MicroservicesArchitectureTest:
         """Test service endpoints directly."""
         print("\n🔍 Testing Service Endpoints...")
         
-        # Test Split Architecture Service providers
+
         await self._run_test(
             "ConceptNet Service Providers List",
             self._test_nlp_providers
         )
         
-        # Test Router Service discovery
+
         await self._run_test(
             "Router Service Discovery",
             self._test_router_discovery
@@ -127,7 +127,7 @@ class MicroservicesArchitectureTest:
         """Test individual providers through services."""
         print("\n🔍 Testing Providers...")
         
-        # Test each Split Architecture provider
+
         split_tests = [
             ("Gensim Provider", "gensim", "action movie thriller"),
             ("SpaCy Provider", "spacy", "90s action movie"),
@@ -140,7 +140,7 @@ class MicroservicesArchitectureTest:
                 lambda p=provider, c=concept: self._test_nlp_provider(p, c)
             )
         
-        # Test LLM provider
+
         await self._run_test(
             "Ollama LLM Provider",
             lambda: self._test_llm_provider("sci-fi space adventure")
@@ -150,13 +150,13 @@ class MicroservicesArchitectureTest:
         """Test Redis queue and worker processing."""
         print("\n🔍 Testing Queue & Worker Flow...")
         
-        # Test queue submission
+
         await self._run_test(
             "Queue Task Submission",
             self._test_queue_submission
         )
         
-        # Test plugin discovery
+
         await self._run_test(
             "Worker Plugin Discovery",
             self._test_plugin_discovery
@@ -166,19 +166,19 @@ class MicroservicesArchitectureTest:
         """Test complete end-to-end flows."""
         print("\n🔍 Testing End-to-End Flows...")
         
-        # Test concept expansion flow
+
         await self._run_test(
             "ConceptExpansion E2E Flow",
             lambda: self._test_e2e_concept_expansion("epic fantasy adventure")
         )
         
-        # Test question expansion flow
+
         await self._run_test(
             "QuestionExpansion E2E Flow", 
             lambda: self._test_e2e_question_expansion("fast-paced psychological thriller")
         )
         
-        # Test temporal analysis flow
+
         await self._run_test(
             "TemporalAnalysis E2E Flow",
             lambda: self._test_e2e_temporal_analysis("classic 80s comedy")
@@ -377,7 +377,7 @@ class MicroservicesArchitectureTest:
     
     async def _test_e2e_plugin_flow(self, plugin_name: str, plugin_type: str, concept: str) -> Dict[str, Any]:
         """Test complete plugin flow through queue → worker → service."""
-        # Submit task to queue
+
         task_data = {
             "plugin_name": plugin_name,
             "plugin_type": plugin_type,
@@ -396,14 +396,14 @@ class MicroservicesArchitectureTest:
         if not task_id:
             raise Exception("Failed to enqueue task")
         
-        # Wait for processing and check results
-        max_wait_time = 60  # 60 seconds max
+
+        max_wait_time = 60
         start_time = time.time()
         
         while time.time() - start_time < max_wait_time:
-            # Check if task was completed by looking at Redis
+
             try:
-                # Check completed tasks key (implementation dependent)
+
                 completed_key = f"completed_task:{task_id}"
                 result = self.queue_manager.redis_client.get(completed_key)
                 
@@ -420,14 +420,14 @@ class MicroservicesArchitectureTest:
                     else:
                         raise Exception(f"Task failed: {result_data.get('error')}")
                 
-                # Wait a bit before checking again
+
                 await asyncio.sleep(2)
                 
             except json.JSONDecodeError:
                 await asyncio.sleep(2)
                 continue
         
-        # If we get here, test via router service directly as fallback
+
         return await self._test_router_plugin_directly(plugin_name, plugin_type, concept)
     
     async def _test_router_plugin_directly(self, plugin_name: str, plugin_type: str, concept: str) -> Dict[str, Any]:

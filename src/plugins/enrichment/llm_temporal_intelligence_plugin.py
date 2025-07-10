@@ -32,7 +32,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             author="System",
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["temporal", "intelligence", "llm", "reasoning", "concepts"],
-            execution_priority=ExecutionPriority.HIGH  # LLM is expensive, prioritize
+            execution_priority=ExecutionPriority.HIGH
         )
     
     @property
@@ -43,10 +43,10 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             preferred_cpu_cores=2.0,
             min_memory_mb=512.0,
             preferred_memory_mb=2048.0,
-            requires_gpu=True,  # LLM inference benefits significantly from GPU
+            requires_gpu=True,
             min_gpu_memory_mb=2048.0,
             preferred_gpu_memory_mb=8192.0,
-            max_execution_time_seconds=90.0  # Temporal reasoning can be complex
+            max_execution_time_seconds=90.0
         )
     
     async def enrich_field(
@@ -67,7 +67,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             Dict containing LLM temporal intelligence results
         """
         try:
-            # Convert field value to text
+
             if isinstance(field_value, str):
                 text = field_value
             elif isinstance(field_value, list):
@@ -78,13 +78,13 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             if not text.strip():
                 self._logger.debug(f"No text found in field {field_name}")
                 result = {"llm_temporal": []}
-                # Normalize all Unicode text in the result
+                
                 return self.normalize_text(result)
             
             self._logger.debug(f"Extracting temporal concepts from {len(text)} characters using LLM")
             
-            # Call LLM service (using general expand endpoint for temporal analysis)
-            # LLM expand endpoint expects LLMRequest format
+            
+
             service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
@@ -98,17 +98,17 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
                     "extract_sequences": config.get("extract_sequences", True),
                     "extract_relationships": config.get("extract_relationships", True),
                     "reasoning_depth": config.get("reasoning_depth", "medium"),
-                    "temperature": config.get("temperature", 0.2),  # Lower for more consistent results
+                    "temperature": config.get("temperature", 0.2),
                     "context_window": config.get("context_window", "full")
                 }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from LLMRequest format
+            
             if response.get("success", False):
                 result_data = response.get("result", {})
-                # LLM service returns temporal data in expanded_concepts
+
                 temporal_concepts = result_data.get("expanded_concepts", 
                                   result_data.get("temporal_concepts", 
                                   result_data.get("concepts", [])))
@@ -135,12 +135,12 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"LLM temporal intelligence failed for field {field_name}: {e}")
-            # Return empty result on error
+            
             result = {
                 "llm_temporal": [],
                 "original_text": "",
@@ -152,7 +152,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
     
     async def analyze_temporal_concepts(
@@ -173,14 +173,14 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
         if config is None:
             config = {}
             
-        # Use enrich_field with dummy field info
+        
         result = await self.enrich_field("text", text, config)
         response = {
             "temporal_concepts": result.get("llm_temporal", []),
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def extract_temporal_periods(
@@ -212,7 +212,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
         
         result = await self.enrich_field("periods", text, config)
         
-        # Filter for period concepts
+
         temporal_concepts = result.get("llm_temporal", [])
         period_concepts = [
             concept for concept in temporal_concepts
@@ -228,7 +228,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def analyze_temporal_sequences(
@@ -263,7 +263,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def extract_temporal_relationships(
@@ -301,7 +301,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def comprehensive_temporal_analysis(
@@ -333,7 +333,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
         result = await self.enrich_field("comprehensive", text, config)
         temporal_concepts = result.get("llm_temporal", [])
         
-        # Categorize concepts by type
+
         periods = [c for c in temporal_concepts if c.get("category") == "period"]
         sequences = [c for c in temporal_concepts if c.get("category") == "sequence"]
         relationships = [c for c in temporal_concepts if c.get("category") == "relationship"]
@@ -358,7 +358,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def health_check(self) -> Dict[str, Any]:
@@ -366,7 +366,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
         base_health = await super().health_check()
         
         try:
-            # Test LLM temporal service connectivity
+            
             service_url = self.get_service_url("llm", "health")
             health_response = await self.http_get(service_url)
             

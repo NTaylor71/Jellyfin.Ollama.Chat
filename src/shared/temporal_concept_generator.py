@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TemporalConceptRequest:
     """Request for temporal concept generation."""
-    temporal_term: str           # e.g., "recent", "classic", "90s"
-    media_context: str          # e.g., "movie", "book", "music"
+    temporal_term: str         
+    media_context: str        
     max_concepts: int = 10
-    bootstrap_mode: bool = False  # True for initial learning, False for cached lookup
+    bootstrap_mode: bool = False
 
 
 class TemporalConceptGenerator:
@@ -53,7 +53,7 @@ class TemporalConceptGenerator:
         self.cache_manager = get_cache_manager()
         self.llm_provider = LLMProvider()
         
-        # No hardcoded bootstrap questions - generate dynamically via LLM
+
     
     async def classify_temporal_concept(self, concept: str) -> PluginResult:
         """
@@ -66,7 +66,7 @@ class TemporalConceptGenerator:
             PluginResult with temporal classification and confidence
         """
         try:
-            # Build LLM prompt for temporal classification
+            
             prompt = f"""Analyze if this concept is temporal (time-related):
             
 Concept: "{concept}"
@@ -94,7 +94,7 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 temperature=0.1
             )
             
-            # Async call for classification
+
             try:
                 llm_response = await self.llm_provider.client.generate_completion(llm_request)
                 if llm_response.success:
@@ -132,7 +132,7 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
         except Exception as e:
             logger.warning(f"Temporal classification failed: {e}")
             
-        # Fallback: simple numeric year detection
+
         import re
         has_year = bool(re.search(r'\b\d{4}s?\b', concept))
         
@@ -170,7 +170,7 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
         start_time = datetime.now()
         
         try:
-            # Generate cache key for this temporal concept
+
             cache_key = self.cache_manager.generate_cache_key(
                 cache_type=CacheType.CUSTOM,
                 field_name="temporal_concept",
@@ -178,7 +178,7 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 media_context=request.media_context
             )
             
-            # Use cache manager's get_or_compute pattern
+            
             result = await self.cache_manager.get_or_compute(
                 cache_key=cache_key,
                 compute_func=lambda: self._compute_temporal_concepts(request, start_time),
@@ -207,30 +207,30 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
         This is called by cache manager when cache miss occurs.
         """
         try:
-            # Ensure LLM provider is available
+
             if not await self.llm_provider._ensure_initialized():
                 logger.error("LLM provider not available for temporal concept generation")
                 return None
             
-            # Build intelligent prompt for temporal understanding
+            
             prompt = self._build_temporal_analysis_prompt(
                 request.temporal_term,
                 request.media_context,
                 request.max_concepts
             )
             
-            # Create LLM request
+            
             from src.providers.llm.base_llm_client import LLMRequest
             llm_request = LLMRequest(
                 prompt=prompt,
                 concept=request.temporal_term,
                 media_context=request.media_context,
                 max_tokens=200,
-                temperature=0.3,  # Lower temperature for more consistent temporal concepts
+                temperature=0.3,
                 system_prompt=self._build_temporal_system_prompt(request.media_context)
             )
             
-            # Call LLM for temporal concept generation
+
             logger.info(f"🤖 LLM Request: Generating temporal concepts for '{request.temporal_term}' in {request.media_context} context")
             llm_response = await self.llm_provider.client.generate_completion(llm_request)
             logger.info(f"🤖 LLM Response: {len(llm_response.text)} characters received")
@@ -239,7 +239,7 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 logger.warning(f"LLM failed for temporal concept generation: {llm_response.error_message}")
                 return None
             
-            # Parse temporal concepts from LLM response
+
             temporal_concepts = self._parse_temporal_concepts(
                 llm_response.text,
                 request.max_concepts
@@ -249,17 +249,17 @@ Format: [TEMPORAL|NON_TEMPORAL] [0.0-1.0] [reason]"""
                 logger.warning(f"No temporal concepts extracted from LLM response for: {request.temporal_term}")
                 return None
             
-            # Generate confidence scores
+
             confidence_scores = await self._generate_confidence_scores(
                 temporal_concepts,
                 request.temporal_term,
                 llm_response
             )
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create PluginResult
+            
             return create_field_expansion_result(
                 field_name="temporal_concept",
                 input_value=f"{request.temporal_term}:{request.media_context}",
@@ -341,10 +341,10 @@ Related temporal concepts:"""
         Returns:
             List of cleaned temporal concept strings
         """
-        # Clean up the response
+
         text = response_text.strip()
         
-        # Remove common prefixes that LLMs might add
+        
         prefixes_to_remove = [
             "Related temporal concepts:", "Temporal concepts:", "Concepts:",
             "Related terms:", "Here are", "The concepts are:"
@@ -354,13 +354,13 @@ Related temporal concepts:"""
             if text.lower().startswith(prefix.lower()):
                 text = text[len(prefix):].strip()
         
-        # Split by commas while respecting quotes and clean each concept
+
         concepts = []
         
         if "," in text:
             raw_concepts = self._smart_split_concepts(text)
         else:
-            # Try newline separation as fallback
+
             raw_concepts = text.split("\n")
         
         for concept in raw_concepts:
@@ -386,19 +386,19 @@ Related temporal concepts:"""
         
         concepts = []
         
-        # First, try to extract quoted strings
+
         quoted_pattern = r'"([^"]+)"'
         quoted_matches = re.findall(quoted_pattern, text)
         
         if quoted_matches:
-            # If we found quoted terms, use those
+
             concepts.extend(quoted_matches)
         else:
-            # No quotes, split by commas normally
+
             raw_concepts = text.split(",")
             concepts.extend([concept.strip() for concept in raw_concepts])
         
-        # Remove empty concepts and normalize
+        
         return [concept.strip() for concept in concepts if concept.strip()]
     
     def _clean_temporal_concept(self, concept: str) -> str:
@@ -413,29 +413,29 @@ Related temporal concepts:"""
         """
         import re
         
-        # Basic cleaning
+
         original = concept
         cleaned = concept.strip()
         
-        # Remove quotes first
+        
         cleaned = cleaned.strip('"\'')
         
-        # Remove unwanted single-letter prefixes followed by slash (s/, a/, etc.) - BEFORE lowercasing
+        
         before_slash_removal = cleaned
         cleaned = re.sub(r'^[a-zA-Z]/', '', cleaned)
         if before_slash_removal != cleaned:
             logger.info(f"🧹 Removed single-letter prefix: '{before_slash_removal}' → '{cleaned}'")
         
-        # Remove numbering (1., 2., etc.)
+        
         cleaned = re.sub(r'^\d+\.?\s*', '', cleaned)
         
-        # Remove bullet points
+        
         cleaned = re.sub(r'^[-•*]\s*', '', cleaned)
         
-        # Remove extra whitespace
+        
         cleaned = re.sub(r'\s+', ' ', cleaned)
         
-        # Lowercase and strip at the end
+
         cleaned = cleaned.lower().strip()
         
         if original != cleaned:
@@ -461,23 +461,23 @@ Related temporal concepts:"""
             Dictionary mapping concept to confidence score
         """
         confidence_scores = {}
-        base_confidence = 0.85  # Higher than general concept expansion due to focused temporal analysis
+        base_confidence = 0.85
         
         for i, concept in enumerate(concepts):
-            # Earlier concepts typically have higher confidence
-            position_factor = 1.0 - (i * 0.05)  # Decrease by 5% per position
-            position_factor = max(position_factor, 0.6)  # Minimum 60%
+
+            position_factor = 1.0 - (i * 0.05)
+            position_factor = max(position_factor, 0.6)
             
-            # Longer, more specific concepts might be better
-            specificity_factor = min(len(concept.split()) / 3.0, 1.2)  # Bonus for multi-word
-            specificity_factor = max(specificity_factor, 0.8)  # Minimum 80%
+
+            specificity_factor = min(len(concept.split()) / 3.0, 1.2)
+            specificity_factor = max(specificity_factor, 0.8)
             
-            # Temporal relevance bonus - use pattern-based calculation
+
             temporal_relevance = await self._calculate_temporal_relevance_patterns(concept, original_term)
             
             final_confidence = base_confidence * position_factor * specificity_factor * temporal_relevance
-            final_confidence = min(final_confidence, 0.95)  # Cap at 95%
-            final_confidence = max(final_confidence, 0.4)   # Floor at 40%
+            final_confidence = min(final_confidence, 0.95)
+            final_confidence = max(final_confidence, 0.4) 
             
             confidence_scores[concept] = round(final_confidence, 3)
         
@@ -517,13 +517,13 @@ Related temporal concepts:"""
             "temporal_categories": temporal_categories
         }
         
-        # Generate temporal terms dynamically via LLM analysis
+
         temporal_terms = await self._generate_temporal_terms_via_llm(media_contexts, temporal_categories)
         
         for media_context in media_contexts:
             for category in temporal_categories:
                 if category in temporal_terms:
-                    for term in temporal_terms[category][:2]:  # Limit to first 2 terms per category
+                    for term in temporal_terms[category][:2]:
                         request = TemporalConceptRequest(
                             temporal_term=term,
                             media_context=media_context,
@@ -572,7 +572,7 @@ Related temporal concepts:"""
         relevance = 1.0
         
         try:
-            # Use LLM to assess temporal relevance instead of hard-coded patterns
+            
             prompt = f"""Analyze the temporal relevance between these concepts:
             
 Original term: "{original_term}"
@@ -586,7 +586,7 @@ Rate temporal relevance on scale 1.0-1.5 where:
 Consider: temporal similarity, semantic overlap, specificity
 Respond with just the number (e.g., 1.3)"""
             
-            # Quick LLM call for relevance scoring
+
             from src.providers.llm.base_llm_client import LLMRequest
             llm_request = LLMRequest(
                 prompt=prompt,
@@ -596,13 +596,13 @@ Respond with just the number (e.g., 1.3)"""
                 temperature=0.1
             )
             
-            # Async call for pattern analysis
+
             try:
                 logger.info(f"🔍 LLM Relevance Check: '{concept}' vs '{original_term}'")
                 llm_response = await self.llm_provider.client.generate_completion(llm_request)
                 if llm_response.success:
                     relevance = float(llm_response.text.strip())
-                    relevance = max(1.0, min(1.5, relevance))  # Clamp to valid range
+                    relevance = max(1.0, min(1.5, relevance))
                     logger.info(f"📊 Relevance score: {relevance} for '{concept}' (response: '{llm_response.text.strip()}')")
                 else:
                     relevance = 1.0
@@ -613,7 +613,7 @@ Respond with just the number (e.g., 1.3)"""
                 
         except Exception as e:
             logger.debug(f"LLM relevance calculation failed: {e}")
-            # Simple fallback: check for semantic similarity
+
             if original_term.lower() in concept.lower() or concept.lower() in original_term.lower():
                 relevance = 1.2
             else:
@@ -637,11 +637,11 @@ Respond with just the number (e.g., 1.3)"""
         concept_lower = concept.lower()
         original_lower = original_term.lower()
         
-        # Direct match gets highest score
+
         if original_lower in concept_lower or concept_lower in original_lower:
             return 1.5
         
-        # Temporal keywords
+
         temporal_keywords = {
             'recent': ['new', 'current', 'contemporary', 'modern', 'latest', 'fresh'],
             'classic': ['old', 'vintage', 'retro', 'traditional', 'golden', 'timeless'], 
@@ -650,19 +650,19 @@ Respond with just the number (e.g., 1.3)"""
             'modern': ['new', 'current', 'contemporary', 'recent', 'latest', 'today']
         }
         
-        # Check if concept contains keywords related to original term
+        
         for term, keywords in temporal_keywords.items():
             if term in original_lower:
                 for keyword in keywords:
                     if keyword in concept_lower:
                         return 1.3
         
-        # Generic temporal indicators
+
         time_indicators = ['year', 'decade', 'era', 'period', 'time', 'age', 'season']
         if any(indicator in concept_lower for indicator in time_indicators):
             return 1.2
         
-        # Default relevance
+
         return 1.0
 
     async def _generate_temporal_terms_via_llm(
@@ -687,13 +687,13 @@ Respond with just the number (e.g., 1.3)"""
             from src.providers.llm.base_llm_client import LLMRequest
             
             if not await self.llm_provider._ensure_initialized():
-                # Fallback for all categories
+
                 for category in temporal_categories:
                     temporal_terms[category] = [category, f"related-{category}"]
                 return temporal_terms
             
             for category in temporal_categories:
-                # Generate terms for this category via LLM
+
                 prompt = f'''Generate 5-8 temporal terms that relate to the category "{category}" across different media contexts.
 
 Consider how people actually talk about "{category}" in discussions of movies, books, music, TV shows, etc.
@@ -716,24 +716,24 @@ Temporal terms:'''
                 response = await self.llm_provider.client.generate_completion(llm_request)
                 
                 if response.success:
-                    # Parse comma-separated terms
+
                     terms = [term.strip() for term in response.text.split(',') if term.strip()]
-                    temporal_terms[category] = terms[:8]  # Limit to 8 terms
+                    temporal_terms[category] = terms[:8]
                     logger.debug(f"Generated {len(terms)} terms for category '{category}'")
                 else:
-                    # Fallback for this category
+
                     temporal_terms[category] = [category, f"related-{category}"]
                     
         except Exception as e:
             logger.error(f"LLM temporal term generation failed: {e}")
-            # Fallback for all categories
+
             for category in temporal_categories:
                 temporal_terms[category] = [category, f"related-{category}"]
         
         return temporal_terms
 
 
-# Global instance for reuse
+
 _temporal_concept_generator: Optional[TemporalConceptGenerator] = None
 
 

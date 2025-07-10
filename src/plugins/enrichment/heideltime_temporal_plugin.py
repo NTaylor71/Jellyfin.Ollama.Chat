@@ -41,19 +41,7 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
         field_value: Any, 
         config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Enrich a field with HeidelTime temporal extraction.
-        
-        Args:
-            field_name: Name of the field being enriched
-            field_value: Value of the field
-            config: Plugin configuration
-            
-        Returns:
-            Dict containing HeidelTime temporal extraction results
-        """
         try:
-            # Convert field value to text
             if isinstance(field_value, str):
                 text = field_value
             elif isinstance(field_value, list):
@@ -64,13 +52,10 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             if not text.strip():
                 self._logger.debug(f"No text found in field {field_name}")
                 result = {"heideltime_temporal": []}
-                # Normalize all Unicode text in the result
                 return self.normalize_text(result)
             
             self._logger.debug(f"Extracting temporal info from {len(text)} characters using HeidelTime")
             
-            # Call HeidelTime provider via dedicated HeidelTime service
-            # HeidelTime provider expects ProviderRequest format
             service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
@@ -78,7 +63,7 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
                 "max_concepts": config.get("max_concepts", 20),
                 "field_name": field_name,
                 "options": {
-                    "document_type": config.get("document_type", "news"),  # news, narrative, colloquial, scientific
+                    "document_type": config.get("document_type", "news"),
                     "document_creation_time": config.get("document_creation_time", None),
                     "language": config.get("language", "english"),
                     "output_format": config.get("output_format", "timeml"),
@@ -89,10 +74,8 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from ProviderResponse format
             if response.get("success", False):
                 result_data = response.get("result", {})
-                # HeidelTime service returns temporal data in expanded_concepts
                 temporal_expressions = result_data.get("expanded_concepts", 
                                      result_data.get("temporal_expressions", 
                                      result_data.get("expressions", [])))
@@ -119,12 +102,10 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"HeidelTime temporal extraction failed for field {field_name}: {e}")
-            # Return empty result on error
             result = {
                 "heideltime_temporal": [],
                 "original_text": "",
@@ -136,7 +117,6 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
             return self.normalize_text(result)
     
     async def extract_temporal_expressions(
@@ -144,27 +124,15 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
         text: str, 
         config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """
-        Direct temporal extraction method for backwards compatibility.
-        
-        Args:
-            text: Text to extract temporal information from
-            config: Extraction configuration
-            
-        Returns:
-            Temporal extraction results
-        """
         if config is None:
             config = {}
             
-        # Use enrich_field with dummy field info
         result = await self.enrich_field("text", text, config)
         response = {
             "temporal_expressions": result.get("heideltime_temporal", []),
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
         return self.normalize_text(response)
     
     async def extract_with_document_time(
@@ -173,17 +141,6 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
         document_creation_time: str,
         document_type: str = "news"
     ) -> Dict[str, Any]:
-        """
-        Extract temporal expressions with specific document creation time.
-        
-        Args:
-            text: Text to extract temporal information from
-            document_creation_time: When the document was created (ISO format)
-            document_type: Type of document (news, narrative, colloquial, scientific)
-            
-        Returns:
-            Temporal extraction results
-        """
         config = {
             "document_creation_time": document_creation_time,
             "document_type": document_type,
@@ -199,7 +156,6 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
         return self.normalize_text(response)
     
     async def extract_for_narrative(
@@ -207,16 +163,6 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
         text: str,
         reference_time: str = None
     ) -> Dict[str, Any]:
-        """
-        Extract temporal expressions optimized for narrative text.
-        
-        Args:
-            text: Narrative text to process
-            reference_time: Reference time for relative expressions
-            
-        Returns:
-            Temporal extraction results for narrative
-        """
         config = {
             "document_type": "narrative",
             "document_creation_time": reference_time,
@@ -232,7 +178,6 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
         return self.normalize_text(response)
     
     async def extract_scientific_temporal(
@@ -240,16 +185,6 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
         text: str,
         normalize: bool = True
     ) -> Dict[str, Any]:
-        """
-        Extract temporal expressions from scientific text.
-        
-        Args:
-            text: Scientific text to process
-            normalize: Whether to normalize temporal expressions
-            
-        Returns:
-            Scientific temporal extraction results
-        """
         config = {
             "document_type": "scientific",
             "normalize_timex": normalize,
@@ -265,15 +200,12 @@ class HeidelTimeTemporalPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
         return self.normalize_text(response)
     
     async def health_check(self) -> Dict[str, Any]:
-        """Check plugin and service health."""
         base_health = await super().health_check()
         
         try:
-            # Test HeidelTime temporal service connectivity
             service_url = self.get_service_url("temporal", "health")
             health_response = await self.http_get(service_url)
             

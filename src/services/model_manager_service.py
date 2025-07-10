@@ -27,9 +27,9 @@ from src.shared.metrics import (
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# RESPONSE MODELS
-# =============================================================================
+
+
+
 
 class ModelInfo(BaseModel):
     """Information about a model."""
@@ -103,47 +103,47 @@ class ServiceHealth(BaseModel):
     total_requests: int
     failed_requests: int
 
-# =============================================================================
-# GLOBAL STATE
-# =============================================================================
 
-# Service state
+
+
+
+
 service_start_time = time.time()
 total_requests = 0
 failed_requests = 0
 http_client: Optional[httpx.AsyncClient] = None
 
-# Service endpoints for coordination - build dynamically from environment
+
 def get_service_endpoints():
     """Get service endpoints for microservices architecture."""
     import os
     
     endpoints = {}
     
-    # Use dynamic service discovery instead of hard-coded endpoints
+    
     try:
         from src.shared.dynamic_service_discovery import get_service_discovery
         import asyncio
         
-        # Get or create event loop (avoid deprecated get_event_loop)
+        
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No running loop, create a new one
+
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         
-        # Discover services dynamically
+
         async def discover_endpoints():
             discovery = await get_service_discovery()
             discovered = await discovery.discover_all_services()
             return {name: info.base_url for name, info in discovered.items()}
         
         if loop.is_running():
-            # If in async context, use the services directly
+
             logger.info("Using dynamic service discovery")
         else:
-            # If not in async context, run discovery
+
             dynamic_endpoints = loop.run_until_complete(discover_endpoints())
             endpoints.update(dynamic_endpoints)
             logger.info(f"Dynamically discovered services: {list(dynamic_endpoints.keys())}")
@@ -151,7 +151,7 @@ def get_service_endpoints():
     except Exception as e:
         logger.warning(f"Dynamic service discovery failed: {e}")
         
-        # No fallback - fail gracefully if discovery fails
+
         logger.error("Service discovery failed and no fallback configured")
         logger.error("Services will be discovered on-demand when accessed")
     
@@ -159,13 +159,13 @@ def get_service_endpoints():
 
 SERVICE_ENDPOINTS = get_service_endpoints()
 
-# Initialization state tracking (following NLP service pattern)
-initialization_state = "starting"  # starting -> coordinating_services -> downloading_models -> ready
-initialization_progress = {}  # Track what's being initialized
 
-# =============================================================================
-# LIFECYCLE MANAGEMENT
-# =============================================================================
+initialization_state = "starting"
+initialization_progress = {}
+
+
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -175,28 +175,28 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting Model Manager Service")
     
     try:
-        # Start initialization
+
         initialization_state = "starting"
         initialization_progress = {"phase": "starting", "current_task": "initializing HTTP client"}
         
-        # Initialize HTTP client
+        
         http_client = httpx.AsyncClient(timeout=30.0)
         
-        # Coordinate with services
+
         initialization_state = "coordinating_services"
         initialization_progress = {"phase": "coordinating_services", "current_task": "waiting for services to be ready"}
         
         logger.info("Waiting for services to be ready...")
         await wait_for_services_ready()
         
-        # Check what models are needed
+        
         initialization_state = "downloading_models"
         initialization_progress = {"phase": "downloading_models", "current_task": "checking model status across services"}
         
         logger.info("Checking model status across all services...")
         models_status = await get_all_models_status()
         
-        # Check if we found any services
+        
         services_found = len(models_status)
         if services_found == 0:
             logger.warning("⚠️ No services discovered for model coordination")
@@ -206,7 +206,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.info(f"Found {services_found} services for model coordination")
             
-            # Count missing required models
+
             total_missing = sum(status.get("summary", {}).get("missing_required", 0) for status in models_status.values())
             
             if total_missing > 0:
@@ -224,7 +224,7 @@ async def lifespan(app: FastAPI):
                 initialization_progress["model_download_status"] = "not_needed"
                 logger.info("✅ All required models already available")
         
-        # Mark as ready
+
         initialization_state = "ready"
         initialization_progress = {
             "phase": "ready",
@@ -246,9 +246,9 @@ async def lifespan(app: FastAPI):
         if http_client:
             await http_client.aclose()
 
-# =============================================================================
-# FASTAPI APP
-# =============================================================================
+
+
+
 
 app = FastAPI(
     title="Model Manager Service",
@@ -257,7 +257,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -266,13 +266,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add Prometheus metrics
+
 instrumentator = Instrumentator()
 instrumentator.instrument(app).expose(app)
 
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
+
+
+
 
 def track_request():
     """Track request metrics."""
@@ -291,7 +291,7 @@ def get_execution_time_ms(start_time: float) -> float:
 
 async def wait_for_services_ready():
     """Wait for all services to be ready."""
-    max_retries = 60  # Wait up to 60 seconds
+    max_retries = 60
     retry_delay = 1.0
     
     for service_name, service_url in SERVICE_ENDPOINTS.items():
@@ -341,11 +341,11 @@ async def orchestrate_model_downloads(force_download: bool = False) -> bool:
         try:
             logger.info(f"Requesting {service_name} to download models...")
             
-            # Request service to download its models
+
             response = await http_client.post(
                 f"{service_url}/models/download",
                 json={"force_download": force_download},
-                timeout=600.0  # 10 minutes for downloads
+                timeout=600.0
             )
             
             if response.status_code == 200:
@@ -372,9 +372,9 @@ async def orchestrate_model_downloads(force_download: bool = False) -> bool:
     
     return success
 
-# =============================================================================
-# ENDPOINTS
-# =============================================================================
+
+
+
 
 @app.get("/health", response_model=ServiceHealth)
 async def health_check():
@@ -389,7 +389,7 @@ async def health_check():
     
     if manager_ready and http_client:
         try:
-            # Get models status from all services
+            
             all_models_status = await get_all_models_status()
             models_status = {
                 service: status.get("summary", {})
@@ -445,10 +445,10 @@ async def get_model_status():
         raise HTTPException(status_code=503, detail="Model Manager not initialized")
     
     try:
-        # Get models status from all services
+        
         all_models_status = await get_all_models_status()
         
-        # Aggregate models info
+
         models_info = {}
         total_models = 0
         available_models = 0
@@ -459,7 +459,7 @@ async def get_model_status():
                 service_models = service_status.get("models", {})
                 service_summary = service_status.get("summary", {})
                 
-                # Add service models to aggregated info
+                
                 for model_id, model_data in service_models.items():
                     models_info[f"{service_name}_{model_id}"] = ModelInfo(
                         name=model_data["name"],
@@ -471,7 +471,7 @@ async def get_model_status():
                         error_message=model_data.get("error_message")
                     )
                 
-                # Aggregate summary
+
                 total_models += service_summary.get("total_models", 0)
                 available_models += service_summary.get("available_models", 0)
                 required_models += service_summary.get("required_models", 0)
@@ -485,7 +485,7 @@ async def get_model_status():
         
         execution_time_ms = get_execution_time_ms(start_time)
         
-        # Track metrics
+
         plugin_execution_total.labels(
             plugin_name="model_manager",
             media_type="system",
@@ -530,10 +530,10 @@ async def download_models(request: ModelDownloadRequest):
     try:
         logger.info(f"Orchestrating model downloads - force_download: {request.force_download}")
         
-        # Orchestrate downloads across services
+
         success = await orchestrate_model_downloads(force_download=request.force_download)
         
-        # Get updated status to determine what was downloaded
+        
         all_models_status = await get_all_models_status()
         
         downloaded_models = []
@@ -553,7 +553,7 @@ async def download_models(request: ModelDownloadRequest):
         
         execution_time_ms = get_execution_time_ms(start_time)
         
-        # Track metrics
+
         plugin_execution_total.labels(
             plugin_name="model_manager",
             media_type="system",
@@ -565,15 +565,15 @@ async def download_models(request: ModelDownloadRequest):
             media_type="system"
         ).observe(execution_time_ms / 1000)
         
-        # Hard-fail if any service is missing (per requirements)
+
         if not success:
-            # Determine which services failed
+
             failed_services = []
             for service_name, service_status in all_models_status.items():
                 if not service_status.get("success", False):
                     failed_services.append(service_name)
             
-            # Build dynamic service URLs for health checks
+            
             service_health_urls = {}
             for service_name, service_url in SERVICE_ENDPOINTS.items():
                 service_health_urls[service_name] = f"{service_url}/health"
@@ -598,7 +598,7 @@ async def download_models(request: ModelDownloadRequest):
         )
         
     except HTTPException:
-        # Re-raise HTTP exceptions without modification
+
         raise
     except Exception as e:
         track_failed_request()
@@ -627,15 +627,15 @@ async def verify_models():
     try:
         logger.info("Verifying model integrity...")
         
-        # Verify all models
+
         verification_results = await model_manager.verify_models()
         
-        # Check if all verifications passed
+        
         all_passed = all(result["valid"] for result in verification_results.values())
         
         execution_time_ms = get_execution_time_ms(start_time)
         
-        # Track metrics
+
         plugin_execution_total.labels(
             plugin_name="model_manager",
             media_type="system",
@@ -680,15 +680,15 @@ async def update_models(request: ModelUpdateRequest):
     try:
         logger.info(f"Updating models - dry_run: {request.dry_run}")
         
-        # Update models
+        
         update_results = await model_manager.update_all_models(dry_run=request.dry_run)
         
-        # Check if all updates succeeded
+        
         all_succeeded = all(result["updated"] for result in update_results.values())
         
         execution_time_ms = get_execution_time_ms(start_time)
         
-        # Track metrics
+
         plugin_execution_total.labels(
             plugin_name="model_manager",
             media_type="system",
@@ -733,7 +733,7 @@ async def cleanup_models(request: ModelCleanupRequest):
     try:
         logger.info(f"Cleaning up models - cleanup_cache: {request.cleanup_cache}, dry_run: {request.dry_run}")
         
-        # Clean up models
+
         cleaned_files, space_freed = await model_manager.cleanup_models(
             cleanup_cache=request.cleanup_cache,
             dry_run=request.dry_run
@@ -741,7 +741,7 @@ async def cleanup_models(request: ModelCleanupRequest):
         
         execution_time_ms = get_execution_time_ms(start_time)
         
-        # Track metrics
+
         plugin_execution_total.labels(
             plugin_name="model_manager",
             media_type="system",
@@ -773,14 +773,14 @@ async def cleanup_models(request: ModelCleanupRequest):
         logger.error(f"Failed to cleanup models: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# =============================================================================
-# MAIN ENTRY POINT
-# =============================================================================
+
+
+
 
 if __name__ == "__main__":
     import uvicorn
     
-    # Configure logging
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'

@@ -24,7 +24,7 @@ from src.plugins.base import PluginExecutionContext
 
 logger = logging.getLogger(__name__)
 
-# Prometheus metrics
+
 TASKS_PROCESSED = Counter('worker_tasks_processed_total', 'Total number of tasks processed')
 TASKS_FAILED = Counter('worker_tasks_failed_total', 'Total number of tasks that failed')
 TASK_DURATION = Histogram('worker_task_duration_seconds', 'Time spent processing tasks')
@@ -39,7 +39,7 @@ class WorkerService:
     def __init__(self):
         self.settings = get_settings()
         
-        # Load hardware configuration from YAML
+
         hardware_loader = get_hardware_config_loader()
         config_name = getattr(self.settings, "HARDWARE_CONFIG", "default")
         
@@ -49,7 +49,7 @@ class WorkerService:
         except Exception as e:
             logger.warning(f"Failed to load hardware config '{config_name}': {e}")
             logger.warning("Falling back to default configuration")
-            # Fallback to hardcoded defaults
+
             resource_config = {
                 "cpu_cores": getattr(self.settings, "WORKER_CPU_CORES", 3),
                 "cpu_threads": getattr(self.settings, "WORKER_CPU_THREADS", 6),
@@ -59,10 +59,10 @@ class WorkerService:
         
         self.resource_pool = create_resource_pool_from_config(resource_config, worker_id=f"worker_{id(self)}")
         
-        # Use resource-aware queue manager
+        
         self.queue_manager = ResourceAwareQueueManager(self.resource_pool)
         self.plugin_loader = PluginLoader()
-        self.health_monitor = None  # Will be initialized after plugin_loader
+        self.health_monitor = None
         self.running = False
         self.metrics_server = None
         self.stats = {
@@ -93,7 +93,7 @@ class WorkerService:
         task_id = task_data.get("task_id")
         task_type = task_data.get("task_type")
         
-        # Allocate resources for this task
+
         resource_req = ResourceRequirement(**task_data.get("resource_requirements", {}))
         allocation = self.resource_pool.allocate(task_id, resource_req)
         
@@ -102,15 +102,15 @@ class WorkerService:
         start_time = time.time()
         
         try:
-            # Route task to appropriate plugin
+
             plugin_result = await self.plugin_loader.route_task_to_plugin(task_type, task_data)
             
-            # Record task duration
+
             duration = time.time() - start_time
             TASK_DURATION.observe(duration)
             
             if plugin_result.success:
-                # Prepare successful result
+
                 result = {
                     "task_id": task_id,
                     "task_type": task_type,
@@ -122,12 +122,12 @@ class WorkerService:
                     "worker_id": f"worker_{id(self)}"
                 }
                 
-                # Mark as completed
+
                 await self.queue_manager.complete_task(task_id, result)
                 self.stats["tasks_processed"] += 1
                 TASKS_PROCESSED.inc()
                 
-                # Update stats based on execution type
+                
                 if plugin_result.metadata and plugin_result.metadata.get("via_service"):
                     self.stats["service_calls"] += 1
                     SERVICE_CALLS.inc()
@@ -138,7 +138,7 @@ class WorkerService:
                 logger.info(f"✅ Completed task {task_id} in {plugin_result.execution_time_ms:.1f}ms")
                 
             else:
-                # Handle plugin execution failure
+
                 error_result = {
                     "task_id": task_id,
                     "task_type": task_type,
@@ -172,7 +172,7 @@ class WorkerService:
             TASKS_FAILED.inc()
         
         finally:
-            # Always release resources, regardless of success or failure
+
             self.resource_pool.release(task_id)
             logger.debug(f"Released resources for task {task_id}")
     
@@ -182,46 +182,46 @@ class WorkerService:
         logger.info(f"💾 Resource pool: {self.resource_pool.total_cpu_cores} CPU cores, {self.resource_pool.total_gpus} GPUs, {self.resource_pool.total_memory_mb}MB memory")
         logger.info(f"📊 Worker stats: {self.stats}")
         
-        # Initialize plugin loader
+        
         if not await self.plugin_loader.initialize():
             logger.error("❌ Failed to initialize plugin loader")
             return
         
-        # Initialize health monitor
+        
         self.health_monitor = HealthMonitor(self.plugin_loader)
         await self.health_monitor.start_monitoring()
         
         self.stats["uptime_start"] = datetime.utcnow()
         
-        # Start metrics server on a different port for worker
+
         try:
-            start_http_server(8004)  # Worker metrics on port 8004
+            start_http_server(8004)
             logger.info("📊 Prometheus metrics server started on port 8004")
         except Exception as e:
             logger.warning(f"⚠️ Failed to start metrics server: {e}")
         
         while self.running:
-            # Update uptime metric
+            
             if self.stats["uptime_start"]:
                 uptime = (datetime.utcnow() - self.stats["uptime_start"]).total_seconds()
                 WORKER_UPTIME.set(uptime)
             try:
-                # Check Redis health
+                
                 if not await self.queue_manager.health_check():
                     logger.warning("⚠️ Redis connection unhealthy, retrying...")
                     await asyncio.sleep(5)
                     continue
                 
-                # Dequeue task with timeout (resource-aware)
+
                 task_data = await self.queue_manager.dequeue_task(timeout=10)
                 
                 if task_data:
                     await self.process_task(task_data)
                 else:
-                    # No tasks available, brief pause
+
                     await asyncio.sleep(1)
                     
-                    # Periodic stats and health logging
+
                     if self.stats["tasks_processed"] > 0 and self.stats["tasks_processed"] % 10 == 0:
                         health_summary = self.health_monitor.get_health_summary() if self.health_monitor else {"overall_status": "unknown"}
                         logger.info(f"📊 Processed: {self.stats['tasks_processed']}, Failed: {self.stats['tasks_failed']}, Plugin: {self.stats['plugin_executions']}, Service: {self.stats['service_calls']}, Health: {health_summary['overall_status']}")
@@ -236,10 +236,10 @@ class WorkerService:
         self.setup_signal_handlers()
         
         try:
-            # Start worker loop
+
             await self.worker_loop()
         finally:
-            # Cleanup
+
             await self.cleanup()
         
         logger.info("🔄 Worker service stopped")
@@ -248,25 +248,25 @@ class WorkerService:
         """Cleanup worker resources."""
         logger.info("🧹 Cleaning up worker resources...")
         
-        # Stop health monitoring
+
         if self.health_monitor:
             await self.health_monitor.stop_monitoring()
         
-        # Cleanup plugin loader
+
         if hasattr(self, 'plugin_loader'):
             await self.plugin_loader.cleanup()
         
-        # Cleanup queue manager
+
         if hasattr(self, 'queue_manager'):
             await self.queue_manager.cleanup()
         
-        # Final stats including resource usage
+
         uptime = (datetime.utcnow() - self.stats.get("uptime_start", datetime.utcnow())).total_seconds()
         resource_summary = self.resource_pool.get_status_summary()
         logger.info(f"📊 Final stats - Processed: {self.stats['tasks_processed']}, Failed: {self.stats['tasks_failed']}, Uptime: {uptime:.1f}s")
         logger.info(f"💾 Final resource usage: {resource_summary['current_usage']}")
         
-        # Log any still-running tasks (should be empty)
+
         if resource_summary['running_tasks']['total'] > 0:
             logger.warning(f"⚠️ {resource_summary['running_tasks']['total']} tasks still marked as running during cleanup")
         
@@ -275,7 +275,7 @@ class WorkerService:
 
 async def main():
     """Main entry point for the worker service."""
-    # Setup logging
+    
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

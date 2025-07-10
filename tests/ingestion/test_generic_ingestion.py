@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -25,12 +25,12 @@ async def test_media_type(media_type: str, test_data: dict):
             print(f"🎯 Jellyfin type: {manager.media_config.execution.get('jellyfin_type', 'Unknown') if manager.media_config.execution else 'Not configured'}")
             print(f"💾 Collection: {manager.media_config.output.get('collection', f'{media_type}_enriched') if manager.media_config.output else f'{media_type}_enriched'}")
             
-            # Test validation
+
             print(f"\n🔍 Testing validation with sample data...")
             validated_item = manager.dynamic_model(**test_data)
             print(f"✅ Validation passed - {len(validated_item.model_dump())} fields")
             
-            # Test computed fields
+
             test_dict = validated_item.model_dump()
             before_computed = len(test_dict)
             manager._add_computed_fields(test_dict)
@@ -42,7 +42,7 @@ async def test_media_type(media_type: str, test_data: dict):
             else:
                 print(f"ℹ️  No computed fields configured")
             
-            # Test enrichment
+
             print(f"\n🔄 Testing enrichment...")
             enriched_data = await manager.enrich_media_item(validated_item)
             print(f"✅ Enrichment completed - {len(enriched_data)} fields")
@@ -62,7 +62,7 @@ async def main():
     print("🎯 GENERIC MEDIA INGESTION SYSTEM TEST")
     print("Testing truly generic behavior across different media types")
     
-    # Test data for different media types
+
     test_cases = {
         "movie": {
             "Name": "Test Movie",
@@ -89,12 +89,12 @@ async def main():
         }
     }
     
-    # Test each media type
+
     results = {}
     for media_type, data in test_cases.items():
         results[media_type] = await test_media_type(media_type, data)
     
-    # Summary
+
     print(f"\n🎉 TEST SUMMARY")
     print("=" * 40)
     for media_type, success in results.items():

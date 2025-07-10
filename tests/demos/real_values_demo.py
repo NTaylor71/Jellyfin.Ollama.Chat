@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from pprint import pprint
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -44,9 +44,9 @@ async def demonstrate_real_values():
     print("🎬 REAL VALUES PIPELINE DEMONSTRATION")
     print("Using config/media_types/movie.yaml for enrichment control")
     
-    # ==========================================================================
-    # INPUT: Raw movie data
-    # ==========================================================================
+
+
+
     raw_movie = {
         "Name": "Blade Runner 2049",
         "OriginalTitle": "Blade Runner 2049",
@@ -73,9 +73,9 @@ async def demonstrate_real_values():
     
     async with IngestionManager(media_type="movie") as manager:
         
-        # ==========================================================================
-        # YAML CONFIG: Show what's controlling the enrichment
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("📄 YAML CONFIGURATION DRIVING ENRICHMENT")
         print(f"{'='*60}")
@@ -83,13 +83,13 @@ async def demonstrate_real_values():
         print(f"Media type: {manager.media_config.media_type}")
         print(f"Collection: {manager.media_config.output.get('collection', 'default') if manager.media_config.output else 'default'}")
         
-        # Show field weights from YAML
+
         print(f"\n🏷️  FIELD WEIGHTS (from YAML):")
         if manager.media_config.field_weights:
             for field, weight in manager.media_config.field_weights.items():
                 print(f"   {field}: {weight}")
         
-        # Show fields that will be enriched
+
         print(f"\n🔧 ENRICHMENT FIELDS (from YAML):")
         enrichment_fields = []
         if manager.media_config.fields:
@@ -99,37 +99,37 @@ async def demonstrate_real_values():
                 enrichment_fields.append(field_name)
                 print(f"   {field_name}: source='{source}', enrichments={enrichments}")
         
-        # ==========================================================================
-        # VALIDATION: Create dynamic model from YAML rules
-        # ==========================================================================
+
+
+
         validated_movie = manager.dynamic_model(**raw_movie)
         validated_data = validated_movie.model_dump()
         
         show_values("AFTER DYNAMIC VALIDATION", validated_data)
         
-        # ==========================================================================
-        # COMPUTED FIELDS: Add derived fields
-        # ==========================================================================
+
+
+
         before_computed = validated_data.copy()
         manager._add_computed_fields(validated_data)
         
-        # Show what was computed
+
         computed_fields = {k: v for k, v in validated_data.items() if k not in before_computed}
         if computed_fields:
             show_values("COMPUTED FIELDS ADDED", computed_fields, computed_fields.keys())
         
         show_values("AFTER COMPUTED FIELDS", validated_data, computed_fields.keys())
         
-        # ==========================================================================
-        # ENRICHMENT: Process each field according to YAML config
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("🔄 FIELD-BY-FIELD ENRICHMENT (YAML-driven)")
         print(f"{'='*60}")
         
         enriched_data = validated_data.copy()
         
-        # Process each enrichment field from YAML
+
         for field_name in enrichment_fields:
             field_config = manager.media_config.fields[field_name]
             
@@ -138,7 +138,7 @@ async def demonstrate_real_values():
             print(f"   Field weight: {field_config.get('field_weight', 'default')}")
             print(f"   Type: {field_config.get('type', 'unknown')}")
             
-            # Show original value if it exists
+
             source_field = field_config.get('source_field')
             if source_field and source_field in validated_data:
                 original_value = validated_data[source_field]
@@ -146,7 +146,7 @@ async def demonstrate_real_values():
             else:
                 print(f"   Original value: None (synthetic field)")
             
-            # Perform enrichment
+
             try:
                 enriched_value = await manager._process_field_enrichments(
                     field_name, field_config, validated_data
@@ -157,14 +157,14 @@ async def demonstrate_real_values():
             except Exception as e:
                 print(f"   ❌ Enrichment failed: {e}")
         
-        # ==========================================================================
-        # SHOW COMPLETE ENRICHED DATA
-        # ==========================================================================
+
+
+
         show_values("FULLY ENRICHED DATA", enriched_data, enrichment_fields)
         
-        # ==========================================================================
-        # VALUE COMPARISON: Before vs After
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("📊 BEFORE vs AFTER VALUE COMPARISON")
         print(f"{'='*60}")
@@ -188,30 +188,30 @@ async def demonstrate_real_values():
             if before != after:
                 print(f"   🔄 CHANGED!")
         
-        # ==========================================================================
-        # MONGODB STORAGE: Add metadata and store
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("💾 MONGODB STORAGE WITH WEIGHTS")
         print(f"{'='*60}")
         
-        # Add metadata for storage
+
         storage_data = enriched_data.copy()
         storage_data["_ingested_at"] = "2025-07-08T02:00:00"
         storage_data["_media_type"] = "movie"
         storage_data["_enrichment_version"] = "2.0"
         storage_data["_field_weights"] = manager.media_config.field_weights
         
-        # Show what's being stored
+
         print(f"Collection: {manager.media_config.output.get('collection', 'movies_enriched') if manager.media_config.output else 'movies_enriched'}")
         print(f"Total fields to store: {len(storage_data)}")
         print(f"Field weights applied: {len(manager.media_config.field_weights) if manager.media_config.field_weights else 0}")
         
-        # Show the actual metadata being added
+
         metadata_fields = {k: v for k, v in storage_data.items() if k.startswith("_")}
         show_values("METADATA BEING ADDED", metadata_fields)
         
-        # Store in MongoDB
+
         collection_name = manager.media_config.output.get("collection", "movies_enriched") if manager.media_config.output else "movies_enriched"
         collection = manager.db[collection_name]
         
@@ -225,20 +225,20 @@ async def demonstrate_real_values():
         print(f"   Operation: {'INSERT' if result.upserted_id else 'UPDATE'}")
         print(f"   Document ID: {result.upserted_id or 'existing'}")
         
-        # ==========================================================================
-        # RETRIEVAL: Get it back and verify
-        # ==========================================================================
+
+
+
         retrieved = await collection.find_one({"Id": storage_data["Id"]})
         
         if retrieved:
-            # Convert ObjectId to string for display
+
             retrieved["_id"] = str(retrieved["_id"])
             
             print(f"\n{'='*60}")
             print("🔍 RETRIEVED FROM MONGODB")
             print(f"{'='*60}")
             
-            # Show key fields to verify data integrity
+
             key_fields = ["Name", "Overview", "Genres", "ProductionYear", "CommunityRating"]
             print(f"\n🔍 KEY FIELD VERIFICATION:")
             for field in key_fields:
@@ -247,17 +247,17 @@ async def demonstrate_real_values():
                 match = "✅" if original == retrieved_val else "❌"
                 print(f"   {field}: {match} {retrieved_val}")
             
-            # Show enriched fields that were added
+
             enriched_fields_in_db = {k: v for k, v in retrieved.items() if k in enrichment_fields}
             show_values("ENRICHED FIELDS IN DATABASE", enriched_fields_in_db)
             
-            # Show field weights stored
+
             if "_field_weights" in retrieved:
                 show_values("FIELD WEIGHTS STORED", retrieved["_field_weights"])
         
-        # ==========================================================================
-        # FINAL SUMMARY
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("🎉 PIPELINE SUMMARY")
         print(f"{'='*60}")

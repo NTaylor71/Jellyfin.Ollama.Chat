@@ -15,7 +15,7 @@ from src.shared.plugin_contracts import PluginResult
 class ProviderMetadata:
     """Metadata about the expansion provider."""
     name: str
-    provider_type: str  # "literal", "semantic", "statistical", "temporal"
+    provider_type: str
     context_aware: bool
     strengths: List[str]
     weaknesses: List[str]
@@ -31,7 +31,7 @@ class ExpansionRequest:
     max_concepts: int = 10
     field_name: str = "concept"
     
-    # Provider-specific options
+
     options: Dict[str, Any] = None
     
     def __post_init__(self):
@@ -111,7 +111,7 @@ class BaseProvider(ABC):
         Returns:
             True if provider can handle this concept
         """
-        return True  # Default: all providers support all concepts
+        return True
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
         """

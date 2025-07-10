@@ -23,7 +23,7 @@ async def test_individual_services():
     logger.info("-" * 40)
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # Test ConceptNet Service
+
         response = await client.get("http://localhost:8001/health")
         assert response.status_code == 200
         health = response.json()
@@ -31,7 +31,7 @@ async def test_individual_services():
         assert len(health["providers"]) > 0
         logger.info("✅ ConceptNet Service: Healthy with {} providers".format(len(health["providers"])))
         
-        # Test LLM Service
+
         response = await client.get("http://localhost:8002/health")
         assert response.status_code == 200
         health = response.json()
@@ -39,7 +39,7 @@ async def test_individual_services():
         assert len(health["models_available"]) > 0
         logger.info("✅ LLM Service: Healthy with {} models".format(len(health["models_available"])))
         
-        # Test Router Service
+
         response = await client.get("http://localhost:8003/health")
         assert response.status_code == 200
         health = response.json()
@@ -54,7 +54,7 @@ async def test_service_capabilities():
     logger.info("-" * 40)
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # Test NLP providers
+
         response = await client.get("http://localhost:8001/providers")
         assert response.status_code == 200
         providers = response.json()
@@ -63,7 +63,7 @@ async def test_service_capabilities():
         assert "spacy_temporal" in available_providers
         logger.info("✅ NLP Providers: {}".format(available_providers))
         
-        # Test LLM provider info
+
         response = await client.get("http://localhost:8002/providers")
         assert response.status_code == 200
         provider_info = response.json()
@@ -78,7 +78,7 @@ async def test_concept_expansion():
     logger.info("-" * 40)
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # Test NLP concept expansion
+
         response = await client.post(
             "http://localhost:8001/providers/gensim/expand",
             json={
@@ -91,12 +91,12 @@ async def test_concept_expansion():
         assert response.status_code == 200
         result = response.json()
         assert result["success"] is True
-        # Check for real gensim results (similar words)
+
         expanded_concepts = result["result"]["expanded_concepts"]
         assert len(expanded_concepts) > 0
         logger.info("✅ NLP Expansion: {} → {}".format("action", expanded_concepts))
         
-        # Test LLM concept expansion
+
         response = await client.post(
             "http://localhost:8002/providers/llm/expand",
             json={
@@ -108,7 +108,7 @@ async def test_concept_expansion():
         assert response.status_code == 200
         result = response.json()
         assert result["success"] is True
-        # Check for real LLM results 
+
         expanded_concepts = result["result"]["expanded_concepts"]
         assert len(expanded_concepts) > 0
         logger.info("✅ LLM Expansion: {} → {}".format("thriller", expanded_concepts))
@@ -120,18 +120,18 @@ async def test_service_communication():
     logger.info("-" * 40)
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # Test router service discovery
+
         response = await client.get("http://localhost:8003/services")
         assert response.status_code == 200
         services = response.json()
-        # Check that split architecture services are available
+
         split_services = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider"]
         available_services = services["services"].keys()
         assert any(service in available_services for service in split_services), f"No split services found in {available_services}"
         assert "llm_provider" in services["services"]
         logger.info("✅ Service Discovery: Router knows about {} services".format(len(services["services"])))
         
-        # Test router health checks
+
         response = await client.post("http://localhost:8003/services/health")
         assert response.status_code == 200
         health_result = response.json()
@@ -146,7 +146,7 @@ async def test_performance():
     logger.info("-" * 40)
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # Test NLP service performance
+
         start_time = asyncio.get_event_loop().time()
         response = await client.post(
             "http://localhost:8001/providers/gensim/expand",
@@ -156,7 +156,7 @@ async def test_performance():
         assert response.status_code == 200
         logger.info("✅ NLP Performance: {:.1f}ms".format(nlp_time))
         
-        # Test LLM service performance
+
         start_time = asyncio.get_event_loop().time()
         response = await client.post(
             "http://localhost:8002/providers/llm/expand",
@@ -166,7 +166,7 @@ async def test_performance():
         assert response.status_code == 200
         logger.info("✅ LLM Performance: {:.1f}ms".format(llm_time))
         
-        # Test router performance
+
         start_time = asyncio.get_event_loop().time()
         response = await client.get("http://localhost:8003/health")
         router_time = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -179,23 +179,23 @@ async def main():
     logger.info("🚀 Stage 4.3 SUCCESS TEST: Service-Oriented Plugin Architecture")
     logger.info("=" * 70)
     
-    # Show current configuration
+
     settings_to_console()
     
     try:
-        # Test 1: Individual service health
+
         await test_individual_services()
         
-        # Test 2: Service capabilities
+
         await test_service_capabilities()
         
-        # Test 3: Concept expansion functionality
+
         await test_concept_expansion()
         
-        # Test 4: Service communication
+
         await test_service_communication()
         
-        # Test 5: Performance validation
+
         await test_performance()
         
         logger.info("\n" + "=" * 70)

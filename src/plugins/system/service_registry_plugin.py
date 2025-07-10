@@ -68,7 +68,7 @@ class ServiceRegistryPlugin(BasePlugin):
         super().__init__()
         self.services: Dict[str, ServiceInfo] = {}
         self.http_client: Optional[httpx.AsyncClient] = None
-        self.health_check_interval = 30  # seconds
+        self.health_check_interval = 30
         self.health_check_task: Optional[asyncio.Task] = None
     
     @property
@@ -98,13 +98,13 @@ class ServiceRegistryPlugin(BasePlugin):
         try:
             logger.info("Initializing Service Registry Plugin...")
             
-            # Initialize HTTP client
+            
             self.http_client = httpx.AsyncClient(timeout=10.0)
             
-            # Register known services
+
             await self._register_default_services()
             
-            # Start health monitoring task
+
             self.health_check_task = asyncio.create_task(self._health_monitor_loop())
             
             logger.info(f"✅ Service Registry initialized with {len(self.services)} services")
@@ -118,7 +118,7 @@ class ServiceRegistryPlugin(BasePlugin):
         """Cleanup service registry resources."""
         logger.info("Cleaning up Service Registry...")
         
-        # Cancel health monitoring
+
         if self.health_check_task:
             self.health_check_task.cancel()
             try:
@@ -126,7 +126,7 @@ class ServiceRegistryPlugin(BasePlugin):
             except asyncio.CancelledError:
                 pass
         
-        # Close HTTP client
+
         if self.http_client:
             await self.http_client.aclose()
         
@@ -171,11 +171,11 @@ class ServiceRegistryPlugin(BasePlugin):
         from src.shared.dynamic_service_discovery import get_service_discovery
         
         try:
-            # Use dynamic service discovery instead of hard-coded registration
+            
             discovery = await get_service_discovery()
             discovered_services = await discovery.discover_all_services()
             
-            # Convert discovered services to ServiceInfo format
+
             for service_name, capability_info in discovered_services.items():
                 self.services[service_name] = ServiceInfo(
                     name=service_name,
@@ -184,7 +184,7 @@ class ServiceRegistryPlugin(BasePlugin):
                     capabilities=capability_info.capabilities
                 )
                 
-                # Update status from discovery
+                
                 self.services[service_name].status = capability_info.status
                 self.services[service_name].last_health_check = capability_info.last_discovery
                 self.services[service_name].metadata = capability_info.metadata
@@ -193,7 +193,7 @@ class ServiceRegistryPlugin(BasePlugin):
             
         except Exception as e:
             logger.error(f"Dynamic service registration failed: {e}")
-            # Fallback to empty registry rather than hard-coded values
+
             logger.warning("Operating with empty service registry - services will be discovered on demand")
     
     async def _health_monitor_loop(self):
@@ -206,7 +206,7 @@ class ServiceRegistryPlugin(BasePlugin):
                 break
             except Exception as e:
                 logger.error(f"Health monitor error: {e}")
-                await asyncio.sleep(5)  # Brief pause on error
+                await asyncio.sleep(5)
     
     async def _perform_health_checks(self) -> Dict[str, Any]:
         """Perform health checks on all registered services."""
@@ -214,7 +214,7 @@ class ServiceRegistryPlugin(BasePlugin):
         
         for service_name, service in self.services.items():
             try:
-                # Perform health check
+
                 health_url = f"{service.url}/health"
                 response = await self.http_client.get(health_url, timeout=5.0)
                 
@@ -223,7 +223,7 @@ class ServiceRegistryPlugin(BasePlugin):
                     service.consecutive_failures = 0
                     service.last_health_check = datetime.utcnow()
                     
-                    # Update metadata from response
+                    
                     try:
                         health_data = response.json()
                         service.metadata = health_data
@@ -276,7 +276,7 @@ class ServiceRegistryPlugin(BasePlugin):
         
         self.services[data["name"]] = service
         
-        # Perform immediate health check
+
         await self._perform_health_checks()
         
         return {
@@ -305,15 +305,15 @@ class ServiceRegistryPlugin(BasePlugin):
         matching_services = []
         
         for service in self.services.values():
-            # Filter by service type
+
             if service_type and service.service_type != service_type:
                 continue
             
-            # Filter by capability
+
             if capability and capability not in service.capabilities:
                 continue
             
-            # Filter by status
+
             if status and service.status != status:
                 continue
             
@@ -329,7 +329,7 @@ class ServiceRegistryPlugin(BasePlugin):
             }
         }
     
-    # Public API methods for other plugins/services
+
     
     def get_healthy_services(self, service_type: Optional[str] = None) -> List[ServiceInfo]:
         """Get list of healthy services, optionally filtered by type."""
@@ -353,12 +353,12 @@ class ServiceRegistryPlugin(BasePlugin):
     
     def get_best_service_for_plugin(self, plugin_name: str, plugin_type: str) -> Optional[ServiceInfo]:
         """Get the best service for executing a specific plugin."""
-        # Legacy fallback - plugins now route themselves via HTTPBasePlugin
+
         if plugin_type in ["concept_expansion", "temporal_analysis"]:
             return self.get_service_by_capability("concept_expansion")
         elif plugin_type in ["query_processing", "llm_concept"]:
             return self.get_service_by_capability("semantic_understanding")
         
-        # Default to any healthy service
+
         healthy_services = self.get_healthy_services()
         return healthy_services[0] if healthy_services else None

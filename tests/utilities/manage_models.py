@@ -3,13 +3,13 @@
 CLI tool for managing all NLP models in the Jelly project.
 
 Usage:
-    python manage_models.py check              # Check model status
-    python manage_models.py download           # Download missing models
-    python manage_models.py download --force   # Re-download all models
-    python manage_models.py status             # Show detailed status
-    python manage_models.py cleanup            # Remove unused/orphaned models
-    python manage_models.py verify             # Verify model integrity
-    python manage_models.py update             # Update all models to latest versions
+    python manage_models.py check            
+    python manage_models.py download         
+    python manage_models.py download --force 
+    python manage_models.py status           
+    python manage_models.py cleanup          
+    python manage_models.py verify           
+    python manage_models.py update           
 """
 
 import asyncio
@@ -18,7 +18,7 @@ import argparse
 import json
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.shared.model_manager import ModelManager, ModelStatus
@@ -34,7 +34,7 @@ def print_model_status(summary):
     print(f"Available Models: {summary['available_models']}")
     print(f"Total Storage: {summary['total_size_mb']} MB\n")
     
-    # Group by package
+
     packages = {}
     for model_id, model_info in summary['models'].items():
         package = model_info['package']
@@ -85,10 +85,10 @@ async def main():
     
     args = parser.parse_args()
     
-    # Create models directory
+
     Path(args.models_path).mkdir(parents=True, exist_ok=True)
     
-    # Create model manager
+
     manager = ModelManager(models_base_path=args.models_path)
     
     if args.action == "check":
@@ -109,7 +109,7 @@ async def main():
         
         success = await manager.download_missing_models(force_download=args.force)
         
-        # Show final status
+
         await manager.check_all_models()
         summary = manager.get_model_summary()
         
@@ -181,14 +181,14 @@ async def main():
         else:
             print_model_status(summary)
             
-            # Additional status info
+
             print("🔍 DETAILED INFORMATION:")
             print(f"Model base path: {manager.models_base_path}")
             print(f"NLTK data path: {manager.nltk_data_path}")
             print(f"Gensim data path: {manager.gensim_data_path}")
             print(f"SpaCy data path: {manager.spacy_data_path}")
             
-            # Check if paths exist
+
             paths_to_check = [
                 ("Models base", manager.models_base_path),
                 ("NLTK data", manager.nltk_data_path),
@@ -201,7 +201,7 @@ async def main():
                 exists = "✅" if path.exists() else "❌"
                 print(f"  {exists} {name}: {path}")
             
-            # Show disk usage if path exists
+
             if path.exists():
                 total_size = sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
                 print(f"     💾 Storage used: {total_size / (1024*1024):.1f} MB")

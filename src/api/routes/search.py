@@ -49,7 +49,7 @@ class SearchResponse(BaseModel):
     expanded_query: Optional[str] = None
 
 
-# Global managers cache
+
 _managers: Dict[str, IngestionManager] = {}
 
 
@@ -67,11 +67,11 @@ def _serialize_media_item(item: Dict[str, Any]) -> Dict[str, Any]:
     from datetime import datetime
     from bson import ObjectId
     
-    # Convert ObjectId to string
+
     if "_id" in item:
         item["_id"] = str(item["_id"])
     
-    # Convert datetime objects to ISO strings
+
     for key, value in item.items():
         if isinstance(value, datetime):
             item[key] = value.isoformat()
@@ -81,7 +81,7 @@ def _serialize_media_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
 async def _expand_query(query: str, media_type: str) -> str:
     """Expand query using available enrichment plugins."""
-    # TODO: Implement query expansion using enrichment plugins
+
     return query
 
 
@@ -94,17 +94,17 @@ async def _text_search(manager: IngestionManager, query: str, limit: int, filter
     )
     collection = manager.db[collection_name]
     
-    # Build search query
+    
     search_query = {
         "_media_type": manager.media_type,
         "$text": {"$search": query}
     }
     
-    # Add filters if provided
+    
     if filters:
         search_query.update(filters)
     
-    # Execute search with text score
+
     cursor = collection.find(
         search_query,
         {"score": {"$meta": "textScore"}}
@@ -123,37 +123,37 @@ async def _text_search(manager: IngestionManager, query: str, limit: int, filter
 
 async def _semantic_search(manager: IngestionManager, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Perform semantic search using available embeddings."""
-    # TODO: Implement semantic search using FAISS or vector search
+
     return await _text_search(manager, query, limit, filters)
 
 
 async def _hybrid_search(manager: IngestionManager, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Perform hybrid search combining text and semantic strategies."""
-    # Get results from both strategies
+    
     text_results = await _text_search(manager, query, limit, filters)
     semantic_results = await _semantic_search(manager, query, limit, filters)
     
-    # Simple hybrid approach: combine and deduplicate
+
     combined_results = {}
     
-    # Add text results
+    
     for result in text_results:
         item_id = str(result["item"].get("_id", result["item"].get("Id")))
         combined_results[item_id] = result
-        combined_results[item_id]["score"] = result["score"] * 0.6  # Weight text results
+        combined_results[item_id]["score"] = result["score"] * 0.6
     
-    # Add semantic results (with different weighting)
+    
     for result in semantic_results:
         item_id = str(result["item"].get("_id", result["item"].get("Id")))
         if item_id in combined_results:
-            # Boost score for items found in both
+
             combined_results[item_id]["score"] += result["score"] * 0.4
             combined_results[item_id]["strategy"] = "hybrid"
         else:
             combined_results[item_id] = result
             combined_results[item_id]["score"] = result["score"] * 0.4
     
-    # Sort by score and return top results
+
     sorted_results = sorted(combined_results.values(), key=lambda x: x["score"], reverse=True)
     return sorted_results[:limit]
 
@@ -165,13 +165,13 @@ async def search_media(request: SearchRequest):
     start_time = time.time()
     
     try:
-        # Get or create manager for media type
+        
         manager = await get_or_create_manager(request.media_type)
         
-        # Expand query if needed
+
         expanded_query = await _expand_query(request.query, request.media_type)
         
-        # Choose search strategy
+
         if request.search_strategy == "text":
             results = await _text_search(manager, expanded_query, request.limit, request.filters)
         elif request.search_strategy == "semantic":
@@ -181,7 +181,7 @@ async def search_media(request: SearchRequest):
         else:
             raise HTTPException(status_code=400, detail=f"Unknown search strategy: {request.search_strategy}")
         
-        # Convert to response format
+
         search_results = []
         for result in results:
             item = result["item"]

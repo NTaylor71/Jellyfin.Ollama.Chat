@@ -22,7 +22,7 @@ from src.ingestion_manager import IngestionManager, MediaData
 from src.api.routes import media_router, ingestion_router, search_router
 
 
-# Global ingestion managers by media type
+
 ingestion_managers: Dict[str, IngestionManager] = {}
 
 
@@ -40,18 +40,18 @@ async def lifespan(app: FastAPI):
     """Application lifespan management."""
     settings = get_settings()
     
-    # Startup
+
     print(f"🚀 Starting API server on {settings.ENV} environment")
     print(f"📡 Service URLs: {settings.get_service_urls()}")
     
-    # Initialize default movie manager
+    
     movie_manager = IngestionManager(media_type="movie")
     await movie_manager.connect()
     ingestion_managers["movie"] = movie_manager
     
     yield
     
-    # Shutdown
+
     print("🔄 Shutting down API server")
     for manager in ingestion_managers.values():
         await manager.disconnect()
@@ -70,7 +70,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
     
-    # CORS middleware
+
     if settings.ENABLE_CORS:
         app.add_middleware(
             CORSMiddleware,
@@ -80,16 +80,16 @@ def create_app() -> FastAPI:
             allow_headers=settings.CORS_HEADERS,
         )
     
-    # Prometheus metrics (creates /metrics endpoint)
+
     if settings.ENABLE_METRICS:
         Instrumentator().instrument(app).expose(app)
     
-    # Include API routers
+
     app.include_router(media_router)
     app.include_router(ingestion_router)
     app.include_router(search_router)
     
-    # Health check endpoint
+
     @app.get("/health")
     async def health_check():
         """Health check endpoint for Docker and monitoring."""
@@ -100,7 +100,7 @@ def create_app() -> FastAPI:
             "services": settings.get_health_status()
         }
     
-    # Root endpoint
+
     @app.get("/")
     async def root():
         """Root endpoint with system information."""
@@ -116,7 +116,7 @@ def create_app() -> FastAPI:
     return app
 
 
-# Create app instance
+
 app = create_app()
 
 

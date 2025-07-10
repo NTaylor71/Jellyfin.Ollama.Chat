@@ -29,7 +29,7 @@ class HardwareConfigLoader:
         self.settings = get_settings()
         
         if config_dir is None:
-            # Default to config/hardware/ relative to project root
+
             self.config_dir = Path(__file__).parent.parent.parent / "config" / "hardware"
         else:
             self.config_dir = Path(config_dir)
@@ -50,7 +50,7 @@ class HardwareConfigLoader:
             FileNotFoundError: If config file doesn't exist
             yaml.YAMLError: If config file is invalid
         """
-        # Check cache first
+        
         if config_name in self._config_cache:
             return self._config_cache[config_name]
             
@@ -66,10 +66,10 @@ class HardwareConfigLoader:
                 
             logger.info(f"Loaded hardware config from {config_path}")
             
-            # Validate config structure
+
             self._validate_config(config)
             
-            # Cache the config
+
             self._config_cache[config_name] = config
             
             return config
@@ -94,7 +94,7 @@ class HardwareConfigLoader:
             if section not in config:
                 raise ValueError(f"Missing required section '{section}' in hardware config")
                 
-        # Validate hardware section
+
         hardware = config["hardware"]
         required_hardware = ["cpu", "gpu", "memory"]
         
@@ -102,12 +102,12 @@ class HardwareConfigLoader:
             if key not in hardware:
                 raise ValueError(f"Missing required hardware config '{key}'")
                 
-        # Validate CPU config
+
         cpu_config = hardware["cpu"]
         if "cores" not in cpu_config or "threads" not in cpu_config:
             raise ValueError("CPU config must include 'cores' and 'threads'")
             
-        # Validate task groups
+
         task_groups = config["task_groups"]
         if not task_groups:
             raise ValueError("At least one task group must be defined")
@@ -131,11 +131,11 @@ class HardwareConfigLoader:
         config = self.load_config(config_name)
         hardware = config["hardware"]
         
-        # Convert GB to MB for memory
+
         memory_gb = hardware["memory"]["total_gb"]
         memory_mb = int(memory_gb * 1024)
         
-        # Apply memory overcommit if configured
+
         if "allocation" in config:
             memory_overcommit = config["allocation"].get("memory_overcommit", 1.0)
             memory_mb = int(memory_mb * memory_overcommit)
@@ -213,7 +213,7 @@ class HardwareConfigLoader:
         return sorted(configs)
 
 
-# Global instance for easy access
+
 _hardware_config_loader = None
 
 

@@ -11,45 +11,45 @@ from enum import Enum
 
 class PluginType(Enum):
     """Types of plugins in the system."""
-    CONCEPT_EXPANSION = "concept_expansion"      # Stage 3: ConceptNet, LLM expansion
-    CONTENT_ANALYSIS = "content_analysis"       # Stage 4: Movie content analysis
-    QUERY_PROCESSING = "query_processing"       # Stage 6: Query intent understanding
-    ENHANCEMENT = "enhancement"                 # General enhancement plugins
+    CONCEPT_EXPANSION = "concept_expansion"    
+    CONTENT_ANALYSIS = "content_analysis"     
+    QUERY_PROCESSING = "query_processing"     
+    ENHANCEMENT = "enhancement"               
 
 
 class CacheType(Enum):
     """Types of cached field expansion results for data ingestion."""
-    # Concept expansion
+
     CONCEPTNET = "conceptnet"
     LLM_CONCEPT = "llm_concept"
     
-    # Synonym/similarity expansion  
+
     GENSIM_SIMILARITY = "gensim_similarity"
     WORDNET_SYNONYMS = "wordnet_synonyms"
     
-    # Temporal extraction/parsing
+
     TEMPORAL_PARSING = "temporal_parsing"
     SPACY_TEMPORAL = "spacy_temporal"
     HEIDELTIME = "heideltime"
     SUTIME = "sutime"
     
-    # NLP processing
+
     SPACY_NER = "spacy_ner"
     NLTK_TOKENIZE = "nltk_tokenize"
     SENTIMENT_ANALYSIS = "sentiment_analysis"
     
-    # Field-specific expansions
+
     TAG_EXPANSION = "tag_expansion"
     GENRE_EXPANSION = "genre_expansion"
     PEOPLE_EXPANSION = "people_expansion"
     
-    # Custom plugin types
+
     CUSTOM = "custom"
     
-    # Backward compatibility aliases
-    LLM = "llm_concept"  # Alias for LLM_CONCEPT
-    GENSIM = "gensim_similarity"  # Alias for GENSIM_SIMILARITY
-    NLTK = "nltk_tokenize"  # Alias for NLTK_TOKENIZE
+
+    LLM = "llm_concept"
+    GENSIM = "gensim_similarity"
+    NLTK = "nltk_tokenize"
 
 
 @dataclass
@@ -61,11 +61,11 @@ class PluginMetadata:
     execution_time_ms: float
     timestamp: datetime = field(default_factory=datetime.utcnow)
     
-    # Resource usage information
+
     memory_used_mb: Optional[float] = None
     cpu_time_ms: Optional[float] = None
     
-    # Plugin-specific metadata
+
     model_used: Optional[str] = None
     api_endpoint: Optional[str] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
@@ -79,7 +79,7 @@ class ConfidenceScore:
     Supports both overall confidence and per-item confidence for
     concept expansion and analysis results.
     """
-    overall: float  # 0.0 to 1.0
+    overall: float
     per_item: Dict[str, float] = field(default_factory=dict)
     
     def __post_init__(self):
@@ -105,9 +105,9 @@ class CacheKey:
     - "tag_expansion:tags:sci-fi:movie" (Tag similarity expansion)
     """
     cache_type: CacheType
-    field_name: str  # Which field is being expanded (tags, genres, people, etc.)
-    input_value: str  # The actual value being processed
-    media_context: str = "movie"  # Media type context
+    field_name: str
+    input_value: str
+    media_context: str = "movie"
     
     def generate_key(self) -> str:
         """
@@ -118,7 +118,7 @@ class CacheKey:
         """
         from src.shared.text_utils import clean_for_cache_key
         
-        # Cache type preserved exactly (it's already lowercase and clean)
+
         cache_type_clean = self.cache_type.value
         normalized_field = clean_for_cache_key(self.field_name)
         normalized_value = clean_for_cache_key(self.input_value)
@@ -153,22 +153,22 @@ class PluginResult:
     all plugin types across the procedural intelligence pipeline.
     """
     
-    # Core result data
+
     enhanced_data: Dict[str, Any]
     confidence_score: ConfidenceScore
     plugin_metadata: PluginMetadata
     cache_key: CacheKey
     
-    # Processing information
+
     input_data: Dict[str, Any] = field(default_factory=dict)
     processing_notes: List[str] = field(default_factory=list)
     
-    # Error handling
+
     success: bool = True
     error_message: Optional[str] = None
     partial_result: bool = False
     
-    # Cache management
+
     cache_ttl_seconds: Optional[int] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     
@@ -191,7 +191,7 @@ class PluginResult:
           "expires_at": ISODate
         }
         """
-        # Calculate expiration date
+
         expires_at = None
         if self.cache_ttl_seconds:
             expires_at = datetime.utcnow().timestamp() + self.cache_ttl_seconds
@@ -202,7 +202,7 @@ class PluginResult:
             "input_value": self.cache_key.input_value,
             "media_type": self.cache_key.media_context,
             "expansion_type": self.cache_key.cache_type.value,
-            "expansion_result": self.enhanced_data,  # Generic result structure
+            "expansion_result": self.enhanced_data,
             "confidence_scores": self.confidence_score.per_item,
             "overall_confidence": self.confidence_score.overall,
             "source_metadata": {
@@ -245,7 +245,7 @@ class PluginResult:
         )
         
         return cls(
-            enhanced_data=doc.get("expansion_result", {}),  # Use generic expansion_result
+            enhanced_data=doc.get("expansion_result", {}),  
             confidence_score=confidence_score,
             plugin_metadata=plugin_metadata,
             cache_key=cache_key,
@@ -257,7 +257,7 @@ class PluginResult:
         )
 
 
-# Helper functions for plugin developers
+
 
 def create_field_expansion_result(
     field_name: str,
@@ -308,11 +308,11 @@ def create_field_expansion_result(
         confidence_score=confidence_score,
         plugin_metadata=plugin_metadata,
         cache_key=cache_key,
-        cache_ttl_seconds=3600  # 1 hour default
+        cache_ttl_seconds=3600
     )
 
 
-# Backward compatibility helper
+
 def create_concept_expansion_result(
     input_term: str,
     expanded_concepts: List[str],
@@ -334,7 +334,7 @@ def create_concept_expansion_result(
     }
     
     return create_field_expansion_result(
-        field_name="concept",  # Generic field name for concepts
+        field_name="concept",
         input_value=input_term,
         expansion_result=expansion_result,
         confidence_scores=confidence_scores,
@@ -383,5 +383,5 @@ def create_content_analysis_result(
         confidence_score=confidence,
         plugin_metadata=plugin_metadata,
         cache_key=cache_key,
-        cache_ttl_seconds=86400  # 24 hours for content analysis
+        cache_ttl_seconds=86400
     )

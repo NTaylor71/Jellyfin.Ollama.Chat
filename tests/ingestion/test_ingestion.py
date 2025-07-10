@@ -8,7 +8,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -20,14 +20,14 @@ async def test_movie_ingestion():
     print("=" * 50)
     
     try:
-        # Test with movie media type
+
         async with IngestionManager(media_type="movie") as manager:
             print(f"✅ Connected to MongoDB")
             print(f"📋 Loaded configuration: {manager.media_config.name}")
             print(f"🎯 Media type: {manager.media_type}")
             print(f"🏗️  Dynamic model: {manager.dynamic_model.__name__}")
             
-            # Load sample data
+
             data_file = Path("test_movie_data.json")
             if not data_file.exists():
                 print(f"❌ Sample data file not found: {data_file}")
@@ -37,7 +37,7 @@ async def test_movie_ingestion():
             movies = await manager.load_media_from_json(data_file)
             print(f"✅ Loaded {len(movies)} movies")
             
-            # Show sample movie info
+
             if movies:
                 sample = movies[0]
                 print(f"\n📋 Sample movie: {sample.Name}")
@@ -45,7 +45,7 @@ async def test_movie_ingestion():
                 print(f"   Type: {getattr(sample, 'Type', 'N/A')}")
                 print(f"   Year: {getattr(sample, 'ProductionYear', 'N/A')}")
                 
-            # Test enrichment on first movie (dry run)
+
             if movies:
                 print(f"\n🔄 Testing enrichment on: {movies[0].Name}")
                 enriched = await manager.enrich_media_item(movies[0])
@@ -53,12 +53,12 @@ async def test_movie_ingestion():
                 print(f"📊 Original fields: {len(movies[0].model_dump())}")
                 print(f"📊 Enriched fields: {len(enriched)}")
                 
-                # Show some enriched fields
+
                 new_fields = set(enriched.keys()) - set(movies[0].model_dump().keys())
                 if new_fields:
                     print(f"🆕 New fields: {', '.join(list(new_fields)[:5])}")
                 
-            # Test ingestion (just first movie for testing)
+
             print(f"\n💾 Testing ingestion (first movie only)")
             await manager.ingest_media(
                 movies[:1], 
@@ -67,7 +67,7 @@ async def test_movie_ingestion():
             )
             print(f"✅ Ingestion completed")
             
-            # Verify ingestion
+
             print(f"\n🔍 Verifying ingestion...")
             results = await manager.verify_ingestion()
             print(f"✅ Verification results:")
@@ -99,7 +99,7 @@ async def test_config_loading():
         
     for config_file in config_dir.glob("*.yaml"):
         if config_file.name.startswith("movie_new_format"):
-            continue  # Skip template files
+            continue
             
         media_type = config_file.stem
         print(f"\n🔧 Testing {media_type} configuration...")
@@ -123,10 +123,10 @@ async def main():
     print("🧪 Generic Media Ingestion System Test")
     print("=" * 60)
     
-    # Test configuration loading
+
     await test_config_loading()
     
-    # Test movie ingestion
+
     await test_movie_ingestion()
     
     print(f"\n✨ All tests completed!")

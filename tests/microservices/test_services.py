@@ -81,7 +81,7 @@ class ServiceTestManager:
         try:
             logger.info("🚀 Starting Docker services...")
             
-            # Start Docker services
+
             result = subprocess.run([
                 "docker", "compose", "-f", "docker-compose.dev.yml", "up", "-d",
                 "conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "redis", "mongodb", "ollama"
@@ -92,7 +92,7 @@ class ServiceTestManager:
             
             logger.info("✅ Docker services started")
             
-            # Wait for services to be ready
+
             await asyncio.sleep(10)
             
             return True
@@ -163,7 +163,7 @@ class ServiceTestManager:
         base_url = service['url']
         
         if service_name in ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider"]:
-            # Test split architecture provider endpoints
+
             response = await self.http_client.get(f"{base_url}/providers")
             if response.status_code != 200:
                 raise AssertionError(f"❌ {service_name} providers endpoint failed: HTTP {response.status_code}")
@@ -176,7 +176,7 @@ class ServiceTestManager:
                 raise AssertionError(f"❌ No {service_name} providers available - check provider initialization")
         
         elif service_name == "llm_provider":
-            # Test LLM provider endpoints
+
             response = await self.http_client.get(f"{base_url}/providers")
             if response.status_code != 200:
                 raise AssertionError(f"❌ LLM provider endpoint failed: HTTP {response.status_code}")
@@ -192,17 +192,17 @@ async def test_service_startup_sequence():
     logger.info("-" * 50)
     
     async with ServiceTestManager() as manager:
-        # Start all services using Docker
+
         await manager.start_docker_services()
         
-        # Test each service health and endpoints
+
         service_order = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider"]
         
         for service_name in service_order:
-            # Verify health
+
             await manager.check_service_health(service_name)
             
-            # Test specific endpoints
+
             await manager.test_service_endpoints(service_name)
         
         logger.info("✅ All services started and healthy")
@@ -214,10 +214,10 @@ async def test_service_communication():
     logger.info("-" * 50)
     
     async with ServiceTestManager() as manager:
-        # Start all services using Docker
+
         await manager.start_docker_services()
         
-        # Services now communicate directly via HTTPBasePlugin
+
         logger.info("✅ Service communication test passed - using direct HTTP calls")
 
 
@@ -227,10 +227,10 @@ async def test_plugin_execution_routing():
     logger.info("-" * 50)
     
     async with ServiceTestManager() as manager:
-        # Start all services using Docker
+
         await manager.start_docker_services()
         
-        # Plugins now execute directly through queue system
+
         
         test_request = {
             "plugin_name": "ConceptExpansionPlugin",
@@ -280,13 +280,13 @@ async def test_service_error_handling():
     logger.info("-" * 50)
     
     async with ServiceTestManager() as manager:
-        # Start only router service (partial Docker setup)
+
         await manager.start_docker_services()
         
-        # Test that services handle unavailability gracefully
+
         logger.info("✅ Services now handle failures via circuit breakers in HTTPBasePlugin")
         
-        # Test plugin execution with unavailable services
+
         test_request = {
             "plugin_name": "ConceptExpansionPlugin", 
             "plugin_type": "concept_expansion",
@@ -294,7 +294,7 @@ async def test_service_error_handling():
             "context": {}
         }
         
-        # Plugins now route themselves directly with circuit breakers
+
         logger.info("✅ Plugins handle service failures via circuit breakers")
         logger.info("✅ Error handling test passed - no router layer needed")
 
@@ -304,7 +304,7 @@ async def test_worker_service_integration():
     logger.info("\n🧪 Testing Worker-Service Integration")
     logger.info("-" * 50)
     
-    # This test requires Redis to be running
+
     settings = get_settings()
     
     try:
@@ -321,10 +321,10 @@ async def test_worker_service_integration():
         raise AssertionError(f"❌ Redis required for worker test: {e}")
     
     async with ServiceTestManager() as manager:
-        # Start all services using Docker
+
         await manager.start_docker_services()
         
-        # Import worker components
+
         try:
             from src.worker.resource_queue_manager import ResourceAwareQueueManager
             from src.worker.resource_manager import create_resource_pool_from_config
@@ -335,13 +335,13 @@ async def test_worker_service_integration():
             queue_manager = ResourceAwareQueueManager(resource_pool)
             plugin_loader = PluginLoader()
             
-            # Initialize plugin loader
+
             if not await plugin_loader.initialize():
                 raise AssertionError("❌ Plugin loader initialization failed")
             
             logger.info("✅ Worker components initialized")
             
-            # Test task routing through services
+
             task_data = {
                 "task_id": "test_service_task",
                 "task_type": "concept_expansion",
@@ -350,7 +350,7 @@ async def test_worker_service_integration():
                 "max_concepts": 3
             }
             
-            # Route task through plugin loader
+
             result = await plugin_loader.route_task_to_plugin("concept_expansion", task_data)
             
             if not result.success:
@@ -360,7 +360,7 @@ async def test_worker_service_integration():
             logger.info(f"   Execution time: {result.execution_time_ms:.1f}ms")
             logger.info(f"   Via service: {result.metadata.get('via_service', False)}")
             
-            # Cleanup
+
             await plugin_loader.cleanup()
             
         except ImportError as e:
@@ -373,7 +373,7 @@ def test_service_runner_cli():
     logger.info("-" * 50)
     
     try:
-        # Test service runner help
+
         result = subprocess.run([
             sys.executable, "-m", "src.services.orchestration.service_runner", "--help"
         ], capture_output=True, text=True, timeout=10)
@@ -386,7 +386,7 @@ def test_service_runner_cli():
         
         logger.info("✅ Service runner CLI working")
         
-        # Test service status (should show no services running)
+
         result = subprocess.run([
             sys.executable, "-m", "src.services.orchestration.service_runner", "status"
         ], capture_output=True, text=True, timeout=10)
@@ -407,23 +407,23 @@ async def main():
     logger.info("🚀 Starting Service-Oriented Plugin Architecture Tests")
     logger.info("=" * 60)
     
-    # Show current configuration
+
     settings_to_console()
     
     try:
-        # Test 1: Service startup sequence
+
         await test_service_startup_sequence()
         
-        # Test 2: Service communication
+
         await test_service_communication()
         
-        # Test 3: Plugin execution routing
+
         await test_plugin_execution_routing()
         
-        # Test 4: Error handling
+
         await test_service_error_handling()
         
-        # Test 5: Worker integration (requires Redis)
+
         try:
             await test_worker_service_integration()
         except AssertionError as e:
@@ -432,7 +432,7 @@ async def main():
             else:
                 raise
         
-        # Test 6: CLI utility
+
         test_service_runner_cli()
         
         logger.info("\n" + "=" * 60)

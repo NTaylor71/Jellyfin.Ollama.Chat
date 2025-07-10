@@ -18,20 +18,20 @@ logger = logging.getLogger(__name__)
 
 class CacheStrategy(Enum):
     """Cache strategies for different types of operations."""
-    CACHE_FIRST = "cache_first"       # Check cache first, call API if miss
-    CACHE_ONLY = "cache_only"         # Only return cached results
-    BYPASS_CACHE = "bypass_cache"     # Skip cache, always call API
-    REFRESH_CACHE = "refresh_cache"   # Force refresh cache entry
+    CACHE_FIRST = "cache_first"       
+    CACHE_ONLY = "cache_only"       
+    BYPASS_CACHE = "bypass_cache"   
+    REFRESH_CACHE = "refresh_cache" 
 
 
 @dataclass
 class CacheConfig:
     """Configuration for cache operations."""
-    ttl_seconds: int = 3600           # Default 1 hour
-    max_retries: int = 3              # Max retries for failed operations
-    retry_delay_seconds: int = 1      # Delay between retries
-    enable_cache_warming: bool = True # Enable cache warming
-    cache_key_prefix: str = ""        # Optional prefix for cache keys
+    ttl_seconds: int = 3600         
+    max_retries: int = 3            
+    retry_delay_seconds: int = 1    
+    enable_cache_warming: bool = True
+    cache_key_prefix: str = ""      
 
 
 class CacheManager:
@@ -65,7 +65,7 @@ class CacheManager:
             True if initialization successful, False otherwise
         """
         try:
-            # Initialize the field expansion cache collection
+            
             success = await self.cache.initialize_collection()
             if success:
                 logger.info("CacheManager initialized successfully")
@@ -99,14 +99,14 @@ class CacheManager:
         try:
             self._cache_metrics["cache_operations"] += 1
             
-            # Handle different cache strategies
+
             if strategy == CacheStrategy.CACHE_ONLY:
                 return await self._get_cached_only(cache_key)
             elif strategy == CacheStrategy.BYPASS_CACHE:
                 return await self._compute_and_cache(cache_key, compute_func, ttl_seconds)
             elif strategy == CacheStrategy.REFRESH_CACHE:
                 return await self._refresh_cache(cache_key, compute_func, ttl_seconds)
-            else:  # CACHE_FIRST
+            else:
                 return await self._cache_first(cache_key, compute_func, ttl_seconds)
                 
         except Exception as e:
@@ -121,7 +121,7 @@ class CacheManager:
         ttl_seconds: Optional[int]
     ) -> Optional[PluginResult]:
         """Execute cache-first strategy."""
-        # Check cache first
+        
         cached_result = await self.cache.get_cached_result(cache_key)
         
         if cached_result:
@@ -129,7 +129,7 @@ class CacheManager:
             self._cache_metrics["hits"] += 1
             return cached_result
         
-        # Cache miss - compute and cache
+
         logger.debug(f"Cache miss for key: {cache_key}")
         self._cache_metrics["misses"] += 1
         
@@ -152,17 +152,17 @@ class CacheManager:
     ) -> Optional[PluginResult]:
         """Compute result and cache it."""
         try:
-            # Compute the result
+
             result = await compute_func()
             
             if result:
-                # Set TTL if provided
+                
                 if ttl_seconds:
                     result.cache_ttl_seconds = ttl_seconds
                 elif result.cache_ttl_seconds is None:
                     result.cache_ttl_seconds = self.config.ttl_seconds
                 
-                # Cache the result
+
                 await self.cache.store_result(result)
                 logger.debug(f"Computed and cached result for key: {cache_key}")
                 
@@ -203,7 +203,7 @@ class CacheManager:
         Returns:
             CacheKey object
         """
-        # Apply prefix if configured
+
         if self.config.cache_key_prefix:
             input_value = f"{self.config.cache_key_prefix}:{input_value}"
         
@@ -263,12 +263,12 @@ class CacheManager:
         for value in values:
             cache_key = self.generate_cache_key(cache_type, field_name, value, media_context)
             
-            # Check if already cached
+            
             if await self.cache.check_cache_hit(cache_key):
                 results[value] = True
                 continue
             
-            # Compute if function provided
+
             if compute_func:
                 try:
                     result = await compute_func(value)
@@ -296,8 +296,8 @@ class CacheManager:
         Returns:
             Number of entries cleared
         """
-        # This would require a more complex MongoDB query
-        # For now, we'll log the request and return 0
+
+
         logger.warning(f"Clear cache by prefix '{prefix}' not implemented yet")
         return 0
     
@@ -310,7 +310,7 @@ class CacheManager:
         """
         cache_stats = await self.cache.get_cache_stats()
         
-        # Add our own metrics
+        
         total_operations = self._cache_metrics["hits"] + self._cache_metrics["misses"]
         hit_rate = (self._cache_metrics["hits"] / total_operations) if total_operations > 0 else 0.0
         
@@ -334,7 +334,7 @@ class CacheManager:
             Health status information
         """
         try:
-            # Test basic cache operations
+
             test_key = CacheKey(
                 cache_type=CacheType.CUSTOM,
                 field_name="health",
@@ -342,7 +342,7 @@ class CacheManager:
                 media_context="test"
             )
             
-            # Check if we can check cache hit
+            
             can_check = await self.cache.check_cache_hit(test_key)
             
             return {
@@ -361,7 +361,7 @@ class CacheManager:
             }
 
 
-# Global cache manager instance
+
 _cache_manager: Optional[CacheManager] = None
 
 

@@ -11,7 +11,7 @@ from src.shared.concept_expander import get_concept_expander, ExpansionMethod
 from src.api.cache_admin import clear_test_cache, print_cache_summary
 from src.shared.test_data import get_concept_expansion_test_cases
 
-# Configure logging to see what's happening
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ async def test_basic_concept_expansion():
     
     expander = get_concept_expander()
     
-    # Show method capabilities
+
     conceptnet_caps = expander.get_method_capabilities(ExpansionMethod.CONCEPTNET)
     llm_caps = expander.get_method_capabilities(ExpansionMethod.LLM)
     
@@ -34,7 +34,7 @@ async def test_basic_concept_expansion():
     print(f"   Strengths: {', '.join(llm_caps['strengths'])}")
     print(f"   Best for: {', '.join(llm_caps['best_for'])}")
     
-    # Test the main example from todo.md
+
     print("\n📋 Testing: 'action' + 'movie' context")
     recommended = expander.get_recommended_method("action", "movie")
     print(f"💡 Recommended method: {recommended.value} (but testing ConceptNet anyway)")
@@ -46,21 +46,21 @@ async def test_basic_concept_expansion():
         confidence_scores = result.confidence_score.per_item
         
         print(f"✅ Success! Expanded 'action' into {len(expanded_concepts)} concepts:")
-        for concept in expanded_concepts[:10]:  # Show first 10
+        for concept in expanded_concepts[:10]:
             confidence = confidence_scores.get(concept, 0.0)
             print(f"   • {concept} (confidence: {confidence:.2f})")
         
-        # Check if we got expected concepts from todo.md
+
         expected = ["fight", "combat", "battle", "intense", "fast-paced"]
         found_expected = [exp for exp in expected if exp in expanded_concepts]
         print(f"\n🎯 Expected concepts found: {found_expected}")
         
-        # Note about ConceptNet limitations
+
         if not found_expected:
             print("💡 NOTE: ConceptNet's RelatedTo gives generic actions, not movie genre concepts.")
             print("      This is why Stage 3.2 LLM expansion will be important for better results.")
         
-        # Cache information
+
         cache_key = result.cache_key.generate_key()
         print(f"🗄️  Cached with key: {cache_key}")
         print(f"⏱️  Execution time: {result.plugin_metadata.execution_time_ms:.1f}ms")
@@ -77,7 +77,7 @@ async def test_cache_behavior():
     
     expander = get_concept_expander()
     
-    # First call - should be cache miss and API call
+
     print("First call (cache miss expected):")
     result1 = await expander.expand_concept("samurai", "movie")
     
@@ -85,7 +85,7 @@ async def test_cache_behavior():
         time1 = result1.plugin_metadata.execution_time_ms
         print(f"   ✅ Success in {time1:.1f}ms (includes API call)")
     
-    # Second call - should be cache hit
+
     print("Second call (cache hit expected):")
     result2 = await expander.expand_concept("samurai", "movie")
     
@@ -106,7 +106,7 @@ async def test_concept_expansion_test_cases():
     expander = get_concept_expander()
     test_cases = get_concept_expansion_test_cases()
     
-    for i, case in enumerate(test_cases[:3], 1):  # Test first 3 cases
+    for i, case in enumerate(test_cases[:3], 1):
         concept = case["input_term"]
         media_context = case["media_context"]
         expected_concepts = case["expected_concepts"]
@@ -130,7 +130,7 @@ async def test_concept_expansion_test_cases():
                 print(f"   - Expanded concepts count: {len(expanded)}")
                 print(f"   - Actual concepts: {expanded}")
                 
-                # Check overlap with expected concepts
+
                 found = [exp for exp in expected_concepts if exp in expanded]
                 if found:
                     print(f"   - ✅ Expected matches found: {found}")
@@ -179,22 +179,22 @@ async def main():
     print("=" * 50)
     
     try:
-        # Optional: Clear cache for fresh test results
+
         print("🧹 Cache management options:")
         print("   - Run: await clear_test_cache() to start fresh")
         print("   - Current cache:")
         await print_cache_summary()
         
-        # Test basic functionality with todo.md example
+
         await test_basic_concept_expansion()
         
-        # Test cache behavior
+
         await test_cache_behavior()
         
-        # Test with test_data.py examples
+
         await test_concept_expansion_test_cases()
         
-        # Test batch processing
+
         await test_batch_expansion()
         
         print("\n🎉 All tests completed!")
@@ -210,7 +210,7 @@ async def main():
         traceback.print_exc()
     
     finally:
-        # Clean up
+
         expander = get_concept_expander()
         await expander.close()
 

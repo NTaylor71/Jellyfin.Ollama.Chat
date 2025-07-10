@@ -57,7 +57,7 @@ class KeywordProviderManager:
         logger.info("Initializing keyword providers...")
         self.start_time = asyncio.get_event_loop().time()
         
-        # Initialize ConceptNet Provider
+        
         try:
             from src.providers.knowledge.conceptnet_provider import ConceptNetProvider
             conceptnet_provider = ConceptNetProvider()
@@ -125,27 +125,27 @@ class KeywordProviderManager:
         )
 
 
-# Global provider manager
+
 provider_manager = KeywordProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle."""
-    # Startup
+
     logger.info("Starting Keyword Expansion Service...")
     await provider_manager.initialize_providers()
     logger.info("Keyword Expansion Service startup complete.")
     
     yield
     
-    # Shutdown
+
     logger.info("Shutting down Keyword Expansion Service...")
     await provider_manager.cleanup_providers()
     logger.info("Keyword Expansion Service shutdown complete.")
 
 
-# Create FastAPI app
+
 app = FastAPI(
     title="Keyword Expansion Service",
     description="Service for keyword expansion using ConceptNet and other providers",
@@ -153,10 +153,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure settings
+
 settings = get_settings()
 
-# Add CORS middleware if enabled
+
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -210,10 +210,10 @@ async def expand_conceptnet_keywords(request: ConceptNetExpansionRequest):
         
         start_time = asyncio.get_event_loop().time()
         
-        # Process each keyword
+
         all_concepts = []
         for keyword in request.keywords:
-            # Create expansion request
+            
             from src.providers.nlp.base_provider import ExpansionRequest
             expansion_request = ExpansionRequest(
                 concept=keyword,
@@ -222,10 +222,10 @@ async def expand_conceptnet_keywords(request: ConceptNetExpansionRequest):
                 field_name="keyword"
             )
             
-            # Call ConceptNet provider
+
             result = await provider.expand_concept(expansion_request)
             
-            # Extract concepts from result
+
             if isinstance(result, dict) and "concepts" in result:
                 concepts = result["concepts"]
             elif isinstance(result, list):
@@ -233,7 +233,7 @@ async def expand_conceptnet_keywords(request: ConceptNetExpansionRequest):
             else:
                 concepts = []
             
-            # Add concepts to the list
+            
             for concept in concepts:
                 if isinstance(concept, str):
                     clean_concept = concept.strip().lower()
@@ -244,7 +244,7 @@ async def expand_conceptnet_keywords(request: ConceptNetExpansionRequest):
                     if clean_concept and clean_concept not in all_concepts:
                         all_concepts.append(clean_concept)
         
-        # Limit final results
+
         final_concepts = all_concepts[:request.max_concepts]
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -270,7 +270,7 @@ async def expand_conceptnet_keywords(request: ConceptNetExpansionRequest):
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.keyword_expansion_service:app",
         host="0.0.0.0",

@@ -108,7 +108,7 @@ class MongoDBClient:
             return {"exists": False, "error": str(e)}
 
 
-# Global client instance
+
 _mongodb_client: Optional[MongoDBClient] = None
 
 

@@ -8,7 +8,6 @@ import os
 import logging
 from unittest.mock import Mock, patch
 
-# Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_imports():
@@ -16,19 +15,16 @@ def test_imports():
     print("Testing imports...")
     
     try:
-        # Test basic imports
         import psutil
         import GPUtil
         print("✓ System monitoring imports successful")
         
-        # Test project imports
         from src.worker.resource_queue_manager import ResourceAwareQueueManager
         from src.worker.resource_manager import create_resource_pool_from_config
         from src.worker.resource_manager import ResourceManager
         from src.shared.config import get_settings
         print("✓ Project imports successful")
         
-        # Test data structures
         from app.main import QueueTask, ResourceUsage
         print("✓ Data structure imports successful")
         
@@ -46,15 +42,12 @@ def test_resource_monitoring():
         import psutil
         import GPUtil
         
-        # Test CPU monitoring
         cpu_percent = psutil.cpu_percent(interval=0.1)
         print(f"✓ CPU: {cpu_percent}%")
         
-        # Test memory monitoring
         memory = psutil.virtual_memory()
         print(f"✓ Memory: {memory.percent}%")
         
-        # Test GPU monitoring
         try:
             gpus = GPUtil.getGPUs()
             if gpus:
@@ -64,7 +57,6 @@ def test_resource_monitoring():
         except:
             print("✓ GPU monitoring handled gracefully")
         
-        # Test disk monitoring
         disk = psutil.disk_usage('/')
         disk_usage = (disk.used / disk.total) * 100
         print(f"✓ Disk: {disk_usage:.1f}%")
@@ -83,13 +75,11 @@ def test_queue_connection():
         from src.worker.resource_queue_manager import ResourceAwareQueueManager
         from src.worker.resource_manager import create_resource_pool_from_config
         
-        # Try to create queue manager
         resource_config = {"cpu_cores": 1, "gpu_count": 0, "memory_mb": 512}
         resource_pool = create_resource_pool_from_config(resource_config, worker_id="app_test")
         queue_manager = ResourceAwareQueueManager(resource_pool)
         print("✓ Queue manager created")
         
-        # Try to get stats (this might fail if Redis isn't running)
         try:
             stats = queue_manager.get_queue_stats()
             print(f"✓ Queue stats: {stats}")
@@ -110,7 +100,6 @@ def test_data_structures():
         from app.main import QueueTask, ResourceUsage
         from datetime import datetime
         
-        # Test QueueTask
         task = QueueTask(
             id="test123",
             status="pending",
@@ -119,7 +108,6 @@ def test_data_structures():
         )
         print(f"✓ QueueTask created: {task.id}")
         
-        # Test ResourceUsage
         usage = ResourceUsage(
             cpu_percent=50.0,
             memory_percent=60.0,
@@ -143,7 +131,6 @@ def test_task_creation():
         from src.worker.resource_queue_manager import ResourceAwareQueueManager
         from src.worker.resource_manager import create_resource_pool_from_config
         
-        # Mock task data
         test_task = {
             'plugin_name': 'test_plugin',
             'field_name': 'test_field',
@@ -151,7 +138,6 @@ def test_task_creation():
             'media_type': 'movie'
         }
         
-        # Try to enqueue task (might fail if Redis isn't running)
         try:
             resource_config = {"cpu_cores": 1, "gpu_count": 0, "memory_mb": 512}
         resource_pool = create_resource_pool_from_config(resource_config, worker_id="app_test")
@@ -178,7 +164,6 @@ def test_mock_gui_components():
     try:
         from app.main import ResourceUsage
         
-        # Test resource display logic
         usage = ResourceUsage(
             cpu_percent=75.5,
             memory_percent=85.2,
@@ -187,7 +172,6 @@ def test_mock_gui_components():
             disk_usage=55.3
         )
         
-        # Mock progress bar updates
         print(f"✓ CPU progress: {int(usage.cpu_percent)}%")
         print(f"✓ Memory progress: {int(usage.memory_percent)}%")
         print(f"✓ GPU progress: {int(usage.gpu_percent)}%")

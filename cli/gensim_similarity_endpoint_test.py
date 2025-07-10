@@ -8,7 +8,7 @@ import argparse
 import sys
 from typing import Dict, Any
 
-# Add project root to path
+
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -61,10 +61,10 @@ async def main_async():
     
     args = parser.parse_args()
     
-    # Initialize test client
+
     test_client = GensimSimilarityTest()
     
-    # Handle info requests
+
     if args.stats:
         stats = test_client.get_queue_stats()
         print(f"Queue Statistics:")
@@ -87,17 +87,17 @@ async def main_async():
                 print(f"  Service type: {definition['service_type']}")
         return
     
-    # Require keyword for testing
+
     if not args.keyword:
         print("❌ Error: keyword required for testing")
         print("Usage: python gensim_similarity_endpoint_test.py 'adventure'")
         return
     
-    # Prepare test data - map to router service format
+
     test_data = {
-        "concept": args.keyword,  # Router expects 'concept' field
+        "concept": args.keyword,
         "field_name": args.field_name,
-        "max_concepts": args.max_keywords,  # Router expects 'max_concepts'
+        "max_concepts": args.max_keywords,
         "similarity_threshold": args.similarity_threshold
     }
     
@@ -108,13 +108,13 @@ async def main_async():
     print(f"   Similarity threshold: {args.similarity_threshold}")
     print()
     
-    # Run test
+
     result = await test_client.test_plugin(test_data, timeout=args.timeout)
     
-    # Display result
+
     print(format_result(result, verbose=args.verbose))
     
-    # Exit with appropriate code
+
     sys.exit(0 if "error" not in result else 1)
 
 

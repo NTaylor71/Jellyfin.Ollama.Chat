@@ -117,7 +117,7 @@ class BasePlugin(ABC):
         self._initialization_error: Optional[str] = None
         self._performance_metrics: Dict[str, Any] = {}
         self._logger = logging.getLogger(f"plugin.{self.__class__.__name__}")
-        self._config_manager: Optional[Any] = None  # Will be set during initialization
+        self._config_manager: Optional[Any] = None
         self._current_config: Optional[Any] = None
     
     @property
@@ -150,13 +150,13 @@ class BasePlugin(ABC):
     async def initialize_with_config(self, config_manager: Optional[Any] = None) -> bool:
         """Initialize the plugin with configuration manager."""
         try:
-            # Set up configuration if config class is provided
+            
             if self.config_class and config_manager:
                 self._config_manager = config_manager
                 self._current_config = config_manager.get_config()
                 self._logger.info(f"Loaded configuration for plugin {self.metadata.name}")
             
-            # Call plugin-specific initialization
+
             config_dict = self._current_config.model_dump() if self._current_config else {}
             success = await self.initialize(config_dict)
             
@@ -198,7 +198,7 @@ class BasePlugin(ABC):
             "last_health_check": time.time()
         }
         
-        # Add configuration information
+        
         if self._config_manager:
             health_info["config"] = {
                 "has_config": True,
@@ -221,7 +221,7 @@ class BasePlugin(ABC):
             import psutil
             import os
             
-            # Get process info
+            
             process = psutil.Process(os.getpid())
             memory_info = process.memory_info()
             
@@ -265,9 +265,9 @@ class BasePlugin(ABC):
             self._performance_metrics["executions"]
         )
         
-        # Record metrics to Prometheus (if available)
+
         try:
-            # Import here to avoid circular dependency
+
             from src.api.plugin_metrics import get_plugin_metrics
             metrics_collector = get_plugin_metrics()
             metrics_collector.record_plugin_execution(
@@ -277,7 +277,7 @@ class BasePlugin(ABC):
                 success=success
             )
         except ImportError:
-            # Prometheus metrics not available (e.g., in worker service)
+
             pass
         except Exception as e:
             self._logger.warning(f"Failed to record Prometheus metrics: {e}")
@@ -291,24 +291,24 @@ class BasePlugin(ABC):
             requirements = self.resource_requirements
             available = context.available_resources
             
-            # Check CPU requirements
+            
             if requirements.min_cpu_cores > available.get("total_cpu_capacity", 0):
                 self._logger.warning(f"Insufficient CPU cores: need {requirements.min_cpu_cores}, have {available.get('total_cpu_capacity', 0)}")
                 return False
             
-            # Check GPU requirements
+            
             if requirements.requires_gpu and not available.get("gpu_available", False):
                 self._logger.warning("GPU required but not available")
                 return False
             
             if requirements.min_gpu_memory_mb > 0:
-                available_gpu_memory = available.get("total_gpu_capacity", 0) * 1024  # Convert GB to MB
+                available_gpu_memory = available.get("total_gpu_capacity", 0) * 1024
                 if requirements.min_gpu_memory_mb > available_gpu_memory:
                     self._logger.warning(f"Insufficient GPU memory: need {requirements.min_gpu_memory_mb}MB, have {available_gpu_memory}MB")
                     return False
             
-            # Check memory requirements
-            available_memory_mb = available.get("local_memory_gb", 0) * 1024  # Convert GB to MB
+            
+            available_memory_mb = available.get("local_memory_gb", 0) * 1024
             if requirements.min_memory_mb > available_memory_mb:
                 self._logger.warning(f"Insufficient memory: need {requirements.min_memory_mb}MB, have {available_memory_mb}MB")
                 return False
@@ -324,21 +324,21 @@ class BasePlugin(ABC):
         start_time = time.time()
         
         try:
-            # Check if plugin is initialized
+            
             if not self._is_initialized:
                 return PluginExecutionResult(
                     success=False,
                     error_message=f"Plugin {self.metadata.name} is not initialized"
                 )
             
-            # Check resource availability
+            
             if not await self._check_resource_availability(context):
                 return PluginExecutionResult(
                     success=False,
                     error_message="Insufficient resources available for plugin execution"
                 )
             
-            # Execute with timeout
+
             try:
                 result = await asyncio.wait_for(
                     self.execute(data, context),
@@ -348,7 +348,7 @@ class BasePlugin(ABC):
                 execution_time_ms = (time.time() - start_time) * 1000
                 result.execution_time_ms = execution_time_ms
                 
-                # Update performance metrics
+                
                 self._update_performance_metrics(execution_time_ms, result.success)
                 
                 return result
@@ -452,13 +452,13 @@ class EmbedDataEmbellisherPlugin(BasePlugin):
                     error_message="Embed data embellisher expects dict input"
                 )
             
-            # Get plugin-specific enhancements
+            
             plugin_enhancements = await self.embellish_embed_data(data, context)
             
-            # Create standardized enhanced data structure
-            enhanced_data = data.copy()  # Preserve original data
             
-            # Initialize plugin tracking structures if not present
+            enhanced_data = data.copy()
+            
+            
             if 'plugin_enhancements' not in enhanced_data:
                 enhanced_data['plugin_enhancements'] = {}
             
@@ -469,23 +469,23 @@ class EmbedDataEmbellisherPlugin(BasePlugin):
                     'plugin_versions': {}
                 }
             
-            # Add this plugin's data with namespacing
+            
             plugin_name = self.metadata.name
             enhanced_data['plugin_enhancements'][plugin_name] = plugin_enhancements
             
-            # Update tracking metadata
+            
             if plugin_name not in enhanced_data['enhancement_metadata']['processing_plugins']:
                 enhanced_data['enhancement_metadata']['processing_plugins'].append(plugin_name)
             
             enhanced_data['enhancement_metadata']['processing_timestamps'][plugin_name] = asyncio.get_event_loop().time()
             enhanced_data['enhancement_metadata']['plugin_versions'][plugin_name] = self.metadata.version
             
-            # Merge top-level fields from plugin (for backward compatibility)
+
             for key, value in plugin_enhancements.items():
                 if key not in ['plugin_enhancements', 'enhancement_metadata']:
-                    # Don't overwrite existing keys, use plugin-specific naming
+
                     if key in enhanced_data and key not in data:
-                        # This key was added by a previous plugin, namespace it
+
                         enhanced_data[f"{plugin_name}_{key}"] = value
                     else:
                         enhanced_data[key] = value
@@ -582,7 +582,7 @@ def plugin_decorator(
 ) -> Callable:
     """Decorator to register plugin metadata."""
     def decorator(cls):
-        # Store metadata as class attributes
+
         cls._plugin_name = name
         cls._plugin_version = version
         cls._plugin_description = description
@@ -593,7 +593,7 @@ def plugin_decorator(
         cls._plugin_tags = tags or []
         cls._plugin_dependencies = dependencies or []
         
-        # Override metadata property
+
         def get_metadata(self) -> PluginMetadata:
             return PluginMetadata(
                 name=cls._plugin_name,

@@ -38,12 +38,12 @@ class ResourceAwareQueueManager:
         self.resource_pool = resource_pool
         self.redis_client = self._create_redis_client()
         
-        # Queue names
+
         self.cpu_queue = f"{self.settings.REDIS_QUEUE}:cpu"
         self.gpu_queue = f"{self.settings.REDIS_QUEUE}:gpu"
         self.dead_letter_queue = self.settings.REDIS_DEAD_LETTER_QUEUE
         
-        # Metrics
+
         self.tasks_enqueued = 0
         self.tasks_dequeued = 0
         self.tasks_failed = 0
@@ -92,12 +92,12 @@ class ResourceAwareQueueManager:
         """
         task_id = str(uuid.uuid4())
         
-        # Determine resource requirements
+
         if resource_req is None:
             if plugin_name:
                 resource_req = get_plugin_resource_requirements(plugin_name)
             else:
-                # Default requirements for unknown tasks
+
                 resource_req = ResourceRequirement()
         
         task_payload = {
@@ -119,13 +119,13 @@ class ResourceAwareQueueManager:
             "max_attempts": self.settings.WORKER_MAX_RETRIES
         }
         
-        # Route to appropriate queue based on resource requirements
+
         if resource_req.gpu_count > 0:
             queue_name = self.gpu_queue
         else:
             queue_name = self.cpu_queue
         
-        # Calculate score for sorted set (priority + timestamp for FIFO within priority)
+
         score = priority + (int(datetime.utcnow().timestamp()) / 1000000)
         
         await self.redis_client.zadd(
@@ -153,7 +153,7 @@ class ResourceAwareQueueManager:
         last_log_time = 0
         
         while time.time() < end_time:
-            # Try to get a runnable task
+
             task = await self._find_runnable_task()
             
             if task:
@@ -161,13 +161,13 @@ class ResourceAwareQueueManager:
                 logger.info(f"Dequeued task {task['task_id']} from queue")
                 return task
             
-            # Log resource status occasionally
+
             current_time = time.time()
-            if current_time - last_log_time > 10:  # Every 10 seconds
+            if current_time - last_log_time > 10:
                 await self._log_queue_status()
                 last_log_time = current_time
             
-            # No runnable tasks, wait briefly
+
             await asyncio.sleep(0.5)
         
         logger.debug(f"No runnable tasks found within {timeout}s timeout")
@@ -183,12 +183,12 @@ class ResourceAwareQueueManager:
         3. For each queue, examine tasks in priority order
         4. Return first task that fits available resources
         """
-        # Try GPU queue first
+
         task = await self._try_dequeue_from_queue(self.gpu_queue)
         if task:
             return task
         
-        # Try CPU queue
+
         task = await self._try_dequeue_from_queue(self.cpu_queue)
         if task:
             return task
@@ -205,8 +205,8 @@ class ResourceAwareQueueManager:
         Returns:
             Task data if found and runnable, None otherwise
         """
-        # Get top tasks (highest priority) without removing them
-        # We check multiple tasks because the highest priority might not be runnable
+        
+
         tasks = await self.redis_client.zrevrange(queue_name, 0, 9, withscores=False)
         
         for task_json in tasks:
@@ -214,15 +214,15 @@ class ResourceAwareQueueManager:
                 task = json.loads(task_json)
                 req = ResourceRequirement(**task["resource_requirements"])
                 
-                # Check if this task can run with current resources
+                
                 if self.resource_pool.can_schedule(req):
-                    # Remove from queue atomically
+                    
                     removed = await self.redis_client.zrem(queue_name, task_json)
                     if removed > 0:
                         logger.debug(f"Found runnable task {task['task_id']} in {queue_name}")
                         return task
                     else:
-                        # Task was already taken by another worker
+
                         logger.debug(f"Task {task['task_id']} was taken by another worker")
                         continue
                 else:
@@ -230,7 +230,7 @@ class ResourceAwareQueueManager:
                     
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Invalid task data in queue {queue_name}: {e}")
-                # Remove malformed task
+                
                 await self.redis_client.zrem(queue_name, task_json)
         
         return None
@@ -250,7 +250,7 @@ class ResourceAwareQueueManager:
             "status": "completed"
         }
         
-        # Store result with TTL
+
         await self.redis_client.setex(
             f"result:{task_id}",
             timedelta(hours=24),
@@ -273,13 +273,13 @@ class ResourceAwareQueueManager:
         
         self.tasks_failed += 1
         
-        # Retry if under max attempts
+
         if task_data["attempts"] < task_data["max_attempts"]:
-            # Exponential backoff
+
             delay = (2 ** task_data["attempts"]) * self.settings.WORKER_RETRY_DELAY
             retry_time = datetime.utcnow() + timedelta(seconds=delay)
             
-            # Re-enqueue with delay (use retry time as score)
+
             resource_req = ResourceRequirement(**task_data["resource_requirements"])
             queue_name = self.gpu_queue if resource_req.gpu_count > 0 else self.cpu_queue
             
@@ -290,7 +290,7 @@ class ResourceAwareQueueManager:
             
             logger.info(f"Retrying task {task_data['task_id']} in {delay}s (attempt {task_data['attempts']}/{task_data['max_attempts']})")
         else:
-            # Move to dead letter queue
+
             await self.redis_client.lpush(
                 self.dead_letter_queue,
                 json.dumps(task_data)
@@ -304,7 +304,7 @@ class ResourceAwareQueueManager:
         gpu_pending = await self.redis_client.zcard(self.gpu_queue)
         failed_tasks = await self.redis_client.llen(self.dead_letter_queue)
         
-        # Get resource utilization
+        
         utilization = self.resource_pool.get_utilization()
         
         return {

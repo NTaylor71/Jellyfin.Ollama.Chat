@@ -42,43 +42,25 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
         field_value: Any, 
         config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Enrich a field with Gensim similarity expansion.
-        
-        Args:
-            field_name: Name of the field being enriched
-            field_value: Value of the field
-            config: Plugin configuration
-            
-        Returns:
-            Dict containing Gensim similarity results
-        """
         try:
-            # Extract keywords from field value
             if isinstance(field_value, str):
                 keywords = extract_key_concepts(field_value)
             elif isinstance(field_value, list):
-                # Handle list fields (e.g., genres, tags)
                 keywords = [str(item).strip() for item in field_value if str(item).strip()]
             else:
-                # Convert other types to string
                 keywords = extract_key_concepts(str(field_value))
             
             if not keywords:
                 self._logger.debug(f"No keywords found in field {field_name}")
                 return {"gensim_similar": []}
             
-            # Limit keywords for processing efficiency
             max_keywords = config.get("max_keywords", 5)
             keywords = keywords[:max_keywords]
             
             self._logger.debug(f"Finding similar terms for {len(keywords)} keywords using Gensim")
             
-            # Call Gensim provider via dedicated Gensim service endpoint
-            # Gensim provider expects ProviderRequest format
             service_url = await self.get_plugin_service_url()
             
-            # Convert keywords list to a single concept string for provider request
             concept_text = ", ".join(keywords)
             
             request_data = {
@@ -89,7 +71,7 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
                 "options": {
                     "task_type": "similarity_search",
                     "similarity_threshold": config.get("threshold", 0.7),
-                    "model_type": config.get("model_type", "word2vec"),  # or "fasttext"
+                    "model_type": config.get("model_type", "word2vec"),
                     "include_scores": config.get("include_scores", True),
                     "filter_duplicates": config.get("filter_duplicates", True)
                 }
@@ -97,23 +79,18 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from ProviderResponse format
             if response.get("success", False):
                 result_data = response.get("result", {})
-                # Gensim provider returns expanded_concepts, use as similar terms
                 similar_keywords = result_data.get("expanded_concepts", result_data.get("similar_terms", []))
                 metadata = response.get("metadata", {})
             else:
                 similar_keywords = []
                 metadata = {"error": response.get("error_message", "Unknown error")}
             
-            # Extract just the terms if scores are included
             if similar_keywords and isinstance(similar_keywords[0], dict):
                 if config.get("include_scores", True):
-                    # Keep the structure with scores
-                    pass  # similar_keywords is already in the right format
+                    pass
                 else:
-                    # Extract just the terms
                     similar_keywords = [item.get("term", str(item)) for item in similar_keywords]
             
             self._logger.info(
@@ -134,12 +111,10 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"Gensim similarity search failed for field {field_name}: {e}")
-            # Return empty result on error
             return {
                 "gensim_similar": [],
                 "original_keywords": [],
@@ -156,20 +131,9 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
         terms: List[str], 
         config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """
-        Direct similarity search method for backwards compatibility.
-        
-        Args:
-            terms: List of terms to find similarities for
-            config: Search configuration
-            
-        Returns:
-            Similarity results
-        """
         if config is None:
             config = {}
             
-        # Use enrich_field with dummy field info
         result = await self.enrich_field("terms", terms, config)
         return {
             "similar_terms": result.get("gensim_similar", []),
@@ -181,16 +145,6 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
         term: str,
         config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """
-        Find most similar terms to a single term.
-        
-        Args:
-            term: Single term to find similarities for
-            config: Search configuration
-            
-        Returns:
-            Similarity results for the term
-        """
         if config is None:
             config = {}
             
@@ -209,17 +163,6 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
         term2: str,
         config: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """
-        Compare similarity between two specific terms.
-        
-        Args:
-            term1: First term
-            term2: Second term
-            config: Comparison configuration
-            
-        Returns:
-            Similarity score and metadata
-        """
         try:
             service_url = self.get_service_url("nlp", "gensim/compare")
             request_data = {
@@ -247,11 +190,9 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
             }
     
     async def health_check(self) -> Dict[str, Any]:
-        """Check plugin and service health."""
         base_health = await super().health_check()
         
         try:
-            # Test Gensim service connectivity
             service_url = self.get_service_url("nlp", "health")
             health_response = await self.http_get(service_url)
             

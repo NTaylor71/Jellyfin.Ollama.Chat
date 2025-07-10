@@ -18,7 +18,7 @@ from src.shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# HeidelTime imports - fail fast if not available
+
 from py_heideltime.py_heideltime import heideltime
 
 
@@ -35,10 +35,10 @@ class HeidelTimeProvider(BaseProvider):
         self.language = language
         self.heideltime_function = heideltime
         self._heideltime_initialized = False
-        self._result_cache = {}  # Cache HeidelTime results to avoid re-processing
-        self._document_context_cache = {}  # Cache LLM-generated document contexts
+        self._result_cache = {}
+        self._document_context_cache = {}
         
-        # Pure HeidelTime temporal parser - no hard-coded patterns
+
     
     @property
     def metadata(self) -> ProviderMetadata:
@@ -77,7 +77,7 @@ class HeidelTimeProvider(BaseProvider):
             if not self._heideltime_initialized:
                 logger.info("Initializing HeidelTime temporal extractor")
                 
-                # Test HeidelTime function
+
                 test_text = "The movie was released in 2020."
                 test_result = heideltime(test_text, language=self.language, document_type='news')
                 
@@ -103,13 +103,13 @@ class HeidelTimeProvider(BaseProvider):
         start_time = datetime.now()
         
         try:
-            # Ensure provider is initialized
+
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("HeidelTime provider not available", "HeidelTime")
             
             if not self.heideltime_function:
                 logger.error("HeidelTime function not available")
-                # Return empty result instead of None
+
                 return create_field_expansion_result(
                     field_name=request.field_name,
                     input_value=request.concept,
@@ -135,19 +135,19 @@ class HeidelTimeProvider(BaseProvider):
             
             concept = request.concept.strip()
             
-            # Create document context for better temporal understanding
+            
             document_context = await self._create_document_context(concept, request.media_context)
             
-            # Pure HeidelTime temporal extraction - no pattern expansion
+
             temporal_concepts = []
             confidence_scores = {}
             
-            # Direct HeidelTime temporal extraction only
+
             extracted_temporals = self._extract_temporal_expressions(
                 document_context, concept, request.media_context
             )
             
-            # Also try direct extraction from the concept itself
+
             if not extracted_temporals:
                 direct_temporals = self._extract_temporal_expressions(
                     concept, concept, request.media_context
@@ -156,7 +156,7 @@ class HeidelTimeProvider(BaseProvider):
             if extracted_temporals:
                 temporal_concepts.extend(extracted_temporals)
             
-            # Remove duplicates while preserving order
+            
             unique_concepts = []
             seen = set()
             for concept_item in temporal_concepts:
@@ -164,12 +164,12 @@ class HeidelTimeProvider(BaseProvider):
                     unique_concepts.append(concept_item)
                     seen.add(concept_item)
             
-            # Limit to max_concepts
+
             final_concepts = unique_concepts[:request.max_concepts]
             
             if not final_concepts:
                 logger.warning(f"No temporal concepts extracted for: {concept}")
-                # Return empty result instead of None
+
                 return create_field_expansion_result(
                     field_name=request.field_name,
                     input_value=request.concept,
@@ -192,19 +192,19 @@ class HeidelTimeProvider(BaseProvider):
                     model_used=f"heideltime-{self.language}"
                 )
             
-            # Generate confidence scores based on extraction quality
+
             for i, concept_item in enumerate(final_concepts):
-                # Higher confidence for directly extracted temporals
+
                 if i < len(extracted_temporals):
                     confidence = max(0.7, 0.95 - (i * 0.05))
                 else:
                     confidence = max(0.4, 0.8 - (i * 0.08))
                 confidence_scores[concept_item] = confidence
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create PluginResult using helper function
+            
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -229,7 +229,7 @@ class HeidelTimeProvider(BaseProvider):
             
         except Exception as e:
             logger.error(f"HeidelTime expansion failed: {e}")
-            # Return error result instead of None
+
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -264,7 +264,7 @@ class HeidelTimeProvider(BaseProvider):
         Returns:
             Document context string
         """
-        # Check document context cache first
+        
         context_cache_key = f"{concept}:{media_context}"
         if context_cache_key in self._document_context_cache:
             logger.info(f"Using cached document context for: {concept[:50]}...")
@@ -272,13 +272,13 @@ class HeidelTimeProvider(BaseProvider):
             
         try:
             context = await self._generate_document_context_via_llm(concept, media_context)
-            # Cache the context
+
             self._document_context_cache[context_cache_key] = context
             logger.info(f"Cached document context for: {concept[:50]}...")
             return context
         except Exception as e:
             logger.debug(f"LLM context generation failed: {e}")
-            # Minimal fallback without hardcoded assumptions
+
             fallback = f"This {media_context} content relates to {concept} and has temporal elements."
             self._document_context_cache[context_cache_key] = fallback
             return fallback
@@ -299,36 +299,36 @@ class HeidelTimeProvider(BaseProvider):
             return []
         
         try:
-            # Create cache key for this specific input
+            
             cache_key = f"{document_context}:{self.language}:news"
             
-            # Check cache first
+            
             if cache_key in self._result_cache:
                 logger.info(f"Using cached HeidelTime result for: {document_context[:50]}...")
                 temporal_data = self._result_cache[cache_key]
             else:
-                # Parse the document context
+
                 logger.info(f"Processing with HeidelTime: {document_context[:50]}...")
                 temporal_data = heideltime(document_context, language=self.language, document_type='news')
                 
-                # Cache the result
+
                 self._result_cache[cache_key] = temporal_data
                 logger.info(f"Cached HeidelTime result for: {document_context[:50]}...")
             
-            # Debug logging
+
             logger.info(f"HeidelTime input: {document_context}")
             logger.info(f"HeidelTime output: {temporal_data}")
             
             temporal_concepts = []
             
-            # Extract temporal expressions from HeidelTime output
+
             if temporal_data:
-                # HeidelTime returns a list of dictionaries, not XML
+
                 temporal_expressions = temporal_data if isinstance(temporal_data, list) else []
                 logger.info(f"Temporal expressions found: {len(temporal_expressions)}")
                 
                 for expr in temporal_expressions:
-                    # Convert to concept format
+
                     concept_forms = self._temporal_to_concepts(expr, media_context)
                     logger.info(f"Generated concepts from {expr}: {concept_forms}")
                     temporal_concepts.extend(concept_forms)
@@ -352,8 +352,8 @@ class HeidelTimeProvider(BaseProvider):
         expressions = []
         
         try:
-            # Simple regex parsing of HeidelTime XML output
-            # In a production system, you'd use proper XML parsing
+
+
             timex_pattern = r'<TIMEX3[^>]*type="([^"]*)"[^>]*value="([^"]*)"[^>]*>([^<]*)</TIMEX3>'
             matches = re.findall(timex_pattern, heideltime_output)
             
@@ -388,17 +388,17 @@ class HeidelTimeProvider(BaseProvider):
         text = temporal_expr.get("text", "")
         mod = temporal_expr.get("mod", "")
         
-        # Add the original temporal text as a primary concept
+        
         if text:
             concepts.append(text)
         
-        # Add type-based concepts
+        
         if timex_type:
             concepts.append(f"temporal-{timex_type.lower()}")
         
-        # Generate semantic concepts based on HeidelTime's structured output
+
         if value and value != "XXXX-XX" and value != "XX":
-            # Only add meaningful temporal values
+
             concepts.append(f"heideltime-value-{value}")
         
         if mod:
@@ -426,7 +426,7 @@ class HeidelTimeProvider(BaseProvider):
                     "error": "HeidelTime instance is None"
                 }
             
-            # Try a simple test parse
+
             try:
                 test_text = "The movie was released last year."
                 test_result = heideltime(test_text, language=self.language, document_type='news')
@@ -466,7 +466,7 @@ class HeidelTimeProvider(BaseProvider):
         """
         concept_lower = concept.lower()
         
-        # Use procedural temporal detection via pattern analysis
+        
         return self._has_temporal_patterns(concept_lower)
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
@@ -475,7 +475,7 @@ class HeidelTimeProvider(BaseProvider):
             "max_concepts": 10
         }
         
-        # HeidelTime can provide detailed temporal analysis
+
         if self.supports_concept(concept, media_context):
             params["max_concepts"] = 15
         
@@ -484,7 +484,7 @@ class HeidelTimeProvider(BaseProvider):
     async def close(self) -> None:
         """Clean up HeidelTime provider resources."""
         if self.heideltime_function:
-            # HeidelTime cleanup if needed
+
             self.heideltime_function = None
             self._heideltime_initialized = False
             logger.info("HeidelTime provider closed")
@@ -506,10 +506,10 @@ class HeidelTimeProvider(BaseProvider):
             
             llm_provider = LLMProvider()
             if not await llm_provider._ensure_initialized():
-                # Fallback if LLM unavailable
+
                 return f"This {media_context} content relates to {concept} and contains temporal information."
             
-            # Create LLM request for document context generation
+            
             prompt = f'''Generate a 2-3 sentence document context for HeidelTime temporal parsing.
 
 Requirements:
@@ -539,7 +539,7 @@ Generated document context:'''
                 logger.debug(f"Generated document context for '{concept}': {context[:50]}...")
                 return context
             else:
-                # Fallback if LLM fails
+
                 return f"This {media_context} content about {concept} has temporal aspects."
                 
         except Exception as e:
@@ -561,19 +561,19 @@ Generated document context:'''
         try:
             from src.shared.temporal_concept_generator import TemporalConceptGenerator
             
-            # Use TemporalConceptGenerator for intelligent temporal detection
+            
             generator = TemporalConceptGenerator()
             
-            # Quick temporal classification request
+
             temporal_result = generator.classify_temporal_concept(concept)
             
-            # Consider temporal if confidence > 0.3
+
             return temporal_result.confidence_score.overall > 0.3
             
         except Exception as e:
             logger.warning(f"LLM temporal detection failed: {e}")
             
-            # Ultimate fallback: only numeric years as temporal
+
             import re
             return bool(re.search(r'\b\d{4}s?\b', concept))
     

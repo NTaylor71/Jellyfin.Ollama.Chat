@@ -8,7 +8,7 @@ import logging
 import time
 from typing import Dict, Any
 
-# Set up logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ async def test_plugin_with_real_services():
     from src.plugins.enrichment.llm_keyword_plugin import LLMKeywordPlugin
     from src.plugins.enrichment.merge_keywords_plugin import MergeKeywordsPlugin
     
-    # Real-world test data
+
     test_movies = [
         {
             "name": "The Matrix",
@@ -45,7 +45,7 @@ async def test_plugin_with_real_services():
     
     print(f"\\n📊 Testing with {len(test_movies)} real movie entries")
     
-    # Test 1: Resource Requirements Validation
+
     print("\\n🔍 RESOURCE REQUIREMENTS TEST:")
     
     conceptnet_plugin = ConceptNetKeywordPlugin()
@@ -63,14 +63,14 @@ async def test_plugin_with_real_services():
     print(f"  GPU Required: {llm_plugin.resource_requirements.requires_gpu}")
     print(f"  GPU Memory: {llm_plugin.resource_requirements.min_gpu_memory_mb}-{llm_plugin.resource_requirements.preferred_gpu_memory_mb} MB")
     
-    # Validate LLM requirements are higher
+
     assert llm_plugin.resource_requirements.requires_gpu, "LLM plugin should require GPU"
     assert llm_plugin.resource_requirements.min_memory_mb > conceptnet_plugin.resource_requirements.min_memory_mb, "LLM should require more memory"
     assert llm_plugin.resource_requirements.max_execution_time_seconds > conceptnet_plugin.resource_requirements.max_execution_time_seconds, "LLM should have longer timeout"
     
     print("✅ LLM plugins correctly have higher resource requirements")
     
-    # Test 2: Service Connectivity Test (with fallback to manual verification)
+
     print("\\n🌐 SERVICE CONNECTIVITY TEST:")
     
     try:
@@ -114,7 +114,7 @@ async def test_plugin_with_real_services():
         print("   python -m src.services.provider_services.spacy_service &")
         print("   python -m src.services.provider_services.heideltime_service &")
     
-    # Test 3: Plugin Initialization Test
+
     print("\\n🚀 PLUGIN INITIALIZATION TEST:")
     
     plugins = [
@@ -145,23 +145,23 @@ async def test_plugin_with_real_services():
             }
             print(f"  {name}: ❌ {str(e)[:50]}")
     
-    # Test 4: Performance Characteristics Test
+
     print("\\n⚡ PERFORMANCE CHARACTERISTICS TEST:")
     
-    # Test with actual text extraction
+
     from src.shared.text_utils import extract_key_concepts
     
-    for movie in test_movies[:2]:  # Test first 2 movies
+    for movie in test_movies[:2]:
         print(f"\\n🎬 Processing: {movie['name']}")
         
-        # Test keyword extraction
+
         name_concepts = extract_key_concepts(movie['name'])
         overview_concepts = extract_key_concepts(movie['overview'])
         
         print(f"  Name concepts: {name_concepts}")
-        print(f"  Overview concepts: {overview_concepts[:5]}...")  # Show first 5
+        print(f"  Overview concepts: {overview_concepts[:5]}...")
         
-        # Test plugin configuration
+
         conceptnet_config = {
             'max_concepts': 10,
             'relation_types': ['RelatedTo', 'IsA', 'PartOf'],
@@ -177,11 +177,11 @@ async def test_plugin_with_real_services():
         print(f"  ConceptNet config: {conceptnet_config}")
         print(f"  LLM config: {llm_config}")
         
-        # Validate configurations are realistic
+
         assert conceptnet_config['max_concepts'] <= 50, "ConceptNet max_concepts should be reasonable"
         assert 0.0 <= llm_config['temperature'] <= 1.0, "LLM temperature should be valid range"
     
-    # Test 5: Error Scenario Testing
+
     print("\\n💥 ERROR SCENARIO TESTING:")
     
     error_scenarios = [
@@ -200,10 +200,10 @@ async def test_plugin_with_real_services():
         except Exception as e:
             print(f"  {scenario_name}: ❌ {str(e)[:30]}")
     
-    # Test 6: Configuration Validation
+
     print("\\n⚙️  CONFIGURATION VALIDATION TEST:")
     
-    # Test realistic configuration scenarios
+
     config_scenarios = [
         ("Minimal", {"max_concepts": 5}),
         ("Standard", {"max_concepts": 10, "threshold": 0.7}),
@@ -213,7 +213,7 @@ async def test_plugin_with_real_services():
     ]
     
     for config_name, config in config_scenarios:
-        # Validate configuration makes sense
+
         if 'max_concepts' in config:
             assert 1 <= config['max_concepts'] <= 50, f"{config_name}: max_concepts out of range"
         if 'threshold' in config:
@@ -223,7 +223,7 @@ async def test_plugin_with_real_services():
         
         print(f"  {config_name}: ✅ Valid configuration")
     
-    # Cleanup
+
     print("\\n🧹 CLEANUP:")
     for name, plugin in plugins:
         try:

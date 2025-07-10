@@ -62,7 +62,7 @@ class MediaTypesResponse(BaseModel):
     media_types: List[MediaTypeInfo]
 
 
-# Global managers cache
+
 _managers: Dict[str, IngestionManager] = {}
 
 
@@ -84,10 +84,10 @@ async def ingest_media_items(
     start_time = time.time()
     
     try:
-        # Get or create manager for media type
+        
         manager = await get_or_create_manager(request.media_type)
         
-        # Convert to MediaData objects
+
         media_items = []
         errors = []
         
@@ -108,14 +108,14 @@ async def ingest_media_items(
                 errors=errors
             )
         
-        # Process ingestion
+
         await manager.ingest_media(
             media_items,
             batch_size=request.batch_size,
             skip_enrichment=request.skip_enrichment
         )
         
-        # Track successful ingestion
+
         media_ingestion_total.labels(
             media_type=request.media_type,
             source='json',
@@ -138,7 +138,7 @@ async def ingest_media_items(
         )
         
     except Exception as e:
-        # Track failed ingestion
+
         media_ingestion_total.labels(
             media_type=request.media_type,
             source='json',
@@ -164,10 +164,10 @@ async def ingest_from_jellyfin(
     start_time = time.time()
     
     try:
-        # Get or create manager for media type
+        
         manager = await get_or_create_manager(request.media_type)
         
-        # Load from Jellyfin
+
         media_items = await manager.load_media_from_api(
             limit=request.limit,
             item_names=request.item_names
@@ -182,14 +182,14 @@ async def ingest_from_jellyfin(
                 enriched=0
             )
         
-        # Process ingestion
+
         await manager.ingest_media(
             media_items,
             batch_size=request.batch_size,
             skip_enrichment=request.skip_enrichment
         )
         
-        # Track successful ingestion
+
         media_ingestion_total.labels(
             media_type=request.media_type,
             source='jellyfin',
@@ -211,7 +211,7 @@ async def ingest_from_jellyfin(
         )
         
     except Exception as e:
-        # Track failed ingestion
+
         media_ingestion_total.labels(
             media_type=request.media_type,
             source='jellyfin',
@@ -238,7 +238,7 @@ async def list_media_types():
         
         media_types = []
         for config_file in config_dir.glob("*.yaml"):
-            if config_file.name not in ["movie_new_format.yaml", "media_detection.yaml"]:  # Skip template files
+            if config_file.name not in ["movie_new_format.yaml", "media_detection.yaml"]:
                 media_type = config_file.stem
                 try:
                     with open(config_file, 'r') as f:

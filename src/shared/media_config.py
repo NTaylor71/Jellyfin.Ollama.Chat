@@ -290,7 +290,7 @@ class AdaptiveThresholds:
     def get_max_expansion_terms(self) -> int:
         """Get maximum expansion terms based on memory."""
         base_terms = 10
-        memory_multiplier = max(1, self.memory_gb / 4)  # 1x for 4GB, 2x for 8GB, etc.
+        memory_multiplier = max(1, self.memory_gb / 4)
         return min(int(base_terms * memory_multiplier), 50)
     
     def get_parallel_tasks(self) -> int:
@@ -301,13 +301,13 @@ class AdaptiveThresholds:
         """Get processing timeout based on resources."""
         base_timeout = 5.0
         if self.cpu_cores >= 8 and self.memory_gb >= 16:
-            return base_timeout * 2  # More time for complex processing
+            return base_timeout * 2
         elif self.cpu_cores <= 2:
-            return base_timeout * 0.5  # Less time for limited resources
+            return base_timeout * 0.5
         return base_timeout
 
 
-# Global configuration instance
+
 _global_config: Optional[FileBasedMediaConfig] = None
 
 

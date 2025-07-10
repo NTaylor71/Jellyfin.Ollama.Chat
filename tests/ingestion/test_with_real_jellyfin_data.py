@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -22,24 +22,24 @@ async def test_with_full_jellyfin_data():
     async with IngestionManager(media_type="movie") as manager:
         print(f"✅ Connected to {manager.media_type} ingestion manager")
         
-        # Load the real data
+
         movies = await manager.load_media_from_json("data/example_movie_data.json")
         print(f"✅ Loaded {len(movies)} movies from data/example_movie_data.json")
         
         if movies:
-            movie = movies[0]  # First movie
+            movie = movies[0]
             print(f"\n📋 Testing with: {movie.Name}")
             print(f"   ID: {movie.Id}")
             print(f"   Year: {movie.ProductionYear}")
             print(f"   Community Rating: {movie.CommunityRating}")
             
-            # Show People array structure
+
             people_data = movie.model_dump().get("People", [])
             print(f"\n👥 People Array ({len(people_data)} entries):")
             directors = []
             writers = []
             actors = []
-            for person in people_data[:10]:  # Show first 10
+            for person in people_data[:10]:
                 person_type = person.get("Type", "Unknown")
                 person_name = person.get("Name", "Unknown")
                 person_role = person.get("Role", "N/A")
@@ -57,7 +57,7 @@ async def test_with_full_jellyfin_data():
             print(f"   Writers found: {len(writers)} - {writers[:3]}{'...' if len(writers) > 3 else ''}")
             print(f"   Actors found: {len(actors)} - {actors[:3]}{'...' if len(actors) > 3 else ''}")
             
-            # Test computed fields
+
             print(f"\n🧮 TESTING COMPUTED FIELDS")
             print("-" * 40)
             
@@ -65,7 +65,7 @@ async def test_with_full_jellyfin_data():
             before_fields = set(movie_dict.keys())
             print(f"Before computed fields: {len(before_fields)} fields")
             
-            # Apply computed fields
+
             manager._add_computed_fields(movie_dict)
             
             after_fields = set(movie_dict.keys())
@@ -79,7 +79,7 @@ async def test_with_full_jellyfin_data():
             else:
                 print("⚠️  No computed fields were added")
             
-            # Test enrichment
+
             print(f"\n🔄 TESTING ENRICHMENT")
             print("-" * 40)
             
@@ -88,14 +88,14 @@ async def test_with_full_jellyfin_data():
             print(f"   Original fields: {len(movie.model_dump())}")
             print(f"   Enriched fields: {len(enriched_data)}")
             
-            # Test storage
+
             print(f"\n💾 TESTING MONGODB STORAGE")
             print("-" * 40)
             
             await manager.store_media_item(enriched_data)
             print(f"✅ Stored in MongoDB")
             
-            # Verify storage
+
             collection_name = manager.media_config.output.get("collection", "movies_enriched")
             collection = manager.db[collection_name]
             stored_doc = await collection.find_one({"Id": movie.Id})
@@ -107,13 +107,13 @@ async def test_with_full_jellyfin_data():
                 print(f"   Ingested at: {stored_doc.get('_ingested_at')}")
                 print(f"   Total fields: {len(stored_doc)}")
                 
-                # Check computed fields in storage
+
                 if "Director" in stored_doc:
                     print(f"   Director computed: {stored_doc['Director']}")
                 else:
                     print(f"   Director: Not computed/stored")
             
-            # Test with second movie to show it works generically
+
             if len(movies) > 1:
                 movie2 = movies[1]
                 print(f"\n🎬 TESTING SECOND MOVIE: {movie2.Name}")
@@ -125,7 +125,7 @@ async def test_with_full_jellyfin_data():
                 if "Director" in movie2_dict:
                     print(f"✅ Director computed: {movie2_dict['Director']}")
                 
-                # Show that People structure is consistent
+
                 people2 = movie2_dict.get("People", [])
                 directors2 = [p["Name"] for p in people2 if p.get("Type") == "Director"]
                 print(f"   Directors in People array: {directors2}")

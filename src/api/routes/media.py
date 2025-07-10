@@ -60,7 +60,7 @@ class EnrichmentResponse(BaseModel):
     errors: List[str] = Field(default_factory=list)
 
 
-# Global managers cache
+
 _managers: Dict[str, IngestionManager] = {}
 
 
@@ -75,11 +75,11 @@ async def get_or_create_manager(media_type: str) -> IngestionManager:
 
 def _serialize_media_item(item: Dict[str, Any]) -> Dict[str, Any]:
     """Serialize MongoDB document for JSON response."""
-    # Convert ObjectId to string
+
     if "_id" in item:
         item["_id"] = str(item["_id"])
     
-    # Convert datetime objects to ISO strings
+
     for key, value in item.items():
         if isinstance(value, datetime):
             item[key] = value.isoformat()
@@ -98,12 +98,12 @@ async def list_media(
     try:
         manager = await get_or_create_manager(media_type)
         
-        # Build query
+        
         query = {"_media_type": media_type}
         if name_filter:
             query["Name"] = {"$regex": name_filter, "$options": "i"}
         
-        # Get collection
+        
         collection_name = (
             manager.media_config.output.get("collection", f"{media_type}_enriched")
             if manager.media_config.output
@@ -111,15 +111,15 @@ async def list_media(
         )
         collection = manager.db[collection_name]
         
-        # Get total count
+        
         total = await collection.count_documents(query)
         
-        # Get paginated results
+        
         skip = (page - 1) * page_size
         cursor = collection.find(query).skip(skip).limit(page_size).sort("_ingested_at", -1)
         items = await cursor.to_list(length=page_size)
         
-        # Convert to response format
+
         media_items = []
         for item in items:
             media_items.append(MediaResponse(
@@ -151,7 +151,7 @@ async def get_media_item(media_type: str, item_id: str):
     try:
         manager = await get_or_create_manager(media_type)
         
-        # Get collection
+        
         collection_name = (
             manager.media_config.output.get("collection", f"{media_type}_enriched")
             if manager.media_config.output
@@ -159,15 +159,15 @@ async def get_media_item(media_type: str, item_id: str):
         )
         collection = manager.db[collection_name]
         
-        # Try to find by MongoDB ObjectId first, then by media Id
+
         query = {"_media_type": media_type}
         
-        # Try ObjectId format first
+
         try:
             query["_id"] = ObjectId(item_id)
             item = await collection.find_one(query)
         except:
-            # Fall back to string Id field
+
             del query["_id"]
             query["Id"] = item_id
             item = await collection.find_one(query)
@@ -176,7 +176,7 @@ async def get_media_item(media_type: str, item_id: str):
             media_retrieval_total.labels(media_type=media_type, status='not_found').inc()
             raise HTTPException(status_code=404, detail=f"{media_type} item not found")
         
-        # Track successful retrieval
+
         media_retrieval_total.labels(media_type=media_type, status='success').inc()
         duration = time.time() - start_time
         media_retrieval_duration.labels(media_type=media_type).observe(duration)
@@ -204,19 +204,19 @@ async def enrich_media_item(media_type: str, request: EnrichmentRequest):
     try:
         start_time = asyncio.get_event_loop().time()
         
-        # Get or create manager for media type
+        
         manager = await get_or_create_manager(media_type)
         
-        # Convert to MediaData
+
         media_item = manager.dynamic_model(**request.media_data)
         
-        # Enrich the item
+
         enriched_data = await manager.enrich_media_item(media_item)
         
-        # Calculate execution time
+
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Get enriched fields
+        
         original_fields = set(request.media_data.keys())
         enriched_fields = [field for field in enriched_data.keys() if field not in original_fields]
         
@@ -245,19 +245,19 @@ async def analyze_media_item(request: EnrichmentRequest):
     try:
         start_time = asyncio.get_event_loop().time()
         
-        # Get or create manager for media type
+        
         manager = await get_or_create_manager(request.media_type)
         
-        # Convert to MediaData
+
         media_item = manager.dynamic_model(**request.media_data)
         
-        # Enrich the item (without storing)
+
         enriched_data = await manager.enrich_media_item(media_item)
         
-        # Calculate execution time
+
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Get enriched fields
+        
         original_fields = set(request.media_data.keys())
         enriched_fields = [field for field in enriched_data.keys() if field not in original_fields]
         
@@ -293,26 +293,26 @@ async def enrich_specific_fields(request: FieldEnrichmentRequest):
     try:
         start_time = asyncio.get_event_loop().time()
         
-        # Get or create manager for media type
+        
         manager = await get_or_create_manager(request.media_type)
         
-        # Convert to MediaData
+
         media_item = manager.dynamic_model(**request.media_data)
         
-        # Selective field enrichment - only run plugins for requested fields
+
         media_config = manager.media_config
         
-        # Get field configurations for only the requested fields
+        
         field_configs = {}
         for field in request.target_fields:
             if field in media_config.fields:
                 field_configs[field] = media_config.fields[field]
         
         if not field_configs:
-            # No valid fields requested, return original data
+
             filtered_data = request.media_data.copy()
         else:
-            # Create temporary config with only target fields
+            
             from src.shared.media_field_config import MediaFieldConfig
             temp_config = MediaFieldConfig(
                 name=media_config.name,
@@ -321,22 +321,22 @@ async def enrich_specific_fields(request: FieldEnrichmentRequest):
                 output=media_config.output
             )
             
-            # Override manager's config temporarily
+
             original_config = manager.media_config
             manager.media_config = temp_config
             
             try:
-                # Enrich with selective field configuration
+
                 enriched_data = await manager.enrich_media_item(media_item)
                 filtered_data = enriched_data
             finally:
-                # Restore original config
+
                 manager.media_config = original_config
         
-        # Calculate execution time
+
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Get enriched fields (only the ones we targeted)
+        
         original_fields = set(request.media_data.keys())
         enriched_fields = [field for field in request.target_fields if field in enriched_data and field not in original_fields]
         

@@ -7,7 +7,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -21,7 +21,7 @@ async def test_completely_new_media_type():
     print("This media type is NOT mentioned anywhere in the code!")
     print("If this works, the system is truly generic and data-driven.")
     
-    # Podcast test data
+
     podcast_data = {
         "Name": "Tech Talk Weekly",
         "Id": "tech-talk-001",
@@ -55,13 +55,13 @@ async def test_completely_new_media_type():
             print(f"   API type: {api_type or 'Not configured'}")
             print(f"   Collection: {manager.media_config.output.get('collection', 'default') if manager.media_config.output else 'default'}")
             
-            # Test validation
+
             print(f"\n🔍 DYNAMIC VALIDATION:")
             validated_item = manager.dynamic_model(**podcast_data)
             print(f"   ✅ Validation passed!")
             print(f"   Fields validated: {len(validated_item.model_dump())}")
             
-            # Test computed fields
+
             print(f"\n🧮 COMPUTED FIELDS:")
             podcast_dict = validated_item.model_dump()
             before_count = len(podcast_dict)
@@ -74,18 +74,18 @@ async def test_completely_new_media_type():
             if 'Host' in podcast_dict:
                 print(f"   ✅ Host computed: '{podcast_dict['Host']}'")
             
-            # Test enrichment
+
             print(f"\n🔄 ENRICHMENT PIPELINE:")
             enriched_data = await manager.enrich_media_item(validated_item)
             print(f"   ✅ Enrichment completed!")
             print(f"   Final field count: {len(enriched_data)}")
             
-            # Test MongoDB storage
+
             print(f"\n💾 MONGODB STORAGE:")
             await manager.store_media_item(enriched_data)
             print(f"   ✅ Stored successfully!")
             
-            # Verify storage
+
             collection_name = manager.media_config.output.get("collection", "podcasts_enriched")
             collection = manager.db[collection_name]
             stored_doc = await collection.find_one({"Id": podcast_data["Id"]})

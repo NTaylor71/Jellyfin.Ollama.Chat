@@ -16,7 +16,7 @@ from src.shared.plugin_contracts import (
 )
 from src.shared.config import get_settings
 
-# Set up logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 async def create_test_plugin_result(term: str, cache_type: CacheType = CacheType.CONCEPTNET) -> PluginResult:
     """Create a test plugin result for caching."""
     
-    # Simulate concept expansion results
+
     expanded_concepts = {
         "action": ["fight", "combat", "battle", "intense", "fast-paced"],
         "thriller": ["suspense", "mystery", "tension", "psychological", "dark"],
@@ -54,14 +54,14 @@ async def test_mongodb_connection():
     try:
         cache = get_concept_cache()
         
-        # Test sync connection
+
         if cache.client.test_sync_connection():
             logger.info("✅ MongoDB sync connection successful")
         else:
             logger.error("❌ MongoDB sync connection failed")
             return False
         
-        # Test async connection
+
         if await cache.client.test_connection():
             logger.info("✅ MongoDB async connection successful")
         else:
@@ -82,14 +82,14 @@ async def test_cache_initialization():
     try:
         cache = get_concept_cache()
         
-        # Initialize collection
+        
         if await cache.initialize_collection():
             logger.info("✅ ConceptCache collection initialized")
         else:
             logger.error("❌ ConceptCache collection initialization failed")
             return False
         
-        # Check collection info
+        
         info = cache.get_collection_info()
         logger.info(f"Collection info: {info}")
         
@@ -107,17 +107,17 @@ async def test_basic_cache_operations():
     try:
         cache = get_concept_cache()
         
-        # Create test result
+        
         test_result = await create_test_plugin_result("action", CacheType.CONCEPTNET)
         
-        # Store in cache
+
         if await cache.store_result(test_result):
             logger.info("✅ Successfully stored result in cache")
         else:
             logger.error("❌ Failed to store result in cache")
             return False
         
-        # Retrieve from cache
+
         cache_key = test_result.cache_key
         retrieved = await cache.get_cached_result(cache_key)
         
@@ -128,7 +128,7 @@ async def test_basic_cache_operations():
             logger.error("❌ Failed to retrieve result from cache")
             return False
         
-        # Test cache hit check
+
         hit = await cache.check_cache_hit(cache_key)
         if hit:
             logger.info("✅ Cache hit check successful")
@@ -148,7 +148,7 @@ async def test_cache_manager():
     logger.info("Testing CacheManager...")
     
     try:
-        # Initialize cache manager
+        
         config = CacheConfig(ttl_seconds=3600)
         manager = get_cache_manager(config)
         
@@ -158,7 +158,7 @@ async def test_cache_manager():
             logger.error("❌ CacheManager initialization failed")
             return False
         
-        # Test cache-first operation
+
         async def mock_compute_func() -> PluginResult:
             return await create_test_plugin_result("thriller", CacheType.LLM)
         
@@ -169,7 +169,7 @@ async def test_cache_manager():
             media_context="movie"
         )
         
-        # First call should be cache miss and compute
+
         result1 = await manager.get_or_compute(cache_key, mock_compute_func)
         if result1:
             logger.info("✅ First call successful (cache miss + compute)")
@@ -177,7 +177,7 @@ async def test_cache_manager():
             logger.error("❌ First call failed")
             return False
         
-        # Second call should be cache hit
+
         result2 = await manager.get_or_compute(cache_key, mock_compute_func)
         if result2:
             logger.info("✅ Second call successful (cache hit)")
@@ -185,11 +185,11 @@ async def test_cache_manager():
             logger.error("❌ Second call failed")
             return False
         
-        # Test cache metrics
+
         metrics = await manager.get_cache_metrics()
         logger.info(f"Cache metrics: {metrics}")
         
-        # Test health check
+
         health = await manager.health_check()
         logger.info(f"Health check: {health}")
         
@@ -207,7 +207,7 @@ async def test_multiple_cache_types():
     try:
         manager = get_cache_manager()
         
-        # Test different cache types
+
         test_cases = [
             (CacheType.CONCEPTNET, "action"),
             (CacheType.LLM, "psychological"),
@@ -243,11 +243,11 @@ async def test_cache_stats():
     try:
         cache = get_concept_cache()
         
-        # Get cache stats
+        
         stats = await cache.get_cache_stats()
         logger.info(f"Cache stats: {stats}")
         
-        # Should have some documents from previous tests
+
         if stats.get("total_documents", 0) > 0:
             logger.info("✅ Cache contains documents from tests")
         else:
@@ -266,7 +266,7 @@ async def run_all_tests():
     logger.info("STARTING STAGE 2.1 CACHE TESTS")
     logger.info("=" * 60)
     
-    # Show environment info
+
     settings = get_settings()
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"MongoDB URL: {settings.mongodb_url}")
@@ -295,7 +295,7 @@ async def run_all_tests():
             logger.error(f"❌ {test_name} ERROR: {e}")
             results.append((test_name, False))
     
-    # Summary
+
     logger.info("\n" + "=" * 60)
     logger.info("TEST SUMMARY")
     logger.info("=" * 60)

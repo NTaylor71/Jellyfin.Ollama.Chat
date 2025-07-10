@@ -8,7 +8,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -22,7 +22,7 @@ async def test_completely_generic():
     print("Testing that YAML configs completely control behavior")
     print("No hardcoded media-specific logic should exist!")
     
-    # Test movie ingestion
+
     print(f"\n📚 STEP 1: Movie Ingestion (YAML-driven)")
     print("-" * 40)
     
@@ -46,18 +46,18 @@ async def test_completely_generic():
         print(f"📋 Model: {movie_manager.dynamic_model.__name__}")
         print(f"🔧 Jellyfin: {movie_manager.media_config.execution.get('jellyfin_type', 'Not configured') if movie_manager.media_config.execution else 'Not configured'}")
         
-        # Validate and enrich
+
         movie_item = movie_manager.dynamic_model(**movie_data)
         movie_enriched = await movie_manager.enrich_media_item(movie_item)
         
         print(f"✅ Movie validation: {len(movie_item.model_dump())} fields")
         print(f"✅ Movie enrichment: {len(movie_enriched)} fields")
         
-        # Store in MongoDB
+
         await movie_manager.store_media_item(movie_enriched)
         print(f"✅ Movie stored in: {movie_manager.media_config.output.get('collection', 'movies_enriched') if movie_manager.media_config.output else 'movies_enriched'}")
     
-    # Test book ingestion 
+
     print(f"\n📖 STEP 2: Book Ingestion (YAML-driven)")
     print("-" * 40)
     
@@ -79,18 +79,18 @@ async def test_completely_generic():
         print(f"📋 Model: {book_manager.dynamic_model.__name__}")
         print(f"🔧 Jellyfin: {book_manager.media_config.execution.get('jellyfin_type', 'Not configured') if book_manager.media_config.execution else 'Not configured'}")
         
-        # Validate and enrich
+
         book_item = book_manager.dynamic_model(**book_data)
         book_enriched = await book_manager.enrich_media_item(book_item)
         
         print(f"✅ Book validation: {len(book_item.model_dump())} fields")
         print(f"✅ Book enrichment: {len(book_enriched)} fields")
         
-        # Store in MongoDB
+
         await book_manager.store_media_item(book_enriched)
         print(f"✅ Book stored in: {book_manager.media_config.output.get('collection', 'books_enriched') if book_manager.media_config.output else 'books_enriched'}")
     
-    # Verify both were stored with correct metadata
+
     print(f"\n🔍 STEP 3: Cross-Media Verification")
     print("-" * 40)
     
@@ -98,19 +98,19 @@ async def test_completely_generic():
         movie_collection = manager.db[manager.media_config.output.get("collection", "movies_enriched")]
         book_collection = manager.db["books_enriched"]
         
-        # Check movie document
+
         movie_doc = await movie_collection.find_one({"Id": "generic-movie-001"})
         if movie_doc:
             print(f"✅ Movie document: media_type='{movie_doc.get('_media_type')}', fields={len(movie_doc)}")
             print(f"   Director computed: {movie_doc.get('Director', 'Not computed')}")
         
-        # Check book document
+
         book_doc = await book_collection.find_one({"Id": "generic-book-001"})
         if book_doc:
             print(f"✅ Book document: media_type='{book_doc.get('_media_type')}', fields={len(book_doc)}")
             print(f"   Author computed: {book_doc.get('Author', 'Not computed')}")
     
-    # Summary
+
     print(f"\n🎉 GENERIC SYSTEM VERIFICATION")
     print("=" * 60)
     print("✅ YAML configs completely control behavior")

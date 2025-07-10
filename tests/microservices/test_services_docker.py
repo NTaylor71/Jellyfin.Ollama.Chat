@@ -30,7 +30,7 @@ class DockerServiceManager:
     
     def __init__(self):
         try:
-            # Test docker is available
+
             result = subprocess.run(["docker", "--version"], capture_output=True, text=True, timeout=10)
             if result.returncode != 0:
                 raise AssertionError("Docker command failed")
@@ -64,7 +64,7 @@ class DockerServiceManager:
         logger.info("🧹 Cleaning up existing containers...")
         
         try:
-            # Stop and remove containers
+
             result = subprocess.run([
                 "docker", "compose", "-f", "docker-compose.dev.yml", "down", "-v"
             ], capture_output=True, text=True, timeout=60)
@@ -82,7 +82,7 @@ class DockerServiceManager:
         logger.info("🔨 Building service images...")
         
         try:
-            # Build only the microservices
+
             services_to_build = ["conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service"]
             
             for service in services_to_build:
@@ -118,11 +118,11 @@ class DockerServiceManager:
             if result.returncode != 0:
                 raise AssertionError(f"❌ Failed to start core services: {result.stderr}")
             
-            # Wait for core services to be healthy
+
             logger.info("⏳ Waiting for core services to be healthy...")
             time.sleep(10)
             
-            # Check health
+
             for service in ["redis", "mongodb"]:
                 self._wait_for_container_health(service)
             
@@ -136,7 +136,7 @@ class DockerServiceManager:
         logger.info("🚀 Starting microservices...")
         
         try:
-            # Start in dependency order
+
             service_order = ["conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service"]
             
             for service in service_order:
@@ -150,9 +150,9 @@ class DockerServiceManager:
                 if result.returncode != 0:
                     raise AssertionError(f"❌ Failed to start {service}: {result.stderr}")
                 
-                # Wait for service to be ready
+
                 logger.info(f"⏳ Waiting for {service} to be healthy...")
-                time.sleep(15)  # Give more time for service startup
+                time.sleep(15)
                 
                 self._wait_for_container_health(service, timeout=120)
                 logger.info(f"✅ {service} started and healthy")
@@ -168,7 +168,7 @@ class DockerServiceManager:
         
         while time.time() - start_time < timeout:
             try:
-                # Check container health
+
                 result = subprocess.run([
                     "docker", "compose", "-f", "docker-compose.dev.yml",
                     "ps", service_name
@@ -194,7 +194,7 @@ class DockerServiceManager:
         async with httpx.AsyncClient(timeout=30.0) as client:
             for service_name, url in self.service_urls.items():
                 try:
-                    # Test health endpoint
+
                     response = await client.get(f"{url}/health")
                     
                     if response.status_code != 200:
@@ -213,11 +213,11 @@ class DockerServiceManager:
         logger.info("🧪 Testing service communication...")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Test router can reach other services
+
             router_url = self.service_urls["router-service"]
             
             try:
-                # Refresh service health through router
+
                 response = await client.post(f"{router_url}/services/health")
                 
                 if response.status_code != 200:
@@ -242,7 +242,7 @@ class DockerServiceManager:
         async with httpx.AsyncClient(timeout=60.0) as client:
             router_url = self.service_urls["router-service"]
             
-            # Test concept expansion
+
             test_request = {
                 "plugin_name": "ConceptExpansionPlugin",
                 "plugin_type": "concept_expansion",
@@ -310,25 +310,25 @@ async def test_docker_microservices():
     manager = DockerServiceManager()
     
     try:
-        # Step 1: Cleanup any existing containers
+
         manager.cleanup_containers()
         
-        # Step 2: Build service images
+
         manager.build_services()
         
-        # Step 3: Start core services
+
         manager.start_core_services()
         
-        # Step 4: Start microservices
+
         manager.start_microservices()
         
-        # Step 5: Test service endpoints
+
         await manager.test_service_endpoints()
         
-        # Step 6: Test service communication
+
         await manager.test_service_communication()
         
-        # Step 7: Test plugin execution
+
         await manager.test_plugin_execution()
         
         logger.info("\n" + "=" * 60)
@@ -338,7 +338,7 @@ async def test_docker_microservices():
     except AssertionError as e:
         logger.error(f"\n❌ DOCKER SERVICE TEST FAILED: {e}")
         
-        # Get logs for debugging
+
         logger.error("\n📋 Service logs for debugging:")
         for service in ["conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service"]:
             logger.error(f"\n--- {service} logs ---")
@@ -352,7 +352,7 @@ async def test_docker_microservices():
         sys.exit(1)
     
     finally:
-        # Always cleanup
+
         manager.cleanup()
 
 
@@ -361,10 +361,10 @@ def main():
     logger.info("🚀 Docker Service Integration Test")
     logger.info("Testing Stage 4.3 Service-Oriented Plugin Architecture")
     
-    # Show configuration
+
     settings_to_console()
     
-    # Run async test
+
     asyncio.run(test_docker_microservices())
 
 

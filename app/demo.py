@@ -9,7 +9,7 @@ import time
 import random
 from datetime import datetime
 
-# Add parent directory to path
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.worker.resource_queue_manager import ResourceAwareQueueManager
@@ -23,12 +23,12 @@ def simulate_resource_monitoring():
     print("-" * 40)
     
     for i in range(5):
-        # Get real resource data
+
         cpu_percent = psutil.cpu_percent(interval=0.1)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
         
-        # GPU data (might not be available)
+
         gpu_percent = 0.0
         gpu_memory_percent = 0.0
         try:
@@ -39,7 +39,7 @@ def simulate_resource_monitoring():
         except:
             pass
         
-        # Display progress bars (simulated)
+
         print(f"CPU Usage:    {'█' * int(cpu_percent/5):20} {cpu_percent:.1f}%")
         print(f"Memory Usage: {'█' * int(memory.percent/5):20} {memory.percent:.1f}%")
         print(f"GPU Usage:    {'█' * int(gpu_percent/5):20} {gpu_percent:.1f}%")
@@ -62,14 +62,14 @@ def simulate_queue_monitoring():
         resource_pool = create_resource_pool_from_config(resource_config, worker_id="demo")
         queue_manager = ResourceAwareQueueManager(resource_pool)
         
-        # Get initial stats
+
         stats = queue_manager.get_queue_stats()
         print(f"Initial Queue Stats:")
         print(f"  Pending Tasks: {stats['pending_tasks']}")
         print(f"  Failed Tasks: {stats['failed_tasks']}")
         print(f"  Redis Memory: {stats['redis_info']['memory_usage']['used_memory_human']}")
         
-        # Add some test tasks
+
         print(f"\n➕ Adding test tasks...")
         test_tasks = [
             {'plugin_name': 'llm_keyword_plugin', 'field_name': 'keywords', 'field_value': 'space exploration movie'},
@@ -87,13 +87,13 @@ def simulate_queue_monitoring():
             task_ids.append(task_id)
             print(f"  Task {i+1}: {task['plugin_name']} -> {task_id[:8]}...")
         
-        # Check updated stats
+
         stats = queue_manager.get_queue_stats()
         print(f"\nUpdated Queue Stats:")
         print(f"  Pending Tasks: {stats['pending_tasks']}")
         print(f"  Failed Tasks: {stats['failed_tasks']}")
         
-        # Simulate queue table display
+
         print(f"\n📊 Queue Table View:")
         print(f"{'ID':10} {'Status':10} {'Plugin':25} {'Created':10}")
         print("-" * 65)
@@ -150,7 +150,7 @@ def main():
     print("in the GUI application on a desktop environment.")
     print()
     
-    # Run demos
+
     simulate_resource_monitoring()
     simulate_queue_monitoring()
     simulate_gui_features()

@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 class QuestionType(Enum):
     """Types of questions we can handle."""
-    RECOMMENDATION = "recommendation"      # "Suggest X movies"
-    INFORMATION = "information"           # "Tell me about X"
-    COMPARISON = "comparison"             # "Compare X and Y"
-    FACTUAL = "factual"                  # "What year was X released?"
-    ANALYTICAL = "analytical"             # "Why is X considered good?"
-    SEARCH = "search"                     # "Find movies with X"
+    RECOMMENDATION = "recommendation"    
+    INFORMATION = "information"         
+    COMPARISON = "comparison"           
+    FACTUAL = "factual"                
+    ANALYTICAL = "analytical"           
+    SEARCH = "search"                   
 
 
 class QuestionExpansionPlugin(HTTPBasePlugin):
@@ -63,7 +63,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
             preferred_cpu_cores=2.0,
             min_memory_mb=300.0,
             preferred_memory_mb=800.0,
-            requires_gpu=False,  # Benefits from Ollama GPU
+            requires_gpu=False,
             max_execution_time_seconds=25.0,
             can_use_distributed_resources=True
         )
@@ -80,17 +80,17 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         start_time = datetime.now()
         
         try:
-            # Detect if this is a question
+
             if not self._is_question(query):
-                # Not a question - pass through
+
                 return query
             
-            # Classify question type
+
             question_type = await self._classify_question(query)
             
             self._logger.info(f"Processing {question_type.value} question")
             
-            # Process based on question type
+
             if question_type == QuestionType.RECOMMENDATION:
                 enhanced = await self._handle_recommendation_question(query, context)
             elif question_type == QuestionType.SEARCH:
@@ -98,7 +98,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
             elif question_type == QuestionType.INFORMATION:
                 enhanced = await self._handle_information_question(query, context)
             else:
-                # Other types need different handling
+
                 enhanced = await self._handle_generic_question(query, context)
             
             self._logger.info(
@@ -110,15 +110,15 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
             
         except Exception as e:
             self._logger.error(f"Question expansion failed: {e}")
-            return query  # Return original on error
+            return query
     
     def _is_question(self, text: str) -> bool:
         """Detect if the text is a question."""
-        # Check for question marks
+        
         if "?" in text:
             return True
         
-        # Check for question words
+        
         question_starters = [
             "what", "who", "where", "when", "why", "how",
             "can", "could", "would", "should", "is", "are",
@@ -133,7 +133,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         """Classify the type of question."""
         query_lower = query.lower()
         
-        # Pattern-based classification (fast)
+
         if any(word in query_lower for word in ["suggest", "recommend", "give me", "list"]):
             return QuestionType.RECOMMENDATION
         elif any(word in query_lower for word in ["find", "search", "show", "with", "featuring"]):
@@ -147,7 +147,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         elif any(word in query_lower for word in ["why", "how come", "reason"]):
             return QuestionType.ANALYTICAL
         
-        # Default to SEARCH for ambiguous cases
+
         
         return QuestionType.SEARCH
     
@@ -159,13 +159,13 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         """
         Handle recommendation questions like "Suggest 5 sci-fi movies".
         """
-        # Extract key parameters
+
         params = self._extract_recommendation_params(query)
         
-        # Expand concepts using ConceptNet service
+
         expanded_concepts = await self._expand_recommendation_concepts(params)
         
-        # Build enhanced query
+        
         enhanced_parts = []
         if params["genre"]:
             enhanced_parts.extend(expanded_concepts.get(params["genre"], [params["genre"]]))
@@ -184,7 +184,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         """
         Handle search questions like "Find movies with robots".
         """
-        # Extract search terms
+
         search_terms = self._extract_search_terms(query)
         
         if not search_terms:
@@ -192,18 +192,18 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         
         expanded_terms = []
         
-        # Expand each search term using ConceptNet service
-        for term in search_terms[:5]:  # Limit to avoid too many calls
+
+        for term in search_terms[:5]:
             expanded_terms.append(term)
             try:
                 result = await self._expand_with_conceptnet_service(term, "movie")
                 if result:
-                    expansions = result[:2]  # Limit expansions per term
+                    expansions = result[:2]
                     expanded_terms.extend(expansions)
             except Exception as e:
                 self._logger.debug(f"Failed to expand term '{term}': {e}")
         
-        # Remove duplicates while preserving order
+        
         unique_terms = list(dict.fromkeys(expanded_terms))
         return " ".join(unique_terms)
     
@@ -215,16 +215,16 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         """
         Handle information questions like "Tell me about censorship in Goodfellas".
         """
-        # Extract subject and topic
+
         subject, topic = self._extract_information_components(query)
         
-        # Build search query from components
+        
         search_parts = []
         if subject:
             search_parts.append(subject)
         if topic:
             search_parts.append(topic)
-            # Expand topic using ConceptNet service
+
             try:
                 expansions = await self._expand_with_conceptnet_service(topic, "movie")
                 if expansions:
@@ -242,20 +242,20 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         """
         Handle other question types with basic keyword extraction.
         """
-        # Extract key concepts
+
         keywords = self._extract_keywords(query)
         
         if not keywords:
             return query
         
-        # Basic expansion for top keywords
+
         expanded = []
         for keyword in keywords[:3]:
             expanded.append(keyword)
             try:
                 expansions = await self._expand_with_conceptnet_service(keyword, "movie")
                 if expansions:
-                    expanded.extend(expansions[:1])  # One expansion per keyword
+                    expanded.extend(expansions[:1])
             except Exception as e:
                 self._logger.debug(f"Failed to expand keyword '{keyword}': {e}")
         
@@ -269,12 +269,12 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
             "modifiers": []
         }
         
-        # Extract count
+
         count_match = re.search(r'\b(\d+)\s+(movie|film)', query.lower())
         if count_match:
             params["count"] = int(count_match.group(1))
         
-        # Extract genre
+
         genres = [
             "action", "comedy", "drama", "horror", "sci-fi", "science fiction",
             "romance", "thriller", "documentary", "animation", "fantasy"
@@ -284,7 +284,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
                 params["genre"] = genre
                 break
         
-        # Extract modifiers
+
         modifiers = ["recent", "classic", "popular", "underrated", "new", "old"]
         for modifier in modifiers:
             if modifier in query.lower():
@@ -294,12 +294,12 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
     
     def _extract_search_terms(self, query: str) -> List[str]:
         """Extract search terms from search questions."""
-        # Remove question words
+        
         clean_query = query.lower()
         for word in ["find", "search", "show", "movies", "films", "with", "featuring", "about"]:
             clean_query = clean_query.replace(word, " ")
         
-        # Extract remaining meaningful words
+
         words = clean_query.split()
         terms = [w for w in words if len(w) > 2 and w not in ["the", "and", "for"]]
         
@@ -307,17 +307,17 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
     
     def _extract_information_components(self, query: str) -> Tuple[str, str]:
         """Extract subject and topic from information questions."""
-        # Pattern: "tell me about TOPIC in SUBJECT"
+
         match = re.search(r'about\s+(.+?)\s+in\s+(.+)', query.lower())
         if match:
             return match.group(2).strip(), match.group(1).strip()
         
-        # Pattern: "what is TOPIC"
+
         match = re.search(r'what\s+is\s+(.+)', query.lower())
         if match:
             return "", match.group(1).strip("?")
         
-        # Pattern: "SUBJECT information/details"
+
         match = re.search(r'(.+?)\s+(information|details|info)', query.lower())
         if match:
             return match.group(1).strip(), "information"
@@ -326,7 +326,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
     
     def _extract_keywords(self, query: str) -> List[str]:
         """Extract keywords from generic questions."""
-        # Remove common question words
+        
         stopwords = {
             "what", "who", "where", "when", "why", "how", "is", "are",
             "the", "a", "an", "and", "or", "but", "in", "on", "at",
@@ -345,7 +345,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
         """Expand concepts from recommendation parameters."""
         expanded = {}
         
-        # Expand genre if present
+
         if params["genre"]:
             try:
                 expansions = await self._expand_with_conceptnet_service(params["genre"], "movie")
@@ -354,7 +354,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
             except Exception as e:
                 self._logger.debug(f"Failed to expand genre '{params['genre']}': {e}")
         
-        # Expand modifiers
+
         for modifier in params.get("modifiers", []):
             try:
                 expansions = await self._expand_with_conceptnet_service(modifier, "movie")
@@ -372,7 +372,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
     ) -> Optional[List[str]]:
         """Expand concept using ConceptNet service via HTTP."""
         try:
-            # Get ConceptNet service URL
+            
             service_url = self.get_service_url("conceptnet", "expand")
             
             request_data = {
@@ -388,7 +388,7 @@ class QuestionExpansionPlugin(HTTPBasePlugin):
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from ProviderResponse format
+            
             if response.get("success", False):
                 result_data = response.get("result", {})
                 expanded_concepts = result_data.get("expanded_concepts", [])

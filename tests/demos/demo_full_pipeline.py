@@ -11,7 +11,7 @@ from pathlib import Path
 from pprint import pprint
 from datetime import datetime
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -40,7 +40,7 @@ def show_field_comparison(original: dict, enriched: dict):
         orig_val = str(original.get(field, "N/A"))[:28]
         enriched_val = str(enriched.get(field, "N/A"))[:28]
         
-        # Highlight new fields
+
         marker = "🆕" if field not in original else "  "
         print(f"{marker} {field:<23} {orig_val:<30} {enriched_val:<30}")
 
@@ -50,9 +50,9 @@ async def demonstrate_full_pipeline():
     print("🎬 COMPLETE PIPELINE DEMONSTRATION")
     print("Raw Input → Dynamic Model → Enrichment → MongoDB → Retrieval")
     
-    # ==========================================================================
-    # STEP 1: RAW INPUT DATA
-    # ==========================================================================
+
+
+
     raw_input = {
         "Name": "The Matrix",
         "OriginalTitle": "The Matrix", 
@@ -77,9 +77,9 @@ async def demonstrate_full_pipeline():
     
     print_section("STEP 1: RAW INPUT DATA", raw_input)
     
-    # ==========================================================================
-    # STEP 2: INGESTION MANAGER INITIALIZATION
-    # ==========================================================================
+
+
+
     async with IngestionManager(media_type="movie") as manager:
         
         print_section("STEP 2: CONFIGURATION LOADED")
@@ -95,9 +95,9 @@ async def demonstrate_full_pipeline():
         }
         print_section("Configuration Details", config_info)
         
-        # ==========================================================================
-        # STEP 3: DYNAMIC MODEL VALIDATION
-        # ==========================================================================
+
+
+
         print_section("STEP 3: DYNAMIC MODEL VALIDATION")
         
         try:
@@ -113,15 +113,15 @@ async def demonstrate_full_pipeline():
             print(f"❌ Validation failed: {e}")
             return
             
-        # ==========================================================================
-        # STEP 4: COMPUTED FIELDS ADDITION
-        # ==========================================================================
+
+
+
         print_section("STEP 4: COMPUTED FIELDS ADDITION")
         
-        # Show before computed fields
+
         before_computed = validated_data.copy()
         
-        # Add computed fields
+
         manager._add_computed_fields(validated_data)
         
         print("Computed fields added:")
@@ -131,9 +131,9 @@ async def demonstrate_full_pipeline():
         
         print_section("Data After Computed Fields", validated_data)
         
-        # ==========================================================================
-        # STEP 5: FIELD-BY-FIELD ENRICHMENT 
-        # ==========================================================================
+
+
+
         print_section("STEP 5: FIELD-BY-FIELD ENRICHMENT PROCESS")
         
         enriched_data = validated_data.copy()
@@ -184,17 +184,17 @@ async def demonstrate_full_pipeline():
         print_section("ENRICHMENT LOG", enrichment_log)
         print_section("FULLY ENRICHED DATA", enriched_data)
         
-        # ==========================================================================
-        # STEP 6: FIELD COMPARISON
-        # ==========================================================================
+
+
+
         show_field_comparison(validated_data, enriched_data)
         
-        # ==========================================================================
-        # STEP 7: MONGODB STORAGE
-        # ==========================================================================
+
+
+
         print_section("STEP 7: MONGODB STORAGE")
         
-        # Add ingestion metadata
+
         storage_data = enriched_data.copy()
         storage_data["_ingested_at"] = datetime.now().isoformat()
         storage_data["_media_type"] = manager.media_type
@@ -210,7 +210,7 @@ async def demonstrate_full_pipeline():
         print(f"  Document size: {len(json.dumps(storage_data, default=str))} bytes")
         print(f"  Total fields: {len(storage_data)}")
         
-        # Store in MongoDB
+
         result = await collection.replace_one(
             {"Id": storage_data["Id"]},
             storage_data,
@@ -227,16 +227,16 @@ async def demonstrate_full_pipeline():
         
         print_section("Storage Result", storage_result)
         
-        # ==========================================================================
-        # STEP 8: MONGODB RETRIEVAL & VERIFICATION
-        # ==========================================================================
+
+
+
         print_section("STEP 8: MONGODB RETRIEVAL & VERIFICATION")
         
-        # Retrieve the document we just stored
+
         retrieved_doc = await collection.find_one({"Id": storage_data["Id"]})
         
         if retrieved_doc:
-            # Convert ObjectId to string for display
+
             if "_id" in retrieved_doc:
                 retrieved_doc["_id"] = str(retrieved_doc["_id"])
                 
@@ -244,11 +244,11 @@ async def demonstrate_full_pipeline():
             print(f"📊 Retrieved document size: {len(json.dumps(retrieved_doc, default=str))} bytes")
             print(f"📊 Retrieved fields: {len(retrieved_doc)}")
             
-            # Show metadata fields
+
             metadata_fields = {k: v for k, v in retrieved_doc.items() if k.startswith("_")}
             print_section("Metadata Fields", metadata_fields)
             
-            # Show original vs retrieved comparison for key fields
+
             print(f"\n🔍 ORIGINAL vs RETRIEVED COMPARISON")
             print(f"{'Field':<25} {'Match':<8} {'Original':<30} {'Retrieved':<30}")
             print(f"{'-'*25} {'-'*8} {'-'*30} {'-'*30}")
@@ -259,7 +259,7 @@ async def demonstrate_full_pipeline():
                 match = "✅" if raw_input.get(field) == retrieved_doc.get(field) else "❌"
                 print(f"{field:<25} {match:<8} {orig_val:<30} {retr_val:<30}")
                 
-            # Show synthetic fields that were created
+
             synthetic_fields = {}
             for field_name, field_config in manager.media_config.fields.items():
                 if field_config.get("source_field") is None and field_name in retrieved_doc:
@@ -271,15 +271,15 @@ async def demonstrate_full_pipeline():
         else:
             print("❌ Failed to retrieve document from MongoDB")
             
-        # ==========================================================================
-        # STEP 9: COLLECTION STATISTICS
-        # ==========================================================================
+
+
+
         print_section("STEP 9: COLLECTION STATISTICS")
         
         stats = await manager.verify_ingestion()
         print_section("Final Statistics", stats)
         
-        # Get sample of all documents in collection
+
         all_docs = []
         async for doc in collection.find({"_demo_run": True}).limit(5):
             doc["_id"] = str(doc["_id"])
@@ -292,9 +292,9 @@ async def demonstrate_full_pipeline():
             
         print_section("DEMO DOCUMENTS IN COLLECTION", all_docs)
         
-        # ==========================================================================
-        # STEP 10: ENRICHMENT ANALYSIS
-        # ==========================================================================
+
+
+
         print_section("STEP 10: ENRICHMENT ANALYSIS")
         
         analysis = {

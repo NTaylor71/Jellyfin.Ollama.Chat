@@ -9,7 +9,7 @@ import sys
 from typing import Dict, Any
 import pprint
 
-# Add project root to path
+
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -68,7 +68,7 @@ async def main_async():
     
     args = parser.parse_args()
 
-    # Set up movie data based on user input
+
     movie_name = args.movie_name or "The Matrix"
     production_year = args.year or 1999
     
@@ -78,7 +78,7 @@ async def main_async():
     if args.domains:
         print(f"🌐 Filtering domains: {', '.join(args.domains)}")
 
-    # Define search configurations for different types
+
     search_configs = {
         "reviews": {
             "search_templates": [
@@ -214,31 +214,31 @@ Evaluate documented cultural impact:
         }
     }
 
-    # Get configuration for selected search type
+
     config = search_configs[args.search_type]
     
-    # Add template variables for substitution
+
     config["template_variables"] = {
         "Name": movie_name,
         "ProductionYear": production_year,
         "Title": movie_name
     }
     
-    # Add rate limiting
+
     config["rate_limiting"] = {
         "delay_between_searches": 2.0
     }
 
-    # Create test instance
+
     test = LLMWebSearchTest()
     
-    # Prepare field value (dummy for web search)
+
     field_value = f"{movie_name} ({production_year})"
     
     print(f"\n🚀 Executing web search + LLM processing...")
     print(f"📋 Configuration: {len(config['search_templates'])} search templates")
     
-    # Execute the test
+
     result = await test.test_plugin(
         {
             "field_name": "web_search_test",
@@ -248,7 +248,7 @@ Evaluate documented cultural impact:
         timeout=args.timeout if hasattr(args, 'timeout') else 60
     )
 
-    # Format and display results
+
     print("\n" + "="*80)
     print("🎯 WEB SEARCH + LLM PROCESSING RESULTS")
     print("="*80)
@@ -265,7 +265,7 @@ Evaluate documented cultural impact:
             print(f"🔍 DEBUG: Result data keys: {list(result.get('data', {}).keys()) if isinstance(result.get('data'), dict) else 'not dict'}")
             websearch_data = result.get("data", result.get("result", {}))
             
-            # Display search results summary
+
             search_results = websearch_data.get("websearch_results", [])
             print(f"\n📊 Search Results Summary:")
             print(f"   Total results found: {len(search_results)}")
@@ -280,7 +280,7 @@ Evaluate documented cultural impact:
                 for source in sorted(sources):
                     print(f"     - {source}")
             
-            # Display LLM analysis
+
             llm_analysis = websearch_data.get("llm_analysis", {})
             if llm_analysis:
                 print(f"\n🤖 LLM Analysis:")
@@ -290,14 +290,14 @@ Evaluate documented cultural impact:
                         if isinstance(content, str):
                             print(f"    {content[:300]}{'...' if len(content) > 300 else ''}")
                         elif isinstance(content, list):
-                            for item in content[:3]:  # Show first 3 items
+                            for item in content[:3]:
                                 print(f"    • {item}")
                             if len(content) > 3:
                                 print(f"    ... and {len(content) - 3} more")
                         else:
                             print(f"    {str(content)[:200]}{'...' if len(str(content)) > 200 else ''}")
             
-            # Display metadata
+
             metadata = websearch_data.get("search_metadata", {})
             if metadata:
                 print(f"\n📈 Execution Metadata:")

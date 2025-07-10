@@ -70,11 +70,11 @@ def test_nlp_models():
     except ImportError:
         raise AssertionError("SpaCy not installed. Run: pip install spacy")
     
-    # Use model manager to check for models
+
     from src.shared.model_manager import ModelManager
     manager = ModelManager(models_base_path="./models")
     
-    # Check required models via model manager
+
     try:
         import asyncio
         loop = asyncio.new_event_loop()
@@ -82,7 +82,7 @@ def test_nlp_models():
         loop.run_until_complete(manager.check_all_models())
         summary = manager.get_model_summary()
         
-        # Check ALL required models, not just SpaCy
+
         missing_required = []
         for model_id, model_info in summary['models'].items():
             if model_info['required'] and model_info['status'] != 'available':
@@ -104,11 +104,11 @@ def test_java_dependencies():
     logger.info("\n☕ Testing Java Dependencies")
     logger.info("-" * 40)
     
-    # Check if Java is available
+
     try:
         result = subprocess.run(['java', '-version'], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            # Extract Java version from stderr (where java -version outputs)
+
             version_output = result.stderr.split('\n')[0] if result.stderr else "Unknown version"
             logger.info(f"✅ Java found: {version_output}")
         else:
@@ -116,14 +116,14 @@ def test_java_dependencies():
     except (subprocess.TimeoutExpired, FileNotFoundError):
         raise AssertionError("Java not found. HeidelTime requires Java 17+. Install with: sudo apt install openjdk-17-jdk")
     
-    # Check JAVA_HOME using config system
+
     try:
         from src.shared.config import get_settings
         settings = get_settings()
 
         logger.info(f"✅ JAVA_HOME (via config): {settings.java_home}")
         
-        # Verify the path exists
+
         from pathlib import Path
         if Path(settings.java_home).exists():
             logger.info(f"✅ JAVA_HOME path verified")
@@ -145,9 +145,9 @@ def test_ollama_connectivity():
         raise AssertionError("Ollama not installed. Run: pip install ollama")
     
     try:
-        # Test basic connectivity by listing models
+
         models = ollama.list()
-        # models is an object with .models attribute containing list of Model objects
+
         model_list = models.models if hasattr(models, 'models') else []
         model_names = [model.model for model in model_list if hasattr(model, 'model')]
         
@@ -211,7 +211,7 @@ def test_model_directories():
         else:
             logger.info(f"✅ {dir_path:20} - {description}")
         
-        # Test if directory is writable
+
         test_file = path / ".write_test"
         try:
             test_file.write_text("test")
@@ -232,13 +232,13 @@ def test_environment_variables():
 
         logger.info(f"✅ Config system: Working")
         
-        # Test that critical settings can be accessed
+
         if hasattr(settings, 'NLTK_DATA'):
             logger.info(f"✅ NLTK_DATA: {settings.NLTK_DATA}")
         if hasattr(settings, 'GENSIM_DATA_DIR'):
             logger.info(f"✅ GENSIM_DATA_DIR: {settings.GENSIM_DATA_DIR}")
             
-        # Test that the config system can handle environment-specific values
+
         logger.info(f"✅ Environment-aware configuration working")
         
     except Exception as e:
@@ -255,7 +255,7 @@ def main():
 
     settings_to_console()
     
-    # Run all tests in order - any failure will stop execution
+
     test_core_python_packages()
     test_nlp_packages()
     test_nlp_models()

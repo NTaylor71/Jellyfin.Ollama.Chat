@@ -167,10 +167,10 @@ class GensimProviderManager(BaseService):
     async def check_models_ready(self) -> bool:
         """Check if all required models are available."""
         try:
-            # Call our own models status endpoint
+
             import httpx
             async with httpx.AsyncClient() as client:
-                # Use centralized service URL configuration
+                
                 from src.shared.config import get_settings
                 settings = get_settings()
                 
@@ -212,7 +212,7 @@ class GensimProviderManager(BaseService):
                 "error": self.initialization_error
             }
         
-        # Service status based on provider availability
+
         if self.initialization_state == "ready" and self.provider:
             service_status = "healthy"
         elif self.initialization_state == "initializing":
@@ -229,21 +229,21 @@ class GensimProviderManager(BaseService):
         )
 
 
-# Global provider manager
+
 provider_manager = GensimProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup
+
     await provider_manager.initialize_provider()
     yield
-    # Shutdown
+
     await provider_manager.cleanup_provider()
 
 
-# Create FastAPI app
+
 settings = get_settings()
 app = FastAPI(
     title="Gensim Provider Service",
@@ -252,7 +252,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -262,7 +262,7 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
-# Prometheus metrics
+
 if settings.ENABLE_METRICS:
     Instrumentator().instrument(app).expose(app)
 
@@ -318,10 +318,10 @@ async def expand_concept(request: ProviderRequest):
         provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Import ExpansionRequest
+
         from src.providers.nlp.base_provider import ExpansionRequest
         
-        # Create expansion request
+        
         expansion_request = ExpansionRequest(
             concept=request.concept,
             media_context=request.media_context,
@@ -330,7 +330,7 @@ async def expand_concept(request: ProviderRequest):
             options=request.options
         )
         
-        # Execute expansion
+
         result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -372,10 +372,10 @@ async def gensim_similarity_search(request: GensimSimilarityRequest):
         
         start_time = asyncio.get_event_loop().time()
         
-        # Convert to similarity search format
+
         similar_terms = []
         for keyword in request.keywords:
-            # Call provider's similarity method
+
             if hasattr(provider, 'find_similar_terms'):
                 similar = await provider.find_similar_terms(
                     keyword, 
@@ -384,21 +384,21 @@ async def gensim_similarity_search(request: GensimSimilarityRequest):
                 )
                 
                 if request.include_scores:
-                    # Keep score information
+
                     for term_data in similar:
                         if isinstance(term_data, dict):
                             similar_terms.append(term_data)
                         else:
                             similar_terms.append({"term": str(term_data), "score": 1.0})
                 else:
-                    # Extract just terms
+
                     for term_data in similar:
                         if isinstance(term_data, dict):
                             similar_terms.append({"term": term_data.get("term", str(term_data))})
                         else:
                             similar_terms.append({"term": str(term_data)})
         
-        # Remove duplicates if requested
+        
         if request.filter_duplicates:
             seen_terms = set()
             filtered_terms = []
@@ -409,7 +409,7 @@ async def gensim_similarity_search(request: GensimSimilarityRequest):
                     filtered_terms.append(term_data)
             similar_terms = filtered_terms
         
-        # Limit results
+
         similar_terms = similar_terms[:request.max_similar]
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -440,11 +440,11 @@ async def gensim_compare_similarity(request: GensimCompareRequest):
         
         start_time = asyncio.get_event_loop().time()
         
-        # Call provider's compare method
+
         if hasattr(provider, 'compare_similarity'):
             similarity_score = await provider.compare_similarity(request.term1, request.term2)
         else:
-            # Fallback: use similarity search
+
             similar_terms = await provider.find_similar_terms(request.term1, max_results=100)
             similarity_score = 0.0
             for term_data in similar_terms:
@@ -453,7 +453,7 @@ async def gensim_compare_similarity(request: GensimCompareRequest):
                         similarity_score = term_data.get("score", 0.0)
                         break
                 elif str(term_data).lower() == request.term2.lower():
-                    similarity_score = 0.8  # Default score for exact match
+                    similarity_score = 0.8
                     break
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -519,24 +519,24 @@ async def check_provider_health():
         }
 
 
-# =============================================================================
-# MODEL MANAGEMENT ENDPOINTS
-# =============================================================================
+
+
+
 
 @app.get("/models/status", response_model=ModelStatusResponse)
 async def get_models_status():
     """Get status of Gensim models."""
     try:
-        # Create ModelManager to check status
+        
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only Gensim models
+
         gensim_models = {
             k: v for k, v in model_manager.models.items()
             if v.package == "gensim"
         }
         
-        # Check status of Gensim models
+        
         models_info = {}
         for model_id, model_info in gensim_models.items():
             status = await model_manager._check_model_status(model_info)
@@ -550,7 +550,7 @@ async def get_models_status():
                 error_message=model_info.error_message
             )
         
-        # Get summary
+        
         available_count = sum(1 for m in models_info.values() if m.status == "available")
         required_count = sum(1 for m in models_info.values() if m.required)
         
@@ -578,16 +578,16 @@ async def download_models(request: ModelDownloadRequest):
     try:
         logger.info(f"Downloading Gensim models - model_ids: {request.model_ids}, force: {request.force_download}")
         
-        # Create ModelManager for downloading
+        
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only Gensim models
+
         gensim_models = {
             k: v for k, v in model_manager.models.items()
             if v.package == "gensim"
         }
         
-        # If specific model IDs requested, filter further
+
         if request.model_ids:
             gensim_models = {
                 k: v for k, v in gensim_models.items()
@@ -597,13 +597,13 @@ async def download_models(request: ModelDownloadRequest):
         downloaded_models = []
         failed_models = []
         
-        # Download each model
+
         for model_id, model_info in gensim_models.items():
             if not model_info.required and not request.force_download:
                 continue
                 
             try:
-                # Check if model needs downloading
+                
                 current_status = await model_manager._check_model_status(model_info)
                 
                 if request.force_download or current_status == ModelStatus.MISSING:
@@ -650,7 +650,7 @@ async def models_ready_check():
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.gensim_service:app",
         host="0.0.0.0",

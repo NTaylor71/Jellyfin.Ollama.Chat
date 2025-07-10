@@ -144,12 +144,12 @@ class SpacyProviderManager(BaseService):
     async def check_models_ready(self) -> bool:
         """Check if all required models are available."""
         try:
-            # Call our own models status endpoint using environment-aware URL
+
             import httpx
             from src.shared.config import get_settings
             settings = get_settings()
             
-            # Use centralized service URL configuration
+            
             our_url = settings.spacy_service_url
             
             async with httpx.AsyncClient() as client:
@@ -189,7 +189,7 @@ class SpacyProviderManager(BaseService):
                 "error": self.initialization_error
             }
         
-        # Service status based on provider availability
+
         if self.initialization_state == "ready" and self.provider:
             service_status = "healthy"
         elif self.initialization_state == "initializing":
@@ -206,21 +206,21 @@ class SpacyProviderManager(BaseService):
         )
 
 
-# Global provider manager
+
 provider_manager = SpacyProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup
+
     await provider_manager.initialize_provider()
     yield
-    # Shutdown
+
     await provider_manager.cleanup_provider()
 
 
-# Create FastAPI app
+
 settings = get_settings()
 app = FastAPI(
     title="SpaCy Provider Service",
@@ -229,7 +229,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -239,7 +239,7 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
-# Prometheus metrics
+
 if settings.ENABLE_METRICS:
     Instrumentator().instrument(app).expose(app)
 
@@ -295,10 +295,10 @@ async def expand_concept(request: ProviderRequest):
         provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Import ExpansionRequest
+
         from src.providers.nlp.base_provider import ExpansionRequest
         
-        # Create expansion request
+        
         expansion_request = ExpansionRequest(
             concept=request.concept,
             media_context=request.media_context,
@@ -307,12 +307,12 @@ async def expand_concept(request: ProviderRequest):
             options=request.options
         )
         
-        # Execute expansion
+
         result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Handle case where provider returns None (no temporal concepts found or error)
+
         if result is None:
             return ProviderResponse(
                 success=False,
@@ -401,24 +401,24 @@ async def check_provider_health():
         }
 
 
-# =============================================================================
-# MODEL MANAGEMENT ENDPOINTS
-# =============================================================================
+
+
+
 
 @app.get("/models/status", response_model=ModelStatusResponse)
 async def get_models_status():
     """Get status of SpaCy models."""
     try:
-        # Create ModelManager to check status
+        
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only SpaCy models
+
         spacy_models = {
             k: v for k, v in model_manager.models.items()
             if v.package == "spacy"
         }
         
-        # Check status of SpaCy models
+        
         models_info = {}
         for model_id, model_info in spacy_models.items():
             status = await model_manager._check_model_status(model_info)
@@ -432,7 +432,7 @@ async def get_models_status():
                 error_message=model_info.error_message
             )
         
-        # Get summary
+        
         available_count = sum(1 for m in models_info.values() if m.status == "available")
         required_count = sum(1 for m in models_info.values() if m.required)
         
@@ -460,16 +460,16 @@ async def download_models(request: ModelDownloadRequest):
     try:
         logger.info(f"Downloading SpaCy models - model_ids: {request.model_ids}, force: {request.force_download}")
         
-        # Create ModelManager for downloading
+        
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only SpaCy models
+
         spacy_models = {
             k: v for k, v in model_manager.models.items()
             if v.package == "spacy"
         }
         
-        # If specific model IDs requested, filter further
+
         if request.model_ids:
             spacy_models = {
                 k: v for k, v in spacy_models.items()
@@ -479,13 +479,13 @@ async def download_models(request: ModelDownloadRequest):
         downloaded_models = []
         failed_models = []
         
-        # Download each model
+
         for model_id, model_info in spacy_models.items():
             if not model_info.required and not request.force_download:
                 continue
                 
             try:
-                # Check if model needs downloading
+                
                 current_status = await model_manager._check_model_status(model_info)
                 
                 if request.force_download or current_status == ModelStatus.MISSING:
@@ -532,7 +532,7 @@ async def models_ready_check():
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.spacy_service:app",
         host="0.0.0.0",

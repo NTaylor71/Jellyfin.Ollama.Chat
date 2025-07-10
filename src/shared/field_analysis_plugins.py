@@ -77,23 +77,23 @@ class GenericTextAnalysisPlugin(FieldAnalysisPlugin):
     
     @property
     def priority(self) -> int:
-        return 100  # High priority for text detection
+        return 100
     
     def can_analyze(self, name: str, value: Any, media_type: str) -> bool:
         """Check if value contains substantial text content."""
         if not value:
             return False
         
-        # Convert to string safely
+
         text = safe_string_conversion(value)
         if not text:
             return False
         
-        # Check for substantial text content (not just IDs or short metadata)
-        if len(text) < 10:  # Too short to be descriptive
+        
+        if len(text) < 10:
             return False
         
-        # Check if it's mostly alphabetic (not technical data)
+        
         ascii_text = to_ascii(text)
         alpha_chars = sum(1 for c in ascii_text if c.isalpha())
         total_chars = len(ascii_text.replace(' ', ''))
@@ -102,16 +102,16 @@ class GenericTextAnalysisPlugin(FieldAnalysisPlugin):
             return False
         
         alpha_ratio = alpha_chars / total_chars
-        return alpha_ratio > 0.5  # More than 50% alphabetic content
+        return alpha_ratio > 0.5
     
     def analyze_field(self, name: str, value: Any, media_type: str) -> MediaField:
         """Analyze text content to determine type and importance."""
         text = safe_string_conversion(value)
         
-        # Determine analysis weight based on content characteristics
+
         weight = self._determine_text_weight(name.lower(), text)
         
-        # All substantial text is concept-expandable
+
         return MediaField(
             name=name,
             value=value,
@@ -130,14 +130,14 @@ class GenericTextAnalysisPlugin(FieldAnalysisPlugin):
         
         Uses content characteristics rather than hard-coded field names.
         """
-        # Longer text generally more important for analysis
+
         text_length = len(text)
         
-        if text_length > 200:  # Long descriptive content
+        if text_length > 200:
             return AnalysisWeight.CRITICAL
-        elif text_length > 100:  # Medium descriptive content  
+        elif text_length > 100:
             return AnalysisWeight.HIGH
-        elif text_length > 30:   # Short but useful content
+        elif text_length > 30: 
             return AnalysisWeight.MEDIUM
         else:
             return AnalysisWeight.LOW
@@ -156,7 +156,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
     
     @property
     def priority(self) -> int:
-        return 90  # High priority for structured data
+        return 90
     
     def can_analyze(self, name: str, value: Any, media_type: str) -> bool:
         """Check if value is structured data (list, dict)."""
@@ -169,7 +169,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
         elif isinstance(value, dict):
             return self._analyze_dict_field(name, value)
         else:
-            # Empty or unknown structure
+
             return MediaField(
                 name=name,
                 value=value,
@@ -187,7 +187,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
         
         first_item = value[0]
         
-        # Check if list contains person-like objects
+        
         if isinstance(first_item, dict) and self._looks_like_person_object(first_item):
             return MediaField(
                 name=name,
@@ -199,11 +199,11 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
                 processing_notes=[f"Person objects detected by {self.plugin_name}"]
             )
         
-        # Check if list contains text items (genres, tags, etc.)
+        
         if isinstance(first_item, str):
-            # Analyze if these are concept-expandable terms
+
             combined_text = " ".join(str(item) for item in value if item)
-            if len(combined_text) > 5:  # Has meaningful content
+            if len(combined_text) > 5:
                 return MediaField(
                     name=name,
                     value=value,
@@ -216,7 +216,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
                     processing_notes=[f"Text list analyzed by {self.plugin_name}"]
                 )
         
-        # Default to metadata for other lists
+
         return MediaField(
             name=name,
             value=value,
@@ -229,7 +229,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
     
     def _analyze_dict_field(self, name: str, value: Dict[str, Any]) -> MediaField:
         """Analyze dictionary structure."""
-        # Look for identifier-like patterns
+
         if self._looks_like_identifier_dict(value):
             return MediaField(
                 name=name,
@@ -241,7 +241,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
                 processing_notes=[f"Identifier dict analyzed by {self.plugin_name}"]
             )
         
-        # Default to structural for complex objects
+
         return MediaField(
             name=name,
             value=value,
@@ -260,7 +260,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
         keys = [k.lower() for k in obj.keys()]
         person_indicators = {'name', 'role', 'type', 'id'}
         
-        # If it has name + role/type, likely a person
+
         has_name = any('name' in k for k in keys)
         has_role_or_type = any(k in ['role', 'type'] for k in keys)
         
@@ -275,7 +275,7 @@ class StructuredDataAnalysisPlugin(FieldAnalysisPlugin):
         id_patterns = ['id', 'url', 'uri', 'tmdb', 'imdb', 'isbn', 'doi']
         
         id_matches = sum(1 for key in keys if any(pattern in key for pattern in id_patterns))
-        return id_matches > len(keys) * 0.5  # More than 50% ID-like keys
+        return id_matches > len(keys) * 0.5
     
     def _create_unknown_field(self, name: str, value: Any) -> MediaField:
         """Create field with unknown classification."""
@@ -303,7 +303,7 @@ class NumericMetadataAnalysisPlugin(FieldAnalysisPlugin):
     
     @property
     def priority(self) -> int:
-        return 80  # Medium priority
+        return 80
     
     def can_analyze(self, name: str, value: Any, media_type: str) -> bool:
         """Check if value is numeric or date-like."""
@@ -311,11 +311,11 @@ class NumericMetadataAnalysisPlugin(FieldAnalysisPlugin):
             return True
         
         if isinstance(value, str):
-            # Check for year patterns (4 digits)
+            
             if re.match(r'^\d{4}$', value.strip()):
                 return True
             
-            # Check for other numeric patterns
+            
             if re.match(r'^[\d.,]+$', value.strip()):
                 return True
         
@@ -347,7 +347,7 @@ class IdentifierAnalysisPlugin(FieldAnalysisPlugin):
     
     @property
     def priority(self) -> int:
-        return 70  # Medium priority
+        return 70
     
     def can_analyze(self, name: str, value: Any, media_type: str) -> bool:
         """Check if value looks like an identifier or URL."""
@@ -356,15 +356,15 @@ class IdentifierAnalysisPlugin(FieldAnalysisPlugin):
         
         text = value.strip().lower()
         
-        # Check for URL patterns
+        
         if any(text.startswith(prefix) for prefix in ['http://', 'https://', 'ftp://', 'mailto:']):
             return True
         
-        # Check for UUID/GUID patterns
+        
         if re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', text):
             return True
         
-        # Check for long hex strings (like ETags)
+        
         if len(text) > 16 and re.match(r'^[0-9a-f]+$', text):
             return True
         
@@ -396,7 +396,7 @@ class FallbackAnalysisPlugin(FieldAnalysisPlugin):
     
     @property
     def priority(self) -> int:
-        return 0  # Lowest priority (fallback)
+        return 0
     
     def can_analyze(self, name: str, value: Any, media_type: str) -> bool:
         """Can always analyze (fallback)."""
@@ -427,8 +427,8 @@ def get_default_field_analysis_plugins() -> List[FieldAnalysisPlugin]:
         StructuredDataAnalysisPlugin(),
         NumericMetadataAnalysisPlugin(),
         IdentifierAnalysisPlugin(),
-        FallbackAnalysisPlugin()  # Always last
+        FallbackAnalysisPlugin()
     ]
     
-    # Sort by priority (highest first)
+
     return sorted(plugins, key=lambda p: p.priority, reverse=True)

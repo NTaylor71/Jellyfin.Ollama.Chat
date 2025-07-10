@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 
 class FieldType(str, Enum):
     """Types of fields for extraction."""
-    TEXT = "text"           # String fields containing text
-    LIST = "list"           # Array fields containing items
-    DATE = "date"           # Date/time fields
-    NUMERIC = "numeric"     # Numeric fields
-    METADATA = "metadata"   # Metadata fields
+    TEXT = "text"         
+    LIST = "list"         
+    DATE = "date"         
+    NUMERIC = "numeric"   
+    METADATA = "metadata" 
 
 
 class ExtractionMethod(str, Enum):
     """Methods for extracting concepts from fields."""
-    KEY_CONCEPTS = "key_concepts"       # Extract key concepts using NLP
-    DIRECT_VALUES = "direct_values"     # Use field values directly
-    LLM_EXTRACTION = "llm_extraction"   # Use LLM for intelligent extraction
-    CUSTOM_PLUGIN = "custom_plugin"     # Use custom plugin for extraction
+    KEY_CONCEPTS = "key_concepts"     
+    DIRECT_VALUES = "direct_values"     
+    LLM_EXTRACTION = "llm_extraction"   
+    CUSTOM_PLUGIN = "custom_plugin"     
 
 
 @dataclass
@@ -104,7 +104,7 @@ class MediaFieldConfigManager:
                 logger.warning(f"Media config directory not found: {self.config_dir}")
                 self._create_default_configs()
             
-            # Load all YAML files in config directory
+
             for config_file in self.config_dir.glob("*.yaml"):
                 await self._load_config_file(config_file)
             
@@ -122,7 +122,7 @@ class MediaFieldConfigManager:
             with open(config_file, 'r', encoding='utf-8') as f:
                 config_data = yaml.safe_load(f)
             
-            # Determine media type from filename or config
+
             media_type_name = config_data.get("media_type") or config_file.stem
             
             try:
@@ -131,7 +131,7 @@ class MediaFieldConfigManager:
                 logger.warning(f"Unknown media type in {config_file}: {media_type_name}")
                 return
             
-            # Create media type configuration
+            
             media_config = MediaTypeConfig.from_dict(media_type, config_data)
             self.media_configs[media_type] = media_config
             
@@ -163,17 +163,17 @@ class MediaFieldConfigManager:
         for rule in config.field_extraction_rules:
             field_concepts = self._extract_concepts_from_field(data, rule)
             
-            # Apply weight and limit
+
             weighted_concepts = field_concepts[:rule.max_concepts]
             concepts.update(weighted_concepts)
         
-        # Apply media type priority order
+
         if config.priority_order:
             prioritized_concepts = []
             remaining_concepts = list(concepts)
             
             for priority_field in config.priority_order:
-                # Find concepts from this field and add them first
+
                 for rule in config.field_extraction_rules:
                     if rule.field_name == priority_field:
                         field_concepts = self._extract_concepts_from_field(data, rule)
@@ -182,9 +182,9 @@ class MediaFieldConfigManager:
                                 prioritized_concepts.append(concept)
                                 remaining_concepts.remove(concept)
             
-            # Add remaining concepts
+            
             prioritized_concepts.extend(remaining_concepts)
-            return prioritized_concepts[:15]  # Global limit
+            return prioritized_concepts[:15]
         
         return list(concepts)[:15]
     
@@ -204,11 +204,11 @@ class MediaFieldConfigManager:
             elif rule.extraction_method == ExtractionMethod.KEY_CONCEPTS:
                 return self._extract_key_concepts(field_value, rule)
             elif rule.extraction_method == ExtractionMethod.LLM_EXTRACTION:
-                # This would be handled by plugins in real implementation
+
                 logger.debug(f"LLM extraction for {rule.field_name} - would use plugin")
                 return []
             elif rule.extraction_method == ExtractionMethod.CUSTOM_PLUGIN:
-                # This would be handled by plugins in real implementation
+
                 logger.debug(f"Custom plugin extraction for {rule.field_name} - would use {rule.plugin_name}")
                 return []
             else:
@@ -228,7 +228,7 @@ class MediaFieldConfigManager:
         concepts = []
         
         if rule.field_type == FieldType.TEXT and isinstance(field_value, str):
-            # For text fields, split and clean
+
             concepts.append(field_value.lower().strip())
         elif rule.field_type == FieldType.LIST and isinstance(field_value, list):
             for item in field_value[:rule.max_concepts]:
@@ -248,18 +248,18 @@ class MediaFieldConfigManager:
     ) -> List[str]:
         """Extract key concepts using NLP."""
         if rule.field_type == FieldType.TEXT and isinstance(field_value, str):
-            # Use the existing extract_key_concepts function
+            
             from src.shared.text_utils import extract_key_concepts
             return extract_key_concepts(field_value)[:rule.max_concepts]
         
-        # For non-text fields, fall back to direct extraction
+
         return self._extract_direct_values(field_value, rule)
     
     def _create_default_configs(self):
         """Create default configuration files if they don't exist."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create default movie configuration
+        
         movie_config = {
             "media_type": "movie",
             "name": "Movie",
@@ -321,7 +321,7 @@ class MediaFieldConfigManager:
         logger.info("Created default movie configuration")
 
 
-# Global instance
+
 _config_manager: Optional[MediaFieldConfigManager] = None
 
 
@@ -341,7 +341,7 @@ def detect_media_type_from_data(data: Dict[str, Any]) -> MediaType:
     try:
         import re
         
-        # Load detection rules
+
         detection_config_path = Path("config/media_types/media_detection.yaml")
         if not detection_config_path.exists():
             logger.warning("Media detection config not found, using fallback detection")
@@ -353,7 +353,7 @@ def detect_media_type_from_data(data: Dict[str, Any]) -> MediaType:
         media_scores = {}
         detection_rules = detection_config.get("media_detection_rules", {})
         
-        # Score each media type based on field patterns
+
         for media_type_name, rules in detection_rules.items():
             score = 0.0
             field_patterns = rules.get("field_patterns", [])
@@ -366,7 +366,7 @@ def detect_media_type_from_data(data: Dict[str, Any]) -> MediaType:
                 flags = re.IGNORECASE if case_insensitive else 0
                 compiled_pattern = re.compile(pattern, flags)
                 
-                # Check if any data field matches this pattern
+                
                 for field_name in data.keys():
                     if compiled_pattern.match(field_name):
                         score += weight
@@ -375,7 +375,7 @@ def detect_media_type_from_data(data: Dict[str, Any]) -> MediaType:
             if score > 0:
                 media_scores[media_type_name] = score
         
-        # Return the media type with highest score
+
         if media_scores:
             best_match = max(media_scores, key=media_scores.get)
             try:
@@ -383,7 +383,7 @@ def detect_media_type_from_data(data: Dict[str, Any]) -> MediaType:
             except ValueError:
                 logger.warning(f"Unknown media type from detection: {best_match}")
         
-        # Fallback
+
         return _fallback_media_detection(data)
         
     except Exception as e:
@@ -395,7 +395,7 @@ def _fallback_media_detection(data: Dict[str, Any]) -> MediaType:
     """Fallback media type detection using simple heuristics."""
     import re
     
-    # Count field patterns that suggest different media types
+
     movie_indicators = 0
     tv_indicators = 0
     book_indicators = 0
@@ -404,27 +404,27 @@ def _fallback_media_detection(data: Dict[str, Any]) -> MediaType:
     for field_name in data.keys():
         field_lower = field_name.lower()
         
-        # Movie patterns
+
         if re.search(r'(premiere|production|runtime|original.*title)', field_lower):
             movie_indicators += 1
         
-        # TV patterns
+
         if re.search(r'(series|season|episode)', field_lower):
             tv_indicators += 1
         
-        # Book patterns  
+
         if re.search(r'(author|publisher|isbn|page)', field_lower):
             book_indicators += 1
         
-        # Music patterns
+
         if re.search(r'(artist|album|track|duration)', field_lower):
             music_indicators += 1
     
-    # Return type with most indicators
+
     max_score = max(movie_indicators, tv_indicators, book_indicators, music_indicators)
     
     if max_score == 0:
-        return MediaType.MOVIE  # Default fallback
+        return MediaType.MOVIE
     elif tv_indicators == max_score:
         return MediaType.TV_SHOW
     elif book_indicators == max_score:

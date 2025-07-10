@@ -48,9 +48,9 @@ class ServiceHealthHistory:
         self.total_checks += 1
         self.last_check_time = datetime.now()
         
-        # Update response time tracking
+        
         self.recent_response_times.append(response_time_ms)
-        if len(self.recent_response_times) > 20:  # Keep last 20 measurements
+        if len(self.recent_response_times) > 20:
             self.recent_response_times.pop(0)
         
         self.average_response_time_ms = sum(self.recent_response_times) / len(self.recent_response_times)
@@ -59,10 +59,10 @@ class ServiceHealthHistory:
             self.consecutive_failures = 0
             self.last_healthy_time = datetime.now()
             
-            # Determine status based on response time
-            if response_time_ms < 1000:  # < 1 second
+
+            if response_time_ms < 1000:
                 self.current_status = ServiceStatus.HEALTHY
-            elif response_time_ms < 5000:  # < 5 seconds
+            elif response_time_ms < 5000:
                 self.current_status = ServiceStatus.DEGRADED
             else:
                 self.current_status = ServiceStatus.DEGRADED
@@ -73,7 +73,7 @@ class ServiceHealthHistory:
             
             if error_message:
                 self.error_messages.append(f"{datetime.now().isoformat()}: {error_message}")
-                if len(self.error_messages) > 10:  # Keep last 10 errors
+                if len(self.error_messages) > 10:
                     self.error_messages.pop(0)
     
     def get_uptime_percentage(self, window_hours: int = 24) -> float:
@@ -81,7 +81,7 @@ class ServiceHealthHistory:
         if self.total_checks == 0:
             return 0.0
         
-        # Simple calculation based on total success rate
+
         success_rate = (self.total_checks - self.total_failures) / self.total_checks
         return success_rate * 100.0
     
@@ -113,10 +113,10 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         super().__init__()
         self.service_history: Dict[str, ServiceHealthHistory] = {}
         self.monitoring_enabled = True
-        self.monitoring_interval = 30.0  # seconds
+        self.monitoring_interval = 30.0
         self.monitoring_task: Optional[asyncio.Task] = None
         self.alert_threshold_failures = 3
-        self.performance_degradation_threshold = 2000.0  # ms
+        self.performance_degradation_threshold = 2000.0
     
     @property
     def metadata(self) -> PluginMetadata:
@@ -147,12 +147,12 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         
         endpoints = []
         
-        # Use dynamic service discovery instead of hard-coded services
+        
         try:
             from src.shared.dynamic_service_discovery import get_service_discovery
             import asyncio
             
-            # Discover services dynamically
+
             loop = asyncio.get_event_loop()
             if not loop.is_running():
                 discovery = loop.run_until_complete(get_service_discovery())
@@ -173,7 +173,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
                 
         except Exception as e:
             logger.error(f"Dynamic service discovery failed in health monitor: {e}")
-            # No fallback - services will be discovered when needed
+
         
         if settings.llm_service_url:
             endpoints.append(ServiceEndpoint(
@@ -186,7 +186,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
             ))
         
         
-        # Infrastructure services
+
         endpoints.append(ServiceEndpoint(
             name="mongodb",
             url=f"http://{settings.mongodb_host}:{settings.mongodb_port}",
@@ -196,7 +196,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
             circuit_breaker_enabled=False
         ))
         
-        # Redis (if available)
+
         if hasattr(settings, 'redis_url'):
             endpoints.append(ServiceEndpoint(
                 name="redis",
@@ -207,7 +207,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
                 circuit_breaker_enabled=False
             ))
         
-        # FAISS service
+
         if settings.vectordb_url:
             endpoints.append(ServiceEndpoint(
                 name="faiss_service",
@@ -218,14 +218,14 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
                 circuit_breaker_enabled=False
             ))
         
-        # Ollama service
+
         if settings.OLLAMA_INGESTION_BASE_URL:
             endpoints.append(ServiceEndpoint(
                 name="ollama",
                 url=settings.OLLAMA_INGESTION_BASE_URL,
                 timeout_seconds=10.0,
                 retry_attempts=1,
-                health_check_path="/api/tags",  # Ollama-specific health check
+                health_check_path="/api/tags",
                 circuit_breaker_enabled=False
             ))
         
@@ -236,16 +236,16 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         if not await super().initialize(config):
             return False
         
-        # Initialize health history for all services
+        
         for service_name in self.services:
             self.service_history[service_name] = ServiceHealthHistory(service_name)
         
-        # Configure monitoring parameters from config
+
         self.monitoring_interval = config.get("monitoring_interval", 30.0)
         self.alert_threshold_failures = config.get("alert_threshold_failures", 3)
         self.performance_degradation_threshold = config.get("performance_degradation_threshold", 2000.0)
         
-        # Start continuous monitoring
+
         if self.monitoring_enabled:
             self.monitoring_task = asyncio.create_task(self._monitoring_loop())
             self._logger.info(f"Started health monitoring for {len(self.services)} services")
@@ -302,14 +302,14 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
                 await self.check_all_services_health()
                 await self._check_for_alerts()
                 
-                # Wait for next monitoring cycle
+
                 await asyncio.sleep(self.monitoring_interval)
                 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self._logger.error(f"Error in monitoring loop: {e}")
-                await asyncio.sleep(5.0)  # Brief pause before retrying
+                await asyncio.sleep(5.0)
         
         self._logger.info("Health monitoring loop stopped")
     
@@ -317,7 +317,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         """Check health of all services and update history."""
         health_results = {}
         
-        # Check all services in parallel
+        
         tasks = []
         for service_name in self.services:
             tasks.append(self._check_single_service_health(service_name))
@@ -348,7 +348,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         start_time = time.time()
         
         try:
-            # Special handling for different service types
+
             if service_name == "ollama":
                 health_result = await self._check_ollama_health(service)
             elif service_name == "mongodb":
@@ -360,10 +360,10 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
             healthy = health_result.get("healthy", False)
             error_message = health_result.get("error")
             
-            # Record in history
+
             history.record_check(healthy, response_time_ms, error_message)
             
-            # Determine overall status
+
             if healthy:
                 if response_time_ms > self.performance_degradation_threshold:
                     status = ServiceStatus.DEGRADED
@@ -398,7 +398,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
     async def _check_ollama_health(self, service: ServiceEndpoint) -> Dict[str, Any]:
         """Special health check for Ollama service."""
         try:
-            # Check if Ollama is responding and has models
+            
             request = HTTPRequest(
                 endpoint="api/tags",
                 method="GET",
@@ -426,7 +426,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
     async def _check_mongodb_health(self, service: ServiceEndpoint) -> Dict[str, Any]:
         """Special health check for MongoDB service."""
         try:
-            # Simple TCP connection check for MongoDB
+
             import socket
             host, port = service.url.replace("http://", "").split(":")
             port = int(port)
@@ -447,7 +447,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
     async def _check_for_alerts(self):
         """Check if any services need alerts."""
         for service_name, history in self.service_history.items():
-            # Check for consecutive failures
+            
             if history.consecutive_failures >= self.alert_threshold_failures:
                 self._log_service_alert(
                     service_name, 
@@ -455,7 +455,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
                     f"Service has failed {history.consecutive_failures} consecutive health checks"
                 )
             
-            # Check for performance degradation
+            
             elif (history.current_status == ServiceStatus.DEGRADED and 
                   history.average_response_time_ms > self.performance_degradation_threshold):
                 self._log_service_alert(
@@ -505,7 +505,7 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
             else:
                 summary["unknown_services"] += 1
         
-        # Determine overall status
+
         if summary["unhealthy_services"] > 0:
             summary["overall_status"] = ServiceStatus.UNHEALTHY
         elif summary["degraded_services"] > 0:

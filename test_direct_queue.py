@@ -18,7 +18,7 @@ async def test_direct_queue_submission():
     
     logger.info("🚀 Testing direct queue submission...")
     
-    # Create resource pool matching worker settings
+
     resource_pool = ResourcePool(
         total_cpu_cores=3,
         total_gpus=1,
@@ -26,11 +26,11 @@ async def test_direct_queue_submission():
         worker_id="test_direct"
     )
     
-    # Create queue manager
+
     queue_manager = ResourceAwareQueueManager(resource_pool)
     
     try:
-        # Check Redis health
+
         healthy = await queue_manager.health_check()
         if not healthy:
             logger.error("❌ Redis not healthy")
@@ -38,15 +38,15 @@ async def test_direct_queue_submission():
         
         logger.info("✅ Redis is healthy")
         
-        # Clear any existing tasks
+
         purged = await queue_manager.purge_queues()
         logger.info(f"🧹 Purged queues: {purged}")
         
-        # Submit CPU tasks
+
         logger.info("\n🔄 Submitting CPU tasks directly to queue...")
         cpu_task_ids = []
         
-        for i in range(3):  # Exactly our CPU limit
+        for i in range(3):
             task_id = await queue_manager.enqueue_task(
                 task_type="plugin_execution",
                 data={
@@ -59,7 +59,7 @@ async def test_direct_queue_submission():
             cpu_task_ids.append(task_id)
             logger.info(f"✅ Queued CPU task {i}: {task_id[:8]}...")
         
-        # Submit GPU task
+
         logger.info("\n🔄 Submitting GPU task...")
         gpu_task_id = await queue_manager.enqueue_task(
             task_type="plugin_execution",
@@ -68,18 +68,18 @@ async def test_direct_queue_submission():
                 "data": {"concept": "action movie"}
             },
             plugin_name="LLMKeywordPlugin",
-            priority=10  # Higher priority
+            priority=10
         )
         logger.info(f"✅ Queued GPU task: {gpu_task_id[:8]}...")
         
-        # Check queue stats
+
         stats = await queue_manager.get_queue_stats()
         logger.info(f"\n📊 Queue stats after submission:")
         logger.info(f"  CPU queue: {stats['queues']['cpu_pending']} tasks")
         logger.info(f"  GPU queue: {stats['queues']['gpu_pending']} tasks")
         logger.info(f"  Total pending: {stats['queues']['total_pending']} tasks")
         
-        # Monitor for worker processing
+
         logger.info("\n👀 Monitoring for worker processing (30s)...")
         start_time = time.time()
         
@@ -96,7 +96,7 @@ async def test_direct_queue_submission():
                 
             await asyncio.sleep(2)
         
-        # Final stats
+
         final_stats = await queue_manager.get_queue_stats()
         logger.info(f"\n📊 Final stats:")
         logger.info(f"  CPU queue: {final_stats['queues']['cpu_pending']} tasks")

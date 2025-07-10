@@ -13,7 +13,7 @@ from src.providers.llm.ollama_backend_client import OllamaBackendClient
 from src.providers.nlp.base_provider import ExpansionRequest
 from src.api.cache_admin import clear_test_cache, print_cache_summary
 
-# Configure logging to see what's happening
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ async def test_ollama_backend_client():
     client = OllamaBackendClient()
     
     try:
-        # Test initialization
+
         print("🔧 Initializing Ollama client...")
         success = await client.initialize()
         
@@ -36,7 +36,7 @@ async def test_ollama_backend_client():
         
         print("✅ Ollama client initialized successfully")
         
-        # Test health check
+
         health = await client.health_check()
         print(f"🏥 Health status: {health['status']}")
         
@@ -44,7 +44,7 @@ async def test_ollama_backend_client():
             print(f"⚠️  Health check issues: {health}")
             return False
         
-        # Test model info
+
         model_info = client.get_model_info()
         print(f"🤖 Model: {model_info['name']} (Backend: {model_info['backend']})")
         
@@ -64,7 +64,7 @@ async def test_llm_provider():
     provider = LLMProvider()
     
     try:
-        # Test initialization
+
         print("🔧 Initializing LLM provider...")
         success = await provider.initialize()
         
@@ -74,13 +74,13 @@ async def test_llm_provider():
         
         print("✅ LLM provider initialized successfully")
         
-        # Test provider metadata
+
         metadata = provider.metadata
         print(f"📋 Provider: {metadata.name} (Type: {metadata.provider_type})")
         print(f"   Context-aware: {metadata.context_aware}")
         print(f"   Strengths: {', '.join(metadata.strengths[:3])}...")
         
-        # Test concept expansion
+
         print("🎬 Testing concept expansion: 'action' movie")
         request = ExpansionRequest(
             concept="action",
@@ -125,15 +125,15 @@ async def test_concept_expander_llm():
     expander = get_concept_expander()
     
     try:
-        # Test LLM capabilities
+
         llm_caps = expander.get_method_capabilities(ExpansionMethod.LLM)
         print(f"🧠 LLM capabilities (type: {llm_caps['type']}, context-aware: {llm_caps['context_aware']})")
         
-        # Test method recommendation
+
         recommended = expander.get_recommended_method("psychological thriller", "movie")
         print(f"💡 Recommended method for 'psychological thriller': {recommended.value}")
         
-        # Test concept expansion
+
         print("🎬 Testing: 'psychological thriller' + 'movie' context")
         result = await expander.expand_concept(
             concept="psychological thriller",
@@ -173,7 +173,7 @@ async def test_llm_vs_conceptnet():
     media_context = "movie"
     
     try:
-        # Test ConceptNet
+
         print("🔍 ConceptNet expansion:")
         conceptnet_result = await expander.expand_concept(
             concept=concept,
@@ -189,7 +189,7 @@ async def test_llm_vs_conceptnet():
         else:
             print("   ❌ Failed")
         
-        # Test LLM
+
         print("🧠 LLM expansion:")
         llm_result = await expander.expand_concept(
             concept=concept,
@@ -205,7 +205,7 @@ async def test_llm_vs_conceptnet():
         else:
             print("   ❌ Failed")
         
-        # Compare results
+
         if conceptnet_result and llm_result and conceptnet_result.success and llm_result.success:
             conceptnet_set = set(conceptnet_concepts)
             llm_set = set(llm_concepts)
@@ -235,7 +235,7 @@ async def test_cache_behavior():
         concept = "horror"
         media_context = "movie"
         
-        # First call (cache miss)
+
         print("🔄 First call (cache miss)...")
         start_time = asyncio.get_event_loop().time()
         result1 = await expander.expand_concept(
@@ -250,7 +250,7 @@ async def test_cache_behavior():
             print("❌ First call failed")
             return False
         
-        # Second call (cache hit)
+
         print("🔄 Second call (cache hit)...")
         start_time = asyncio.get_event_loop().time()
         result2 = await expander.expand_concept(
@@ -265,7 +265,7 @@ async def test_cache_behavior():
             print("❌ Second call failed")
             return False
         
-        # Compare results
+
         concepts1 = result1.enhanced_data.get("expanded_concepts", [])
         concepts2 = result2.enhanced_data.get("expanded_concepts", [])
         
@@ -312,7 +312,7 @@ async def run_all_tests():
             results.append((test_name, False))
             print(f"\n❌ ERROR in {test_name}: {e}")
     
-    # Print summary
+
     print("\n" + "=" * 60)
     print("🎯 TEST SUMMARY")
     print("=" * 60)
@@ -336,7 +336,7 @@ async def run_all_tests():
 
 
 if __name__ == "__main__":
-    # Run the test suite
+
     success = asyncio.run(run_all_tests())
     
     if success:

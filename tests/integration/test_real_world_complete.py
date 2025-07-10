@@ -12,14 +12,14 @@ import json
 from typing import Dict, Any, List
 import httpx
 
-# Configure logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Import all HTTP-only plugins
+
 from src.plugins.enrichment.conceptnet_keyword_plugin import ConceptNetKeywordPlugin
 from src.plugins.enrichment.gensim_similarity_plugin import GensimSimilarityPlugin  
 from src.plugins.enrichment.llm_keyword_plugin import LLMKeywordPlugin
@@ -38,7 +38,7 @@ class RealWorldTester:
         self.http_client = httpx.AsyncClient(timeout=60.0)
         self.results = {}
         
-        # Real movie test data
+
         self.test_movies = [
             {
                 "title": "The Dark Knight",
@@ -87,7 +87,7 @@ class RealWorldTester:
                     
                     print(f"✅ {service_name}: {status} ({response.elapsed.total_seconds()*1000:.1f}ms)")
                     
-                    # Show provider details for NLP service
+
                     if service_name == "NLP Service" and "providers" in health_data:
                         providers = health_data["providers"]
                         for provider_name, provider_info in providers.items():
@@ -147,10 +147,10 @@ class RealWorldTester:
         }
         
         try:
-            # Initialize plugin
+
             await plugin.initialize({})
             
-            # Choose appropriate test data and config for each plugin type
+
             if "ConceptNet" in plugin_name:
                 field_name = "title"
                 field_value = test_data["title"]
@@ -180,7 +180,7 @@ class RealWorldTester:
                 field_value = test_data["title"]
                 config = {}
             
-            # Get the service URL this plugin will call
+
             try:
                 service_url = plugin.get_plugin_service_url()
                 result["service_url"] = service_url
@@ -195,7 +195,7 @@ class RealWorldTester:
             print(f"   📊 Full Input: {field_value}")
             print(f"   ⚙️  Config: {config}")
             
-            # Execute the plugin
+
             start_time = time.time()
             
             output = await plugin.enrich_field(field_name, field_value, config)
@@ -209,14 +209,14 @@ class RealWorldTester:
             print(f"   ⏱️  Execution: {execution_time:.2f}ms")
             print(f"   📤 Success: True")
             
-            # Show detailed output values
+
             print(f"   🔍 DETAILED OUTPUT:")
             if isinstance(output, dict):
                 for key, value in output.items():
                     print(f"       📋 {key}:")
                     if isinstance(value, list):
                         print(f"           📊 Count: {len(value)}")
-                        if value:  # Show all items if reasonable number
+                        if value:
                             if len(value) <= 10:
                                 for i, item in enumerate(value):
                                     print(f"           [{i+1}] {item}")
@@ -261,7 +261,7 @@ class RealWorldTester:
         print("🚀 TESTING ALL HTTP-ONLY PLUGINS")
         print("=" * 60)
         
-        # Define all plugins to test
+
         plugins_to_test = [
             (ConceptNetKeywordPlugin, "ConceptNet Keyword Plugin"),
             (GensimSimilarityPlugin, "Gensim Similarity Plugin"),
@@ -273,7 +273,7 @@ class RealWorldTester:
             (LLMTemporalIntelligencePlugin, "LLM Temporal Intelligence Plugin"),
         ]
         
-        # Use first test movie
+
         test_movie = self.test_movies[0]
         print(f"🎬 Test Movie: {test_movie['title']} ({test_movie['year']})")
         print()
@@ -291,7 +291,7 @@ class RealWorldTester:
         print("🔗 TESTING MERGE PLUGIN")
         print("-" * 50)
         
-        # Only test merge if we have successful results from other plugins
+
         successful_results = {name: result for name, result in self.results.items() 
                             if result["success"] and result["output"]}
         
@@ -303,14 +303,14 @@ class RealWorldTester:
             merge_plugin = MergeKeywordsPlugin()
             await merge_plugin.initialize({})
             
-            # Create merge input from successful results
+
             merge_input = {}
-            for plugin_name, result in list(successful_results.items())[:3]:  # Use first 3 successful results
+            for plugin_name, result in list(successful_results.items())[:3]:
                 merge_input[f"result_{len(merge_input)}"] = result["output"]
             
             print(f"   📊 Merging results from {len(merge_input)} plugins")
             
-            # Test different merge strategies
+
             strategies = ["union", "intersection", "weighted"]
             
             for strategy in strategies:
@@ -420,13 +420,13 @@ class RealWorldTester:
         print("📊 COMPREHENSIVE TEST SUMMARY")
         print("=" * 60)
         
-        # Service Status Summary
+
         healthy_services = sum(1 for s in service_status.values() if s["healthy"])
         total_services = len(service_status)
         
         print(f"🏥 Services: {healthy_services}/{total_services} healthy")
         
-        # Plugin Test Summary
+
         if self.results:
             successful_plugins = sum(1 for r in self.results.values() if r["success"])
             total_plugins = len(self.results)
@@ -434,7 +434,7 @@ class RealWorldTester:
             print(f"🧪 Plugins: {successful_plugins}/{total_plugins} successful")
             print(f"📈 Success Rate: {(successful_plugins/total_plugins)*100:.1f}%")
             
-            # Execution Time Summary
+
             successful_results = [r for r in self.results.values() if r["success"]]
             if successful_results:
                 exec_times = [r["execution_time_ms"] for r in successful_results]
@@ -446,7 +446,7 @@ class RealWorldTester:
                 print(f"   Average: {avg_time:.2f}ms")
                 print(f"   Range: {min_time:.2f}ms - {max_time:.2f}ms")
             
-            # Failed Tests
+
             failed_tests = [name for name, result in self.results.items() if not result["success"]]
             if failed_tests:
                 print(f"\n❌ Failed Tests:")
@@ -456,14 +456,14 @@ class RealWorldTester:
             else:
                 print(f"\n✅ All plugin tests passed!")
         
-        # Architecture Summary
+
         print(f"\n🏗️  Architecture Status:")
         print(f"   ✅ HTTP-only plugin architecture operational")
         print(f"   ✅ Dynamic plugin discovery working")
         print(f"   ✅ Configuration-driven endpoint mapping active")
         print(f"   ✅ Environment-aware service URLs functional")
         
-        # Recommendations
+
         print(f"\n💡 Recommendations:")
         if healthy_services < total_services:
             print(f"   • Start missing services for full functionality")
@@ -491,22 +491,22 @@ async def main():
     tester = RealWorldTester()
     
     try:
-        # 1. Check service health
+
         service_status = await tester.check_services()
         
-        # 2. Test dynamic discovery
+
         await tester.test_dynamic_discovery()
         
-        # 3. Test configuration system
+
         await tester.test_configuration_system()
         
-        # 4. Test all plugins
+
         await tester.test_all_plugins(service_status)
         
-        # 5. Test merge functionality
+
         await tester.test_merge_plugin()
         
-        # 6. Generate comprehensive summary
+
         tester.generate_summary(service_status)
         
     finally:

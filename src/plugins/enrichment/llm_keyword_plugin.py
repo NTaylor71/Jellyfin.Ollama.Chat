@@ -33,21 +33,20 @@ class LLMKeywordPlugin(HTTPBasePlugin):
             author="System",
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["keyword", "expansion", "llm", "semantic", "ai"],
-            execution_priority=ExecutionPriority.HIGH  # LLM is expensive, prioritize
+            execution_priority=ExecutionPriority.HIGH
         )
     
     @property
     def resource_requirements(self) -> PluginResourceRequirements:
-        """LLM plugins have higher resource requirements due to model inference."""
         return PluginResourceRequirements(
             min_cpu_cores=1.0,
             preferred_cpu_cores=2.0,
             min_memory_mb=512.0,
             preferred_memory_mb=2048.0,
-            requires_gpu=True,  # LLM inference benefits significantly from GPU
+            requires_gpu=True,
             min_gpu_memory_mb=2048.0,
             preferred_gpu_memory_mb=8192.0,
-            max_execution_time_seconds=60.0  # LLM calls can take longer
+            max_execution_time_seconds=60.0
         )
     
     async def enrich_field(
@@ -56,28 +55,14 @@ class LLMKeywordPlugin(HTTPBasePlugin):
         field_value: Any, 
         config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Enrich a field with LLM keyword expansion.
-        
-        Args:
-            field_name: Name of the field being enriched
-            field_value: Value of the field
-            config: Plugin configuration
-            
-        Returns:
-            Dict containing LLM expansion results
-        """
         try:
-            # Extract keywords from field value
             if isinstance(field_value, str):
                 keywords = extract_key_concepts(field_value)
-                context_text = field_value  # Use full text as context
+                context_text = field_value
             elif isinstance(field_value, list):
-                # Handle list fields (e.g., genres, tags)
                 keywords = [str(item).strip() for item in field_value if str(item).strip()]
                 context_text = ", ".join(keywords)
             else:
-                # Convert other types to string
                 text_value = str(field_value)
                 keywords = extract_key_concepts(text_value)
                 context_text = text_value
@@ -86,17 +71,13 @@ class LLMKeywordPlugin(HTTPBasePlugin):
                 self._logger.debug(f"No keywords found in field {field_name}")
                 return {"llm_keywords": []}
             
-            # Limit keywords for LLM efficiency (LLM is more expensive)
             max_keywords = config.get("max_keywords", 3)
             keywords = keywords[:max_keywords]
             
             self._logger.debug(f"Expanding {len(keywords)} keywords using LLM")
             
-            # Call LLM service using general expand endpoint
-            # LLM expand endpoint expects LLMRequest format
             service_url = await self.get_plugin_service_url()
             
-            # Convert keywords list to a single concept string with context
             keywords_text = ", ".join(keywords)
             concept_text = f"Keywords: {keywords_text}. Context: {context_text}"
             
@@ -109,14 +90,13 @@ class LLMKeywordPlugin(HTTPBasePlugin):
                     "task_type": "keyword_expansion",
                     "expansion_style": config.get("expansion_style", "semantic_related"),
                     "prompt_template": config.get("prompt_template", self._get_default_prompt(field_name)),
-                    "temperature": config.get("temperature", 0.3),  # Lower for more focused results
+                    "temperature": config.get("temperature", 0.3),
                     "smart_retry_until": config.get("smart_retry_until", "list")
                 }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from LLMRequest format
             if response.get("success", False):
                 result_data = response.get("result", {})
                 expanded_keywords = result_data.get("expanded_concepts", result_data.get("concepts", []))
@@ -125,7 +105,6 @@ class LLMKeywordPlugin(HTTPBasePlugin):
                 expanded_keywords = []
                 metadata = {"error": response.get("error_message", "Unknown error")}
             
-            # LLM might return nested structure, flatten if needed
             if expanded_keywords and isinstance(expanded_keywords[0], dict):
                 expanded_keywords = [item.get("concept", str(item)) for item in expanded_keywords]
             
@@ -147,12 +126,11 @@ class LLMKeywordPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"LLM keyword expansion failed for field {field_name}: {e}")
-            # Return empty result on error
+            
             return {
                 "llm_keywords": [],
                 "original_keywords": [],
@@ -176,13 +154,13 @@ class LLMKeywordPlugin(HTTPBasePlugin):
             "summary": "Given this summary: '{value}', extract and expand key concepts and themes."
         }
         
-        # Use field-specific prompt or generic one
+        
         field_lower = field_name.lower()
         for key, prompt in prompts.items():
             if key in field_lower:
                 return prompt
         
-        # Generic prompt
+
         return "Given this content: '{value}', provide related concepts, themes, and terms that would help categorize and find similar content."
     
     async def expand_keywords(
@@ -205,11 +183,11 @@ class LLMKeywordPlugin(HTTPBasePlugin):
         if config is None:
             config = {}
         
-        # Add context to config if provided
+        
         if context:
             config["context"] = context
             
-        # Use enrich_field with dummy field info
+        
         result = await self.enrich_field("keywords", keywords, config)
         return {
             "expanded_keywords": result.get("llm_keywords", []),
@@ -244,7 +222,7 @@ class LLMKeywordPlugin(HTTPBasePlugin):
         base_health = await super().health_check()
         
         try:
-            # Test LLM service connectivity
+            
             service_url = self.get_service_url("llm", "health")
             health_response = await self.http_get(service_url)
             

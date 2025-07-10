@@ -87,38 +87,38 @@ class ConceptNetProvider(BaseProvider):
         start_time = datetime.now()
         
         try:
-            # Ensure provider is initialized
+
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("ConceptNet provider not available", "ConceptNet")
             
-            # Call ConceptNet API
+
             response: ConceptNetResponse = await self.client.expand_concept(
                 concept=request.concept,
                 media_context=request.media_context,
-                limit=request.max_concepts * 2  # Get extra to filter down
+                limit=request.max_concepts * 2  
             )
             
             if not response.success:
                 logger.warning(f"ConceptNet API failed: {response.error_message}")
                 return None
             
-            # Limit and sort concepts by confidence
+
             sorted_concepts = sorted(
                 response.concepts,
                 key=lambda c: response.confidence_scores.get(c, 0.0),
                 reverse=True
             )[:request.max_concepts]
             
-            # Build confidence scores for selected concepts
+            
             filtered_scores = {
                 concept: response.confidence_scores.get(concept, 0.0)
                 for concept in sorted_concepts
             }
             
-            # Calculate total execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create PluginResult using helper function
+            
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -154,7 +154,7 @@ class ConceptNetProvider(BaseProvider):
                     "error": "Not initialized"
                 }
             
-            # Try a simple test expansion
+
             test_response = await self.client.expand_concept("test", "test", limit=1)
             
             return {
@@ -187,12 +187,12 @@ class ConceptNetProvider(BaseProvider):
         - Domain-specific jargon
         - Context-dependent meanings
         """
-        # ConceptNet handles most concepts but has limitations
+
         if len(concept.split()) > 3:
-            # Very long phrases are poorly supported
+
             return False
         
-        # ConceptNet supports most single words and simple phrases
+
         return True
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
@@ -201,12 +201,12 @@ class ConceptNetProvider(BaseProvider):
             "max_concepts": 10
         }
         
-        # Adjust based on concept complexity
+
         if " " in concept:
-            # Compound terms often return fewer results
+
             params["max_concepts"] = 15
         
-        # Simple single words can return many good results
+
         if len(concept.split()) == 1:
             params["max_concepts"] = 20
         

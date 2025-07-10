@@ -37,7 +37,7 @@ class MediaAgnosticAnalyzer:
         self.patterns = self._load_patterns(media_type)
     
     def _load_patterns(self, media_type: MediaType) -> Dict:
-        # Load from configuration files, not hard-coded
+
         return load_config(f"patterns/{media_type.value}.yml")
 
 
@@ -46,7 +46,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
     config_file = Path(__file__).parent.parent.parent / "config" / config_path
     
     if not config_file.exists():
-        # Return empty dict if config doesn't exist yet
+
         return {}
     
     with open(config_file, 'r', encoding='utf-8') as f:
@@ -58,8 +58,8 @@ class MediaPerson:
     """A person associated with media content (actor, author, director, etc.)."""
     name: str
     normalized_name: str
-    role: str  # e.g., "actor", "director", "author", "composer"
-    character: Optional[str] = None  # Character played (for actors)
+    role: str
+    character: Optional[str] = None
     id: Optional[str] = None
 
 
@@ -77,8 +77,8 @@ class MediaAnalysis:
     """Comprehensive analysis of media content."""
     media_type: MediaType
     title: str
-    primary_creators: List[MediaPerson] = field(default_factory=list)  # Directors, authors, etc.
-    performers: List[MediaPerson] = field(default_factory=list)  # Actors, musicians, etc.
+    primary_creators: List[MediaPerson] = field(default_factory=list)
+    performers: List[MediaPerson] = field(default_factory=list)
     genres: List[MediaGenre] = field(default_factory=list)
     themes: List[str] = field(default_factory=list)
     keywords: List[str] = field(default_factory=list)
@@ -148,25 +148,25 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         
         patterns = self._get_patterns(media_type)
         
-        # Extract title (field name varies by media type)
+
         title = self._extract_title(content, media_type)
         
-        # Extract people (actors, directors, authors, etc.)
+
         primary_creators, performers = self._extract_people(content, media_type, patterns)
         
-        # Extract genres
+
         genres = self._extract_genres(content, media_type, patterns)
         
-        # Extract themes and keywords
+
         themes, keywords = self._extract_themes_and_keywords(content, media_type, patterns)
         
-        # Extract temporal information
+
         temporal_info = self._extract_temporal_info(content, media_type)
         
-        # Extract quality indicators
+
         quality_indicators = self._extract_quality_indicators(content, media_type, patterns)
         
-        # Extract technical information
+
         technical_info = self._extract_technical_info(content, media_type)
         
         return MediaAnalysis(
@@ -188,13 +188,13 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         
         patterns = self._get_patterns(media_type)
         
-        # This would use the same pattern matching but on query text
-        # Implementation would be similar to analyze_content but focused on query parsing
+
+
         
         return MediaAnalysis(
             media_type=media_type,
-            title=query,  # Basic query-to-title mapping
-            # Other fields would be populated based on query analysis
+            title=query,
+
         )
     
     def _extract_title(self, content: Dict[str, Any], media_type: MediaType) -> str:
@@ -224,7 +224,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         
         people_data = content.get('people', [])
         
-        # Role mappings for different media types
+
         creator_roles = {
             MediaType.MOVIE: ['director', 'producer'],
             MediaType.BOOK: ['author', 'editor'],
@@ -238,7 +238,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         
         performer_roles = {
             MediaType.MOVIE: ['actor', 'actress'],
-            MediaType.BOOK: ['narrator'],  # For audiobooks
+            MediaType.BOOK: ['narrator'],
             MediaType.MUSIC: ['artist', 'performer', 'vocalist'],
             MediaType.TV_SHOW: ['actor', 'actress'],
             MediaType.COMIC: ['artist', 'illustrator'],
@@ -257,7 +257,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
                 name=person.get('name', ''),
                 normalized_name=person.get('name', '').lower().strip(),
                 role=role,
-                character=person.get('role'),  # Character played
+                character=person.get('role'),
                 id=person.get('id'),
                 type=person.get('type')
             )
@@ -274,13 +274,13 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         """Extract genres based on media type patterns."""
         genres = []
         
-        # Get genres from content
+        
         content_genres = content.get('genres', [])
         
         for genre_name in content_genres:
             genre = MediaGenre(
                 name=genre_name,
-                confidence=1.0  # From structured data
+                confidence=1.0
             )
             genres.append(genre)
         
@@ -292,7 +292,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         themes = []
         keywords = []
         
-        # Extract from overview/description
+
         text_fields = ['overview', 'description', 'plot', 'summary']
         text_content = ""
         
@@ -300,14 +300,14 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
             if field in content:
                 text_content += f" {content[field]}"
         
-        # Enhanced fields from LLM processing
+
         enhanced_fields = content.get('enhanced_fields', {})
         if enhanced_fields:
             text_content += f" {enhanced_fields.get('summary', '')}"
         
-        # Simple keyword extraction (would be enhanced with NLP)
+
         words = text_content.lower().split()
-        keywords = [word for word in words if len(word) > 3][:10]  # Simplified
+        keywords = [word for word in words if len(word) > 3][:10]
         
         return themes, keywords
     
@@ -315,7 +315,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         """Extract temporal information based on media type."""
         temporal_info = {}
         
-        # Year fields vary by media type
+
         year_fields = {
             MediaType.MOVIE: ['production_year', 'year', 'release_year'],
             MediaType.BOOK: ['publication_year', 'year'],
@@ -339,7 +339,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         """Extract quality indicators based on media type."""
         quality_indicators = []
         
-        # Rating fields vary by media type
+
         rating_fields = {
             MediaType.MOVIE: ['official_rating', 'mpaa_rating'],
             MediaType.BOOK: ['age_rating', 'content_rating'],
@@ -361,7 +361,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         """Extract technical information based on media type."""
         technical_info = {}
         
-        # Technical fields vary by media type
+
         if media_type == MediaType.MOVIE:
             technical_info.update({
                 'container': content.get('container'),
@@ -376,15 +376,15 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
                 'bitrate': content.get('bitrate'),
                 'format': content.get('format')
             })
-        # Add other media type technical fields as needed
+        
         
         return {k: v for k, v in technical_info.items() if v is not None}
 
 
-# Utility functions for media type detection
+
 def detect_media_type(content: Dict[str, Any]) -> MediaType:
     """Detect media type from content structure."""
-    # Simple detection based on content fields
+
     if 'production_year' in content or 'movie_id' in content:
         return MediaType.MOVIE
     elif 'album' in content or 'artist' in content:
@@ -394,7 +394,7 @@ def detect_media_type(content: Dict[str, Any]) -> MediaType:
     elif 'series_name' in content or 'episode' in content:
         return MediaType.TV_SHOW
     else:
-        return MediaType.MOVIE  # Default fallback
+        return MediaType.MOVIE
 
 
 def get_media_type_from_string(media_type_str: str) -> MediaType:
@@ -402,4 +402,4 @@ def get_media_type_from_string(media_type_str: str) -> MediaType:
     try:
         return MediaType(media_type_str.lower())
     except ValueError:
-        return MediaType.MOVIE  # Default fallback
+        return MediaType.MOVIE

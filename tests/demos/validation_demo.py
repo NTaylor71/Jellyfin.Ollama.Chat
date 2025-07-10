@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from pydantic import ValidationError
 
-# Add src to path for imports
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.ingestion_manager import IngestionManager
@@ -33,7 +33,7 @@ async def test_validation_rules():
     
     async with IngestionManager(media_type="movie") as manager:
         
-        # Show the actual validation rules from YAML
+
         print(f"\n{'='*60}")
         print("📋 VALIDATION RULES FROM YAML CONFIG")
         print(f"{'='*60}")
@@ -50,15 +50,15 @@ async def test_validation_rules():
                     else:
                         print(f"   {rule}: {value}")
         
-        # ==========================================================================
-        # TEST 1: Valid data that should pass all validation
-        # ==========================================================================
+
+
+
         valid_movie = {
             "Name": "Valid Movie",
             "Id": "valid-movie-001",
-            "ProductionYear": 2020,  # Valid: between 1888-2030
-            "CommunityRating": 7.5,  # Valid: between 0.0-10.0
-            "Genres": ["Action", "Drama"],  # Valid: from allowed list
+            "ProductionYear": 2020,
+            "CommunityRating": 7.5,
+            "Genres": ["Action", "Drama"],
             "Overview": "A perfectly valid movie description."
         }
         
@@ -72,13 +72,13 @@ async def test_validation_rules():
         except ValidationError as e:
             print(f"❌ UNEXPECTED FAILURE: {e}")
         
-        # ==========================================================================
-        # TEST 2: Invalid ProductionYear (too old)
-        # ==========================================================================
+
+
+
         invalid_year_old = {
             "Name": "Ancient Movie",
             "Id": "ancient-movie-001", 
-            "ProductionYear": 1800,  # Invalid: before 1888
+            "ProductionYear": 1800,
             "CommunityRating": 7.5,
             "Genres": ["Drama"]
         }
@@ -95,13 +95,13 @@ async def test_validation_rules():
                 print(f"   Field: {error['loc']}")
                 print(f"   Input: {error['input']}")
         
-        # ==========================================================================
-        # TEST 3: Invalid ProductionYear (future)
-        # ==========================================================================
+
+
+
         invalid_year_future = {
             "Name": "Future Movie",
             "Id": "future-movie-001",
-            "ProductionYear": 2050,  # Invalid: after 2030
+            "ProductionYear": 2050,
             "CommunityRating": 8.0,
             "Genres": ["Science Fiction"]
         }
@@ -118,14 +118,14 @@ async def test_validation_rules():
                 print(f"   Field: {error['loc']}")
                 print(f"   Input: {error['input']}")
         
-        # ==========================================================================
-        # TEST 4: Invalid CommunityRating (too low)
-        # ==========================================================================
+
+
+
         invalid_rating_low = {
             "Name": "Terrible Movie",
             "Id": "terrible-movie-001",
             "ProductionYear": 2020,
-            "CommunityRating": -1.0,  # Invalid: below 0.0
+            "CommunityRating": -1.0,
             "Genres": ["Horror"]
         }
         
@@ -141,14 +141,14 @@ async def test_validation_rules():
                 print(f"   Field: {error['loc']}")
                 print(f"   Input: {error['input']}")
         
-        # ==========================================================================
-        # TEST 5: Invalid CommunityRating (too high)
-        # ==========================================================================
+
+
+
         invalid_rating_high = {
             "Name": "Perfect Movie",
             "Id": "perfect-movie-001",
             "ProductionYear": 2020,
-            "CommunityRating": 15.0,  # Invalid: above 10.0
+            "CommunityRating": 15.0,
             "Genres": ["Fantasy"]
         }
         
@@ -164,15 +164,15 @@ async def test_validation_rules():
                 print(f"   Field: {error['loc']}")
                 print(f"   Input: {error['input']}")
         
-        # ==========================================================================
-        # TEST 6: Invalid Genre (not in allowed list)
-        # ==========================================================================
+
+
+
         invalid_genre = {
             "Name": "Unknown Genre Movie",
             "Id": "unknown-genre-001",
             "ProductionYear": 2020,
             "CommunityRating": 7.0,
-            "Genres": ["Fake Genre", "Made Up Category"]  # Invalid: not in allowed list
+            "Genres": ["Fake Genre", "Made Up Category"]
         }
         
         show_validation_test("TEST 6: INVALID GENRES", invalid_genre, "❌ SHOULD FAIL")
@@ -187,13 +187,13 @@ async def test_validation_rules():
                 print(f"   Field: {error['loc']}")
                 print(f"   Input: {error['input']}")
         
-        # ==========================================================================
-        # TEST 7: Missing required fields
-        # ==========================================================================
+
+
+
         missing_required = {
             "Overview": "A movie without required fields",
             "ProductionYear": 2020
-            # Missing "Name" and "Id" which are required
+
         }
         
         show_validation_test("TEST 7: MISSING REQUIRED FIELDS", missing_required, "❌ SHOULD FAIL")
@@ -208,9 +208,9 @@ async def test_validation_rules():
                 print(f"   Field: {error['loc']}")
                 print(f"   Input: {error['input']}")
         
-        # ==========================================================================
-        # TEST 8: Show the actual allowed genres from YAML
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("📋 ACTUAL ALLOWED GENRES FROM YAML")
         print(f"{'='*60}")
@@ -223,15 +223,15 @@ async def test_validation_rules():
             for i, genre in enumerate(allowed_genres, 1):
                 print(f"   {i:2d}. {genre}")
         
-        # ==========================================================================
-        # TEST 9: Valid genre combinations
-        # ==========================================================================
+
+
+
         valid_genres_test = {
             "Name": "Multi-Genre Movie",
             "Id": "multi-genre-001",
             "ProductionYear": 1995,
             "CommunityRating": 8.5,
-            "Genres": ["Action", "Adventure", "Comedy", "Drama"]  # All valid from allowed list
+            "Genres": ["Action", "Adventure", "Comedy", "Drama"]
         }
         
         show_validation_test("TEST 9: VALID MULTIPLE GENRES", valid_genres_test, "✅ SHOULD PASS")
@@ -243,9 +243,9 @@ async def test_validation_rules():
         except ValidationError as e:
             print(f"❌ UNEXPECTED FAILURE: {e}")
         
-        # ==========================================================================
-        # SUMMARY
-        # ==========================================================================
+
+
+
         print(f"\n{'='*60}")
         print("🎯 VALIDATION SUMMARY")
         print(f"{'='*60}")

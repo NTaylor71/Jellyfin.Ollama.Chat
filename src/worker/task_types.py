@@ -13,23 +13,23 @@ from dataclasses import dataclass
 class TaskType(str, Enum):
     """Supported task types for the queue system."""
     
-    # Plugin execution tasks
+
     PLUGIN_EXECUTION = "plugin_execution"
     
-    # Concept expansion tasks
+
     CONCEPT_EXPANSION = "concept_expansion"
     TEMPORAL_ANALYSIS = "temporal_analysis"
     QUESTION_EXPANSION = "question_expansion"
     
-    # Service management tasks
+
     SERVICE_HEALTH = "service_health"
     SERVICE_DISCOVERY = "service_discovery"
     
-    # Data processing tasks
+
     DATA_INGESTION = "data_ingestion"
     DATA_ENHANCEMENT = "data_enhancement"
     
-    # System tasks
+
     HEALTH_CHECK = "health_check"
     METRICS_COLLECTION = "metrics_collection"
     CACHE_MAINTENANCE = "cache_maintenance"
@@ -54,12 +54,12 @@ class TaskDefinition:
             self.optional_fields = []
 
 
-# Task type definitions for direct plugin execution
+
 TASK_DEFINITIONS: Dict[TaskType, TaskDefinition] = {
     
     TaskType.PLUGIN_EXECUTION: TaskDefinition(
         task_type=TaskType.PLUGIN_EXECUTION,
-        plugin_name="dynamic",  # Determined from task data
+        plugin_name="dynamic",
         description="Execute a specific plugin by name",
         required_fields=["plugin_name", "data"],
         optional_fields=["context", "timeout"],
@@ -188,7 +188,7 @@ def validate_task_data(task_type: str, task_data: Dict[str, Any]) -> tuple[bool,
     if not definition:
         return False, f"Unknown task type: {task_type}"
     
-    # Check required fields
+    
     missing_fields = []
     for field in definition.required_fields:
         if field not in task_data:
@@ -206,7 +206,7 @@ def get_plugin_for_task(task_type: str, task_data: Dict[str, Any]) -> Optional[s
     if not definition:
         return None
     
-    # Handle dynamic plugin selection
+
     if definition.plugin_name == "dynamic":
         return task_data.get("plugin_name")
     

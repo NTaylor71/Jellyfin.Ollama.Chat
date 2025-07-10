@@ -8,7 +8,7 @@ import argparse
 import sys
 from typing import Dict, Any
 
-# Add project root to path
+
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -58,10 +58,10 @@ async def main_async():
     
     args = parser.parse_args()
     
-    # Initialize test client
+
     test_client = HeidelTimeTemporalTest()
     
-    # Handle info requests
+
     if args.stats:
         stats = await test_client.get_queue_stats()
         print(f"Queue Statistics:")
@@ -85,15 +85,15 @@ async def main_async():
                 print(f"  Service type: {definition['service_type']}")
         return
     
-    # Require text for testing
+
     if not args.text:
         print("❌ Error: text required for testing")
         print("Usage: python heideltime_temporal_endpoint_test.py 'The movie was released last summer and set in the early 2000s'")
         return
     
-    # Prepare test data - map to router service format
+
     test_data = {
-        "concept": args.text,  # Router expects 'concept' field
+        "concept": args.text,
         "field_name": args.field_name,
         "language": args.language
     }
@@ -109,13 +109,13 @@ async def main_async():
         print(f"   Document date: {args.document_date}")
     print()
     
-    # Run test
+
     result = await test_client.test_plugin(test_data, timeout=args.timeout)
     
-    # Display result
+
     print(format_result(result, verbose=args.verbose))
     
-    # Exit with appropriate code
+
     sys.exit(0 if "error" not in result else 1)
 
 

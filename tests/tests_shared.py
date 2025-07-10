@@ -10,7 +10,7 @@ def settings_to_console():
     
     settings = get_settings()
     
-    # Core environment
+
     logger.info(f"✅ Environ Switch: {settings.ENV}")
     logger.info(f"🔗 Redis: {settings.redis_url}")
     logger.info(f"🤖 Ollama Ingestion: {settings.OLLAMA_INGESTION_BASE_URL}")
@@ -18,16 +18,16 @@ def settings_to_console():
     logger.info(f"📊 VectorDB: {settings.vectordb_url}")
     logger.info(f"🗄️ MongoDB: {settings.mongodb_url}")
     
-    # Development features
+
     logger.info(f"🔓 CORS Enabled: {settings.ENABLE_CORS}")
     logger.info(f"📚 API Docs: {settings.ENABLE_API_DOCS}")
     logger.info(f"📝 Log Level: {settings.LOG_LEVEL}")
     logger.info(f"🔥 Hot Reload: {settings.PLUGIN_HOT_RELOAD}")
     
-    # Java configuration
+
     logger.info(f"☕ Java Home: {settings.JAVA_HOME}")
     
-    # Plugin configuration
+
     logger.info(f"🔌 Plugin Dir: {settings.PLUGIN_DIRECTORY}")
 
     logger.info("----------------------------------------")

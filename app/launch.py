@@ -37,7 +37,7 @@ def main():
     print("Queue & Resource Monitor App Launcher")
     print("=" * 40)
     
-    # Check if dependencies are available
+
     if not check_dependencies():
         print("\nRequired dependencies not found.")
         response = input("Would you like to install them? (y/n): ")
@@ -49,18 +49,18 @@ def main():
             print("Cannot run without dependencies. Exiting.")
             sys.exit(1)
     
-    # Change to the app directory
+
     app_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(app_dir)
     
-    # Add parent directory to Python path for imports
+
     parent_dir = os.path.dirname(app_dir)
     sys.path.insert(0, parent_dir)
     
     print("\nStarting Queue & Resource Monitor App...")
     print("Press Ctrl+C to stop")
     
-    # Import and run the main app
+
     try:
         from main import main as app_main
         app_main()

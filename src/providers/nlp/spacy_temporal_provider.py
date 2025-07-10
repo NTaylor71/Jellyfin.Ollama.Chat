@@ -18,7 +18,7 @@ from src.shared.plugin_contracts import (
 
 logger = logging.getLogger(__name__)
 
-# SpaCy imports - fail fast if not available
+
 import spacy
 
 
@@ -72,10 +72,10 @@ class SpacyTemporalProvider(BaseProvider):
             if not self._spacy_initialized:
                 logger.info("Initializing SpaCy temporal parser")
                 
-                # Load SpaCy model
+
                 self.nlp = spacy.load(self.model_name)
                 
-                # Test the model
+
                 test_doc = self.nlp("next Friday")
                 self._spacy_initialized = True
                 
@@ -100,7 +100,7 @@ class SpacyTemporalProvider(BaseProvider):
         start_time = datetime.now()
         
         try:
-            # Ensure provider is initialized
+
             if not await self._ensure_initialized():
                 raise ProviderNotAvailableError("SpaCy temporal provider not available", "SpacyTemporal")
             
@@ -110,14 +110,14 @@ class SpacyTemporalProvider(BaseProvider):
             
             concept = request.concept.strip()
             
-            # SpaCy temporal parsing
+
             temporal_concepts = await self._parse_temporal_concept(concept)
             
             if not temporal_concepts:
                 logger.warning(f"No temporal concepts found for: {concept}")
                 return None
             
-            # Remove duplicates while preserving order
+            
             unique_concepts = []
             seen = set()
             for concept_item in temporal_concepts:
@@ -125,20 +125,20 @@ class SpacyTemporalProvider(BaseProvider):
                     unique_concepts.append(concept_item)
                     seen.add(concept_item)
             
-            # Limit to max_concepts
+
             final_concepts = unique_concepts[:request.max_concepts]
             
-            # Generate confidence scores
+
             confidence_scores = {}
             for i, concept_item in enumerate(final_concepts):
-                # Higher confidence for earlier results
+
                 confidence = max(0.3, 0.9 - (i * 0.1))
                 confidence_scores[concept_item] = confidence
             
-            # Calculate execution time
+
             total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Create result using the helper function
+            
             return create_field_expansion_result(
                 field_name=request.field_name,
                 input_value=request.concept,
@@ -179,21 +179,21 @@ class SpacyTemporalProvider(BaseProvider):
             return []
         
         try:
-            # Parse the concept with SpaCy
+
             doc = self.nlp(concept)
             
             temporal_concepts = []
             
-            # Extract temporal entities
+
             for ent in doc.ents:
                 if ent.label_ in ['DATE', 'TIME', 'ORDINAL', 'CARDINAL']:
-                    # Generate temporal concepts based on entity
+
                     entity_text = ent.text.lower()
                     
-                    # Add the entity itself
+                    
                     temporal_concepts.append(entity_text)
                     
-                    # Generate related temporal concepts
+
                     if ent.label_ == 'DATE':
                         if any(word in entity_text for word in ['week', 'weekly']):
                             temporal_concepts.append("weekly")
@@ -208,10 +208,10 @@ class SpacyTemporalProvider(BaseProvider):
                         if any(word in entity_text for word in ['old', 'classic', 'vintage']):
                             temporal_concepts.append("classic")
                     
-                    # Add temporal classification
+                    
                     temporal_concepts.append(f"temporal-{ent.label_.lower()}")
             
-            # If no explicit entities found but concept seems temporal, use TemporalConceptGenerator
+
             if not temporal_concepts:
                 try:
                     from src.shared.temporal_concept_generator import TemporalConceptGenerator
@@ -244,19 +244,19 @@ class SpacyTemporalProvider(BaseProvider):
         try:
             from src.shared.temporal_concept_generator import TemporalConceptGenerator
             
-            # Use TemporalConceptGenerator for intelligent temporal detection
+            
             generator = TemporalConceptGenerator()
             
-            # Quick temporal classification request
+
             temporal_result = generator.classify_temporal_concept(concept)
             
-            # Consider temporal if confidence > 0.3
+
             return temporal_result.confidence_score.overall > 0.3
             
         except Exception as e:
             logger.warning(f"LLM temporal detection failed: {e}")
             
-            # Ultimate fallback: only numeric years as temporal
+
             import re
             return bool(re.search(r'\b\d{4}s?\b', concept))
     
@@ -278,7 +278,7 @@ class SpacyTemporalProvider(BaseProvider):
                     "error": "SpaCy model not loaded"
                 }
             
-            # Test basic functionality
+
             try:
                 test_doc = self.nlp("next week")
                 return {
@@ -313,7 +313,7 @@ class SpacyTemporalProvider(BaseProvider):
         if not concept or len(concept.strip()) == 0:
             return False
         
-        # Use procedural temporal detection
+        
         return self._fallback_temporal_detection(concept)
     
     def get_recommended_parameters(self, concept: str, media_context: str) -> Dict[str, Any]:
@@ -327,7 +327,7 @@ class SpacyTemporalProvider(BaseProvider):
     async def close(self) -> None:
         """Clean up SpaCy provider resources."""
         if self.nlp:
-            # SpaCy doesn't need explicit cleanup
+
             self.nlp = None
             self._spacy_initialized = False
             logger.info("SpaCy temporal provider closed")

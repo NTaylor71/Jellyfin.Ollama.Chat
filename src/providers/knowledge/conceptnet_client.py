@@ -33,7 +33,7 @@ class ConceptNetClient:
     
     BASE_URL = "https://api.conceptnet.io"
     DEFAULT_LIMIT = 20
-    MIN_WEIGHT = 1.0  # Minimum edge weight to consider
+    MIN_WEIGHT = 1.0
     
     def __init__(self, rate_limit_per_second: float = 3.0, timeout_seconds: int = 10):
         """
@@ -89,11 +89,11 @@ class ConceptNetClient:
         start_time = datetime.now()
         
         try:
-            # Rate limiting
+
             await self._rate_limit()
             
-            # Build API URL  
-            # Try compound term first, then fall back to first word if no results
+            
+
             concept_normalized = concept.lower().replace(' ', '_')
             url = f"{self.BASE_URL}/query"
             params = {
@@ -120,7 +120,7 @@ class ConceptNetClient:
                 
                 data = await response.json()
                 
-                # If no results and concept has multiple words, try first word
+
                 if not data.get("edges") and " " in concept:
                     logger.debug(f"No results for compound term '{concept}', trying first word")
                     first_word = concept.split()[0]
@@ -171,56 +171,56 @@ class ConceptNetClient:
             concepts = []
             confidence_scores = {}
             
-            # Parse edges from query response
+
             edges = data.get("edges", [])
             
             for edge in edges:
-                # Extract weight
+
                 weight = edge.get("weight", 0.0)
                 
-                # Skip if weight too low
+
                 if weight < self.MIN_WEIGHT:
                     continue
                 
-                # Extract related concept from 'start' node
+
                 start_node = edge.get("start", {})
                 start_uri = start_node.get("@id", "")
                 start_label = start_node.get("label", "")
                 start_lang = start_node.get("language", "")
                 
-                # Also check 'end' node in case the structure is reversed
+
                 end_node = edge.get("end", {}) 
                 end_uri = end_node.get("@id", "")
                 end_label = end_node.get("label", "")
                 end_lang = end_node.get("language", "")
                 
-                # Prefer English concepts, extract from both start and end nodes
+
                 concept_candidates = []
                 
-                # Check start node
+                
                 if start_lang == "en" and start_uri.startswith("/c/en/"):
                     concept_candidates.append((start_label or self._extract_term_from_uri(start_uri), start_uri))
                 
-                # Check end node  
+                
                 if end_lang == "en" and end_uri.startswith("/c/en/"):
                     concept_candidates.append((end_label or self._extract_term_from_uri(end_uri), end_uri))
                 
-                # Process valid English concepts
+
                 for concept_term, uri in concept_candidates:
                     if not concept_term or len(concept_term.strip()) < 2:
                         continue
                     
-                    # Clean up the concept term
+
                     concept_term = concept_term.strip().lower()
                     
-                    # Skip if it's the same as input concept  
+
                     input_normalized = input_concept.lower().replace(" ", "_").replace("-", "_")
                     term_normalized = concept_term.replace(" ", "_").replace("-", "_")
                     if term_normalized == input_normalized:
                         continue
                     
-                    # Convert weight to confidence score (0.0 to 1.0)
-                    # ConceptNet weights typically range from 1.0 to 10.0+
+
+
                     confidence = min(weight / 10.0, 1.0)
                     
                     concepts.append(concept_term)
@@ -260,13 +260,13 @@ class ConceptNetClient:
         if not uri.startswith("/c/en/"):
             return ""
         
-        # Remove /c/en/ prefix
+        
         term_part = uri[6:]
         
-        # Split on / and take first part (the actual term)
+
         term = term_part.split("/")[0]
         
-        # Convert underscores to spaces
+
         term = term.replace("_", " ")
         
         return term.strip()
@@ -283,7 +283,7 @@ class ConceptNetClient:
         await self.close()
 
 
-# Global client instance for reuse
+
 _conceptnet_client: Optional[ConceptNetClient] = None
 
 

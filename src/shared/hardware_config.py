@@ -32,12 +32,12 @@ class ResourceType(str, Enum):
 class ResourceEndpoint:
     """Represents a computational resource endpoint."""
     resource_type: ResourceType
-    endpoint_url: Optional[str] = None  # None means local resource
-    capacity: float = 1.0  # Resource capacity (cores, GB, etc.)
-    model: Optional[str] = None  # Hardware model/name
-    health_check_path: Optional[str] = None  # Health check endpoint
+    endpoint_url: Optional[str] = None
+    capacity: float = 1.0
+    model: Optional[str] = None
+    health_check_path: Optional[str] = None
     is_available: bool = True
-    response_time_ms: float = 0.0  # Average response time
+    response_time_ms: float = 0.0
     
     def to_dict(self) -> Dict:
         return {
@@ -62,9 +62,9 @@ class HardwareProfile:
     local_cpu_cores: int
     local_cpu_threads: int
     local_memory_gb: float
-    local_storage_type: str = "hdd"  # hdd, ssd, nvme
+    local_storage_type: str = "hdd"
     
-    # Distributed resources
+
     cpu_endpoints: List[ResourceEndpoint] = None
     gpu_endpoints: List[ResourceEndpoint] = None
     memory_endpoints: List[ResourceEndpoint] = None
@@ -93,7 +93,7 @@ class HardwareProfile:
     
     @classmethod
     def from_dict(cls, data: Dict) -> "HardwareProfile":
-        # Convert endpoint dicts back to ResourceEndpoint objects
+
         data["cpu_endpoints"] = [ResourceEndpoint.from_dict(ep) for ep in data.get("cpu_endpoints", [])]
         data["gpu_endpoints"] = [ResourceEndpoint.from_dict(ep) for ep in data.get("gpu_endpoints", [])]
         data["memory_endpoints"] = [ResourceEndpoint.from_dict(ep) for ep in data.get("memory_endpoints", [])]
@@ -173,7 +173,7 @@ class HardwareDetector:
     def detect_gpu() -> tuple[int, float, Optional[str]]:
         """Detect GPU information. Returns (count, memory_gb, model)."""
         try:
-            # Try to detect NVIDIA GPUs first
+
             import subprocess
             result = subprocess.run(['nvidia-smi', '--query-gpu=count,memory.total,name', '--format=csv,noheader,nounits'], 
                                   capture_output=True, text=True, timeout=5)
@@ -189,7 +189,7 @@ class HardwareDetector:
         except Exception as e:
             logger.debug(f"NVIDIA GPU detection failed: {e}")
         
-        # AMD/Intel GPU detection not implemented - NVIDIA only system
+
         
         return 0, 0.0, None
     
@@ -197,12 +197,12 @@ class HardwareDetector:
     def detect_storage_type() -> str:
         """Detect primary storage type."""
         try:
-            # Simple heuristic: check if root partition is on SSD
+
             partitions = psutil.disk_partitions()
             for partition in partitions:
                 if partition.mountpoint == "/" or partition.mountpoint == "C:\\":
-                    # This is a simplified check - in practice, would need more sophisticated detection
-                    return "ssd"  # Default to SSD for modern systems
+
+                    return "ssd"
         except Exception as e:
             logger.debug(f"Storage detection failed: {e}")
         
@@ -226,11 +226,11 @@ class HardwareDetector:
             is_auto_detected=True
         )
         
-        # Add local GPU as an endpoint if detected
+        
         if gpu_count > 0:
             gpu_endpoint = ResourceEndpoint(
                 resource_type=ResourceType.GPU,
-                endpoint_url=None,  # Local resource
+                endpoint_url=None,
                 capacity=gpu_memory_gb,
                 model=gpu_model,
                 is_available=True
@@ -250,7 +250,7 @@ class EndpointHealthChecker:
     async def check_endpoint_health(endpoint: ResourceEndpoint) -> tuple[bool, float]:
         """Check if an endpoint is healthy and measure response time."""
         if endpoint.endpoint_url is None:
-            return True, 0.0  # Local resource
+            return True, 0.0
         
         try:
             import time
@@ -262,14 +262,14 @@ class EndpointHealthChecker:
                     health_url = f"{endpoint.endpoint_url.rstrip('/')}/{endpoint.health_check_path.lstrip('/')}"
                 
                 response = await client.get(health_url)
-                response_time = (time.time() - start_time) * 1000  # Convert to ms
+                response_time = (time.time() - start_time) * 1000
                 
                 is_healthy = response.status_code == 200
                 return is_healthy, response_time
                 
         except Exception as e:
             logger.warning(f"Health check failed for {endpoint.endpoint_url}: {e}")
-            return False, 10000.0  # High response time for failed checks
+            return False, 10000.0
     
     @staticmethod
     async def update_endpoint_health(endpoint: ResourceEndpoint) -> ResourceEndpoint:
@@ -300,7 +300,7 @@ class HardwareConfigManager:
                     with open(self.config_path, 'r') as f:
                         data = json.load(f)
                     
-                    # Validate the loaded config
+
                     validated = HardwareConfigModel(**data)
                     self._current_profile = HardwareProfile.from_dict(validated.dict())
                     
@@ -311,16 +311,16 @@ class HardwareConfigManager:
                     logger.error(f"Failed to load hardware config: {e}")
                     logger.info("Falling back to auto-detection")
             
-            # Auto-detect if no config file or loading failed
+
             self._current_profile = HardwareDetector.auto_detect()
-            # Save without acquiring lock again (we already have it)
+
             await self._save_config_unlocked(self._current_profile)
             return self._current_profile
     
     async def _save_config_unlocked(self, profile: HardwareProfile) -> None:
         """Save hardware configuration to file without acquiring lock."""
         try:
-            # Validate before saving
+
             validated = HardwareConfigModel(**profile.to_dict())
             
             with open(self.config_path, 'w') as f:
@@ -342,10 +342,10 @@ class HardwareConfigManager:
         """Update specific hardware configuration values."""
         current = await self.load_config()
         
-        # Create new profile with updated values
+        
         update_data = current.to_dict()
         update_data.update(kwargs)
-        update_data['is_auto_detected'] = False  # Mark as manually configured
+        update_data['is_auto_detected'] = False
         
         new_profile = HardwareProfile.from_dict(update_data)
         await self.save_config(new_profile)
@@ -373,10 +373,10 @@ class HardwareConfigManager:
             health_check_path=health_check_path
         )
         
-        # Update endpoint health
+        
         endpoint = await self.health_checker.update_endpoint_health(endpoint)
         
-        # Add to appropriate list
+        
         if resource_type == ResourceType.CPU:
             profile.cpu_endpoints.append(endpoint)
         elif resource_type == ResourceType.GPU:
@@ -405,7 +405,7 @@ class HardwareConfigManager:
         """Refresh health status for all endpoints."""
         profile = await self.load_config()
         
-        # Update all endpoints
+        
         for endpoint_list in [profile.cpu_endpoints, profile.gpu_endpoints, profile.memory_endpoints]:
             for i, endpoint in enumerate(endpoint_list):
                 endpoint_list[i] = await self.health_checker.update_endpoint_health(endpoint)
@@ -417,7 +417,7 @@ class HardwareConfigManager:
         """Get resource limits for plugin scheduling."""
         profile = await self.load_config()
         
-        # Calculate totals including endpoints
+
         total_cpu_capacity = profile.get_total_cpu_capacity()
         total_gpu_capacity = profile.get_total_gpu_capacity()
         available_gpu_endpoints = profile.get_available_gpu_endpoints()
@@ -425,7 +425,7 @@ class HardwareConfigManager:
         return {
             "local_cpu_cores": profile.local_cpu_cores,
             "local_cpu_threads": profile.local_cpu_threads,
-            "local_memory_gb": profile.local_memory_gb * 0.8,  # Reserve 20% for system
+            "local_memory_gb": profile.local_memory_gb * 0.8,
             "total_cpu_capacity": total_cpu_capacity,
             "total_gpu_capacity": total_gpu_capacity,
             "gpu_endpoints": available_gpu_endpoints,
@@ -436,7 +436,7 @@ class HardwareConfigManager:
         }
 
 
-# Global hardware config manager instance
+
 hardware_config = HardwareConfigManager()
 
 

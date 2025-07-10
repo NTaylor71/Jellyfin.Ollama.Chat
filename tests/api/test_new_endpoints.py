@@ -67,7 +67,7 @@ class TestMediaEndpoints:
     @patch('src.api.routes.media.get_or_create_manager')
     def test_list_media_basic(self, mock_get_manager, client):
         """Test basic media listing endpoint."""
-        # Mock the manager and database
+
         mock_manager = AsyncMock()
         mock_collection = AsyncMock()
         mock_manager.db = {"movie_enriched": mock_collection}
@@ -91,7 +91,7 @@ class TestMediaEndpoints:
     @patch('src.api.routes.media.get_or_create_manager')
     def test_get_media_item_not_found(self, mock_get_manager, client):
         """Test getting non-existent media item."""
-        # Mock the manager and database
+
         mock_manager = AsyncMock()
         mock_collection = AsyncMock()
         mock_manager.db = {"movie_enriched": mock_collection}
@@ -114,7 +114,7 @@ class TestSearchEndpoints:
     @patch('src.api.routes.search.get_or_create_manager')
     def test_search_basic_post(self, mock_get_manager, client):
         """Test basic search POST endpoint."""
-        # Mock the manager and database
+
         mock_manager = AsyncMock()
         mock_collection = AsyncMock()
         mock_manager.db = {"movie_enriched": mock_collection}
@@ -122,7 +122,7 @@ class TestSearchEndpoints:
         mock_manager.media_config.output = {"collection": "movie_enriched"}
         mock_manager.media_type = "movie"
         
-        # Mock empty search results
+
         mock_collection.find.return_value.sort.return_value.limit.return_value = AsyncMock()
         mock_collection.find.return_value.sort.return_value.limit.return_value.__aiter__ = AsyncMock(return_value=iter([]))
         
@@ -146,7 +146,7 @@ class TestSearchEndpoints:
     @patch('src.api.routes.search.get_or_create_manager')
     def test_search_basic_get(self, mock_get_manager, client):
         """Test basic search GET endpoint."""
-        # Mock the manager and database
+
         mock_manager = AsyncMock()
         mock_collection = AsyncMock()
         mock_manager.db = {"movie_enriched": mock_collection}
@@ -154,7 +154,7 @@ class TestSearchEndpoints:
         mock_manager.media_config.output = {"collection": "movie_enriched"}
         mock_manager.media_type = "movie"
         
-        # Mock empty search results
+
         mock_collection.find.return_value.sort.return_value.limit.return_value = AsyncMock()
         mock_collection.find.return_value.sort.return_value.limit.return_value.__aiter__ = AsyncMock(return_value=iter([]))
         
@@ -218,14 +218,14 @@ class TestMetricsIntegration:
     def test_metrics_endpoint_available(self, client):
         """Test that metrics endpoint is available."""
         response = client.get("/metrics")
-        # The endpoint should exist (might be 404 if metrics disabled in test)
+
         assert response.status_code in [200, 404]
     
     @patch('src.shared.metrics.media_retrieval_total')
     @patch('src.api.routes.media.get_or_create_manager')
     def test_metrics_called_on_media_retrieval(self, mock_get_manager, mock_metric, client):
         """Test that metrics are called during media retrieval."""
-        # Mock the manager and database
+
         mock_manager = AsyncMock()
         mock_collection = AsyncMock()
         mock_manager.db = {"movie_enriched": mock_collection}
@@ -238,7 +238,7 @@ class TestMetricsIntegration:
         response = client.get("/api/v1/media/movie/test")
         assert response.status_code == 404
         
-        # Verify metrics were called
+
         mock_metric.labels.assert_called_with(media_type="movie", status="not_found")
         mock_metric.labels.return_value.inc.assert_called_once()
 

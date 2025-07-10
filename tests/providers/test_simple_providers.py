@@ -4,7 +4,7 @@ Simple test for Stage 3.2.5 providers - tests basic functionality without large 
 import sys
 import os
 
-# Add project root to path
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from tests.tests_shared import logger
@@ -18,7 +18,7 @@ def test_provider_initialization():
     
     expander = ConceptExpander()
     
-    # Test that all providers are created
+
     expected_providers = [
         ExpansionMethod.CONCEPTNET,
         ExpansionMethod.LLM, 
@@ -33,7 +33,7 @@ def test_provider_initialization():
     for method in expected_providers:
         if method in expander.providers:
             provider = expander.providers[method]
-            # NO FALLBACKS - if metadata is broken, test should fail hard
+
             metadata = provider.metadata
             if not metadata:
                 raise AssertionError(f"{method.value} provider returned no metadata - provider is broken")
@@ -43,17 +43,17 @@ def test_provider_initialization():
         else:
             logger.info(f"❌ {method.value}: Not found in providers")
     
-    # Test method capabilities
+
     logger.info(f"\n🔧 Testing Method Capabilities")
     
     for method in expected_providers:
-        # NO FALLBACKS - if capabilities are broken, test should fail hard
+
         capabilities = expander.get_method_capabilities(method)
         if not capabilities or 'type' not in capabilities:
             raise AssertionError(f"{method.value} get_method_capabilities returned invalid data - expander is broken")
         logger.info(f"✅ {method.value}: {capabilities['type']} provider")
     
-    # Test method recommendation
+
     logger.info(f"\n🎯 Testing Method Recommendation")
     
     test_concepts = [
@@ -64,7 +64,7 @@ def test_provider_initialization():
     ]
     
     for concept, context in test_concepts:
-        # NO FALLBACKS - if method recommendation is broken, test should fail hard
+
         recommended = expander.get_recommended_method(concept, context)
         if not recommended:
             raise AssertionError(f"get_recommended_method returned None for '{concept}' ({context}) - recommendation logic is broken")
@@ -94,7 +94,7 @@ def test_provider_support():
     for concept, context in test_concepts:
         logger.info(f"\nConcept: '{concept}' ({context})")
         for method in providers_to_test:
-            # NO FALLBACKS - if provider support checking is broken, test should fail hard
+
             if method not in expander.providers:
                 raise AssertionError(f"Provider {method.value} not found in expander.providers - provider system is broken")
             provider = expander.providers[method]
@@ -102,13 +102,13 @@ def test_provider_support():
             if supports is None:
                 raise AssertionError(f"Provider {method.value} supports_concept returned None - provider logic is broken")
             
-            # Show detailed provider info
+
             status = "✅" if supports else "❌"
             metadata = provider.metadata
             strengths = ", ".join(metadata.strengths[:2]) if metadata.strengths else "unknown"
             logger.info(f"  {method.value:15}: {status} - {metadata.provider_type} ({strengths})")
             
-            # For supported providers, show what they would recommend
+
             if supports:
                 try:
                     params = provider.get_recommended_parameters(concept, context)
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     logger.info("🚀 Simple Provider Test - Stage 3.2.5")
     logger.info("=" * 50)
     
-    # NO FALLBACKS - if any test fails, the whole test should fail hard
+
     test_provider_initialization()
     test_provider_support()
     logger.info(f"\n🎉 All basic provider tests passed - system is working correctly!")

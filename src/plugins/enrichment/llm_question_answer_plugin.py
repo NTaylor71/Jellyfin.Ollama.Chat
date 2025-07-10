@@ -32,7 +32,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             author="System",
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["qa", "question", "answer", "llm", "ai", "reasoning"],
-            execution_priority=ExecutionPriority.HIGH  # LLM is expensive, prioritize
+            execution_priority=ExecutionPriority.HIGH
         )
     
     @property
@@ -43,10 +43,10 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             preferred_cpu_cores=2.0,
             min_memory_mb=512.0,
             preferred_memory_mb=2048.0,
-            requires_gpu=True,  # LLM inference benefits significantly from GPU
+            requires_gpu=True,
             min_gpu_memory_mb=2048.0,
             preferred_gpu_memory_mb=8192.0,
-            max_execution_time_seconds=90.0  # Q&A can take longer due to reasoning
+            max_execution_time_seconds=90.0
         )
     
     async def enrich_field(
@@ -67,7 +67,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             Dict containing LLM Q&A results
         """
         try:
-            # Convert field value to context text
+
             if isinstance(field_value, str):
                 context = field_value
             elif isinstance(field_value, list):
@@ -75,25 +75,25 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             else:
                 context = str(field_value)
             
-            # Get questions from config
+            
             questions = config.get("questions", [])
             if not questions:
-                # Default questions based on field name
+
                 questions = self._get_default_questions(field_name)
             
             if not questions:
                 self._logger.debug(f"No questions provided for field {field_name}")
                 result = {"llm_qa": []}
-                # Normalize all Unicode text in the result
+                
                 return self.normalize_text(result)
             
             self._logger.debug(f"Answering {len(questions)} questions for field {field_name}")
             
-            # Call LLM service (using general expand endpoint for Q&A)
-            # LLM expand endpoint expects LLMRequest format
+            
+
             service_url = await self.get_plugin_service_url()
             
-            # Create a concept that includes context and questions for LLM processing
+            
             concept_text = f"Context: {context}\n\nQuestions: {', '.join(questions)}"
             
             request_data = {
@@ -107,17 +107,17 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
                     "answer_format": config.get("answer_format", "concise"),
                     "max_answer_length": config.get("max_answer_length", 200),
                     "confidence_threshold": config.get("confidence_threshold", 0.5),
-                    "temperature": config.get("temperature", 0.1),  # Lower for more factual answers
+                    "temperature": config.get("temperature", 0.1),
                     "include_reasoning": config.get("include_reasoning", False)
                 }
             }
             
             response = await self.http_post(service_url, request_data)
             
-            # Process response from LLMRequest format
+            
             if response.get("success", False):
                 result_data = response.get("result", {})
-                # LLM service returns Q&A data in expanded_concepts (answers to questions)
+
                 qa_results = result_data.get("expanded_concepts", 
                            result_data.get("answers", 
                            result_data.get("concepts", [])))
@@ -145,12 +145,12 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
             
         except Exception as e:
             self._logger.error(f"LLM Q&A failed for field {field_name}: {e}")
-            # Return empty result on error
+            
             result = {
                 "llm_qa": [],
                 "context": "",
@@ -163,7 +163,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
+            
             return self.normalize_text(result)
     
     def _get_default_questions(self, field_name: str) -> List[str]:
@@ -196,13 +196,13 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             ]
         }
         
-        # Return field-specific questions or generic ones
+
         field_lower = field_name.lower()
         for key, questions in field_questions.items():
             if key in field_lower:
                 return questions
         
-        # Generic questions
+
         return [
             "What is this about?",
             "What are the main themes or topics?",
@@ -231,14 +231,14 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             
         config["questions"] = questions
         
-        # Use enrich_field with dummy field info
+        
         result = await self.enrich_field("context", context, config)
         response = {
             "answers": result.get("llm_qa", []),
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def answer_single_question(
@@ -274,7 +274,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def extract_key_information(
@@ -292,7 +292,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
         Returns:
             Extracted key information
         """
-        # Define question sets for different information types
+
         question_sets = {
             "general": [
                 "What is the main topic or subject?",
@@ -333,7 +333,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             "metadata": result.get("metadata", {})
         }
         
-        # Normalize all Unicode text in the result
+        
         return self.normalize_text(response)
     
     async def health_check(self) -> Dict[str, Any]:
@@ -341,7 +341,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
         base_health = await super().health_check()
         
         try:
-            # Test LLM Q&A service connectivity
+            
             service_url = self.get_service_url("llm", "health")
             health_response = await self.http_get(service_url)
             

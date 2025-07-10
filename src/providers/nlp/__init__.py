@@ -12,7 +12,7 @@ from src.providers.nlp.base_provider import (
     BaseProvider, ProviderMetadata, ExpansionRequest, 
     ProviderError, ProviderNotAvailableError, ProviderTimeoutError, ProviderConfigurationError
 )
-# ConceptNet moved to knowledge providers
+
 
 __all__ = [
     "BaseProvider",
@@ -22,5 +22,5 @@ __all__ = [
     "ProviderNotAvailableError",
     "ProviderTimeoutError", 
     "ProviderConfigurationError",
-    # ConceptNet providers moved to knowledge
+
 ]

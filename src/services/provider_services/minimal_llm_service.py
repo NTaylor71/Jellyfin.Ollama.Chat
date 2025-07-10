@@ -17,7 +17,7 @@ from src.shared.config import get_settings
 from src.services.base_service import BaseService
 from src.shared.model_manager import ModelManager, ModelStatus
 
-# Import will be added when config loader is stable
+
 try:
     from src.shared.model_config_loader import get_model_config_loader
     CONFIG_LOADER_AVAILABLE = True
@@ -99,7 +99,7 @@ class MinimalLLMManager(BaseService):
         self.settings = get_settings()
         self.ollama_url = self.settings.OLLAMA_INGESTION_BASE_URL
         self.model = self._get_ingestion_model()
-        self.initialization_state = "starting"  # starting -> connecting_ollama -> ready
+        self.initialization_state = "starting"
         self.initialization_progress = {}
         logger.info(f"Initialized LLM manager with Ollama URL: {self.ollama_url}, model: {self.model}")
     
@@ -110,7 +110,7 @@ class MinimalLLMManager(BaseService):
                 config_loader = get_model_config_loader()
                 ollama_models = config_loader.get_models_for_service('ollama')
                 
-                # Look for chat model in YAML config
+
                 chat_model_config = ollama_models.get('chat_model')
                 if chat_model_config:
                     logger.info(f"Using ingestion model from YAML config: {chat_model_config.name}")
@@ -119,13 +119,13 @@ class MinimalLLMManager(BaseService):
             except Exception as e:
                 logger.warning(f"Failed to load ingestion model from YAML config: {e}")
         
-        # Fallback to environment variable or default
+
         try:
             model_name = self.settings.OLLAMA_INGESTION_MODEL
             logger.info(f"Using ingestion model from environment variable: {model_name}")
             return model_name
         except AttributeError:
-            # Final fallback if env var is not defined
+
             default_model = "mistral:latest"
             logger.info(f"Using default ingestion model: {default_model}")
             return default_model
@@ -140,14 +140,14 @@ class MinimalLLMManager(BaseService):
             self.http_client = httpx.AsyncClient(timeout=30.0)
             self.initialization_progress["current_task"] = "connecting to Ollama API"
             
-            # Test Ollama connection
+
             response = await self.http_client.get(f"{self.ollama_url}/api/tags")
             if response.status_code != 200:
                 self.initialization_progress["error"] = f"Ollama not available: {response.status_code}"
                 logger.error(f"Ollama not available: {response.status_code}")
                 return False
                 
-            # Skip model downloading - Model Manager Service will handle this
+
             logger.info("Skipping model check/download - Model Manager Service will orchestrate this")
                 
             self.initialization_state = "ready"
@@ -180,10 +180,10 @@ class MinimalLLMManager(BaseService):
     async def check_models_ready(self) -> bool:
         """Check if all required models are available."""
         try:
-            # Call our own models status endpoint
+
             import httpx
             async with httpx.AsyncClient() as client:
-                # Use environment-aware URL
+                
                 from src.shared.config import get_settings
                 settings = get_settings()
                 
@@ -209,7 +209,7 @@ class MinimalLLMManager(BaseService):
         
         if self.http_client:
             try:
-                # Test Ollama connection
+
                 response = await self.http_client.get(f"{self.ollama_url}/api/tags")
                 if response.status_code == 200:
                     models_data = response.json()
@@ -242,7 +242,7 @@ class MinimalLLMManager(BaseService):
                 "type": "ollama"
             }
         
-        # Determine overall service status based on initialization state
+
         service_status = "starting"
         if self.initialization_state == "ready":
             service_status = "healthy" if self.http_client and provider_status.get("status") == "healthy" else "degraded"
@@ -258,18 +258,18 @@ class MinimalLLMManager(BaseService):
             total_requests=self.request_count,
             failed_requests=self.error_count,
             models_available=models_available,
-            models_ready=False  # This will be set by the endpoint
+            models_ready=False
         )
 
 
-# Global provider manager
+
 provider_manager = MinimalLLMManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup
+
     try:
         initialization_success = await provider_manager.initialize_provider()
         if not initialization_success:
@@ -279,7 +279,7 @@ async def lifespan(app: FastAPI):
         
     yield
     
-    # Shutdown - cleanup HTTP client
+
     try:
         if provider_manager.http_client:
             await provider_manager.http_client.aclose()
@@ -287,7 +287,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"Error during shutdown: {e}")
 
 
-# Create FastAPI app
+
 settings = get_settings()
 app = FastAPI(
     title="Minimal LLM Provider Service",
@@ -296,7 +296,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -306,7 +306,7 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
-# Prometheus metrics (creates /metrics endpoint)
+
 if settings.ENABLE_METRICS:
     Instrumentator().instrument(app).expose(app)
 
@@ -315,7 +315,7 @@ if settings.ENABLE_METRICS:
 async def health_check():
     """Get service health status."""
     health = await provider_manager.get_health_status()
-    # Add models status to health check
+    
     health.models_ready = await provider_manager.check_models_ready()
     return health
 
@@ -357,7 +357,7 @@ async def get_provider_info():
         )
     
     try:
-        # Get available models
+        
         response = await provider_manager.http_client.get(f"{provider_manager.ollama_url}/api/tags")
         models_available = []
         status = "unknown"
@@ -389,10 +389,10 @@ async def expand_concept(request: LLMRequest):
     start_time = asyncio.get_event_loop().time()
     
     try:
-        provider_manager.get_provider()  # Verify provider is available
+        provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Build prompt for concept expansion
+        
         prompt = f"""You are a {request.media_context} expert. For the concept "{request.concept}", list {request.max_concepts} related concepts that would help users find similar {request.media_context}s.
 
 Guidelines:
@@ -406,25 +406,25 @@ Format: Return only a comma-separated list of concepts, no explanations.
 Concept: {request.concept}
 Related {request.media_context} concepts:"""
         
-        # Make Ollama API call
+
         payload = {
             "model": provider_manager.model,
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": 0.3,  # Focused temperature for concept expansion
-                "num_predict": 200,  # Reasonable limit for concept lists
+                "temperature": 0.3,
+                "num_predict": 200,
                 "stop": ["\n\n", "Explanation:", "Note:"]
             }
         }
         
-        # Get response from Ollama
+        
         response = await provider_manager.http_client.post(
             f"{provider_manager.ollama_url}/api/generate",
             json=payload
         )
         
-        # If model not found, return error (Model Manager Service handles downloads)
+
         if response.status_code == 404:
             logger.error(f"Model {provider_manager.model} not found. Models should be downloaded via Model Manager Service.")
             return LLMResponse(
@@ -437,7 +437,7 @@ Related {request.media_context} concepts:"""
             response_data = response.json()
             concepts_text = response_data.get("response", "").strip()
             
-            # Parse concepts from response text
+
             expanded_concepts = [
                 concept.strip() 
                 for concept in concepts_text.split(',') 
@@ -446,7 +446,7 @@ Related {request.media_context} concepts:"""
             
             result = {
                 "expanded_concepts": expanded_concepts,
-                "confidence_scores": [0.9] * len(expanded_concepts),  # Ollama doesn't provide confidence
+                "confidence_scores": [0.9] * len(expanded_concepts),
                 "llm_reasoning": f"Generated {len(expanded_concepts)} concepts related to '{request.concept}' in {request.media_context} context using {provider_manager.model}"
             }
             
@@ -463,7 +463,7 @@ Related {request.media_context} concepts:"""
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
-        # Normalize Unicode text in the result
+
         normalized_result = provider_manager.normalize_text(result)
         
         return LLMResponse(
@@ -494,25 +494,25 @@ Related {request.media_context} concepts:"""
         )
 
 
-# =============================================================================
-# MODEL MANAGEMENT ENDPOINTS
-# =============================================================================
+
+
+
 
 @app.get("/models/status", response_model=ModelStatusResponse)
 async def get_models_status():
     """Get status of all Ollama models."""
     try:
-        # Create a temporary ModelManager to check status
-        # This doesn't download models, just checks their status
+        
+
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only Ollama models
+
         ollama_models = {
             k: v for k, v in model_manager.models.items()
             if v.package == "ollama"
         }
         
-        # Check status of Ollama models
+        
         models_info = {}
         for model_id, model_info in ollama_models.items():
             status = await model_manager._check_model_status(model_info)
@@ -526,7 +526,7 @@ async def get_models_status():
                 error_message=model_info.error_message
             )
         
-        # Get summary
+        
         available_count = sum(1 for m in models_info.values() if m.status == "available")
         required_count = sum(1 for m in models_info.values() if m.required)
         
@@ -554,16 +554,16 @@ async def download_models(request: ModelDownloadRequest):
     try:
         logger.info(f"Downloading Ollama models - model_ids: {request.model_ids}, force: {request.force_download}")
         
-        # Create ModelManager for model info
+        
         model_manager = ModelManager(models_base_path="/app/models")
         
-        # Filter to only Ollama models
+
         ollama_models = {
             k: v for k, v in model_manager.models.items()
             if v.package == "ollama"
         }
         
-        # If specific model IDs requested, filter further
+
         if request.model_ids:
             ollama_models = {
                 k: v for k, v in ollama_models.items()
@@ -573,23 +573,23 @@ async def download_models(request: ModelDownloadRequest):
         downloaded_models = []
         failed_models = []
         
-        # Download each model using Ollama API
+
         for model_id, model_info in ollama_models.items():
             if not model_info.required and not request.force_download:
                 continue
                 
             try:
-                # Check if model needs downloading
+                
                 current_status = await model_manager._check_model_status(model_info)
                 
                 if request.force_download or current_status == ModelStatus.MISSING:
                     logger.info(f"Pulling Ollama model {model_info.name}")
                     
-                    # Use Ollama API to pull model
+                    
                     pull_response = await provider_manager.http_client.post(
                         f"{provider_manager.ollama_url}/api/pull",
                         json={"name": model_info.name},
-                        timeout=600.0  # 10 minutes for model download
+                        timeout=600.0
                     )
                     
                     if pull_response.status_code == 200:
@@ -632,7 +632,7 @@ async def models_ready_check():
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.minimal_llm_service:app",
         host="0.0.0.0",

@@ -10,7 +10,7 @@ import time
 import httpx
 from typing import Dict, Any
 
-# Setup logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -20,12 +20,12 @@ async def test_real_worker_processing():
     
     logger.info("🚀 Testing real worker with resource-aware queue...")
     
-    # Connect to the running services
-    base_url = "http://localhost:8003"  # Router service
+
+    base_url = "http://localhost:8003"
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            # Check router health
+
             response = await client.get(f"{base_url}/health")
             if response.status_code != 200:
                 logger.error("Router service not available")
@@ -33,11 +33,11 @@ async def test_real_worker_processing():
             
             logger.info("✅ Router service is healthy")
             
-            # Submit CPU tasks (should run in parallel, up to 3)
+
             logger.info("\n🔄 Submitting CPU tasks...")
             cpu_tasks = []
             
-            for i in range(5):  # More than our CPU limit
+            for i in range(5):
                 task_data = {
                     "plugin_name": "ConceptNetKeywordPlugin",
                     "plugin_type": "field_enrichment", 
@@ -56,7 +56,7 @@ async def test_real_worker_processing():
                 else:
                     logger.error(f"❌ Failed to submit CPU task {i}: {response.text}")
             
-            # Submit GPU task (should run exclusively)
+
             logger.info("\n🔄 Submitting GPU task...")
             gpu_task_data = {
                 "plugin_name": "LLMKeywordPlugin",
@@ -77,19 +77,19 @@ async def test_real_worker_processing():
                 logger.error(f"❌ Failed to submit GPU task: {response.text}")
                 gpu_task_id = None
             
-            # Monitor processing
+
             logger.info("\n📊 Monitoring task processing...")
             start_time = time.time()
-            timeout = 60  # 1 minute timeout
+            timeout = 60
             
             while time.time() - start_time < timeout:
-                # Check worker metrics
+
                 try:
                     metrics_response = await client.get("http://localhost:8004/metrics")
                     if metrics_response.status_code == 200:
                         metrics_text = metrics_response.text
                         
-                        # Extract task counts from metrics
+
                         processed_count = 0
                         failed_count = 0
                         
@@ -101,7 +101,7 @@ async def test_real_worker_processing():
                         
                         logger.info(f"📈 Worker metrics: {processed_count} processed, {failed_count} failed")
                         
-                        # Stop when all tasks are processed
+
                         total_submitted = len(cpu_tasks) + (1 if gpu_task_id else 0)
                         if processed_count + failed_count >= total_submitted:
                             logger.info("✅ All tasks processed!")
@@ -112,7 +112,7 @@ async def test_real_worker_processing():
                 
                 await asyncio.sleep(2)
             
-            # Final status
+
             logger.info("\n📊 Final status:")
             logger.info(f"CPU tasks submitted: {len(cpu_tasks)}")
             logger.info(f"GPU task submitted: {'Yes' if gpu_task_id else 'No'}")
@@ -127,7 +127,7 @@ async def test_queue_stats():
     logger.info("\n📊 Checking queue statistics...")
     
     try:
-        # Import here to avoid issues if Redis not available
+
         import redis.asyncio as redis
         from src.shared.config import get_settings
         
@@ -138,7 +138,7 @@ async def test_queue_stats():
             decode_responses=True
         )
         
-        # Check queue sizes
+
         cpu_queue = "ingestion:queue:cpu"
         gpu_queue = "ingestion:queue:gpu"
         dead_letter = "ingestion:dead_letter"
@@ -152,7 +152,7 @@ async def test_queue_stats():
         logger.info(f"  GPU queue: {gpu_count} tasks")
         logger.info(f"  Dead letter: {dead_count} tasks")
         
-        # Get some sample tasks
+
         if cpu_count > 0:
             sample_cpu = await redis_client.zrange(cpu_queue, 0, 2, withscores=False)
             logger.info(f"  Sample CPU tasks: {len(sample_cpu)} found")
@@ -202,7 +202,7 @@ async def main():
     await test_queue_stats()
     await test_real_worker_processing()
     
-    # Check final queue stats
+
     await test_queue_stats()
     
     logger.info("✅ Real-world tests completed!")

@@ -62,7 +62,6 @@ class ConceptNetProviderManager(BaseService):
         self.initialization_state = "starting"
     
     async def initialize_provider(self):
-        """Initialize ConceptNet provider."""
         logger.info("Initializing ConceptNet provider...")
         self.start_time = asyncio.get_event_loop().time()
         self.initialization_state = "initializing"
@@ -89,7 +88,6 @@ class ConceptNetProviderManager(BaseService):
             logger.error(f"❌ ConceptNet provider error: {e}")
     
     async def cleanup_provider(self):
-        """Cleanup ConceptNet provider."""
         logger.info("Cleaning up ConceptNet provider...")
         if self.provider and hasattr(self.provider, 'cleanup'):
             try:
@@ -99,7 +97,6 @@ class ConceptNetProviderManager(BaseService):
                 logger.error(f"❌ Error cleaning up ConceptNet provider: {e}")
     
     def get_provider(self):
-        """Get the ConceptNet provider instance."""
         if self.provider is None:
             raise HTTPException(
                 status_code=503,
@@ -108,7 +105,6 @@ class ConceptNetProviderManager(BaseService):
         return self.provider
     
     def get_health_status(self) -> ServiceHealth:
-        """Get service health status."""
         current_time = asyncio.get_event_loop().time()
         uptime = current_time - self.start_time if self.start_time else 0
         
@@ -133,7 +129,6 @@ class ConceptNetProviderManager(BaseService):
                 "error": self.initialization_error
             }
         
-        # Service status based on provider availability
         if self.initialization_state == "ready" and self.provider:
             service_status = "healthy"
         elif self.initialization_state == "initializing":
@@ -150,21 +145,16 @@ class ConceptNetProviderManager(BaseService):
         )
 
 
-# Global provider manager
 provider_manager = ConceptNetProviderManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan handler."""
-    # Startup
     await provider_manager.initialize_provider()
     yield
-    # Shutdown
     await provider_manager.cleanup_provider()
 
 
-# Create FastAPI app
 settings = get_settings()
 app = FastAPI(
     title="ConceptNet Provider Service",
@@ -173,7 +163,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
 if settings.ENABLE_CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -183,20 +172,17 @@ if settings.ENABLE_CORS:
         allow_headers=settings.CORS_HEADERS,
     )
 
-# Prometheus metrics
 if settings.ENABLE_METRICS:
     Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health", response_model=ServiceHealth)
 async def health_check():
-    """Get service health status."""
     return provider_manager.get_health_status()
 
 
 @app.get("/health/ready")
 async def readiness_check():
-    """Simple readiness check for Docker health checks."""
     if provider_manager.initialization_state == "ready":
         return {"ready": True, "status": "healthy"}
     else:
@@ -237,10 +223,10 @@ async def expand_concept(request: ProviderRequest):
         provider = provider_manager.get_provider()
         provider_manager.request_count += 1
         
-        # Import ExpansionRequest
+
         from src.providers.nlp.base_provider import ExpansionRequest
         
-        # Create expansion request
+        
         expansion_request = ExpansionRequest(
             concept=request.concept,
             media_context=request.media_context,
@@ -249,7 +235,7 @@ async def expand_concept(request: ProviderRequest):
             options=request.options
         )
         
-        # Execute expansion
+
         result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
@@ -331,7 +317,7 @@ async def check_provider_health():
 if __name__ == "__main__":
     import uvicorn
     
-    # Run the service
+
     uvicorn.run(
         "src.services.provider_services.conceptnet_service:app",
         host="0.0.0.0",

@@ -38,35 +38,24 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             author="System",
             plugin_type=PluginType.EMBED_DATA_EMBELLISHER,
             tags=["websearch", "llm", "realtime", "web", "search", "enrichment"],
-            execution_priority=ExecutionPriority.HIGH  # Web search + LLM is resource intensive
+            execution_priority=ExecutionPriority.HIGH
         )
     
     @property
     def resource_requirements(self) -> PluginResourceRequirements:
-        """Web search + LLM requires significant resources and network access."""
         return PluginResourceRequirements(
             min_cpu_cores=1.0,
             preferred_cpu_cores=2.0,
             min_memory_mb=1024.0,
             preferred_memory_mb=3072.0,
-            requires_gpu=True,  # LLM processing benefits from GPU
+            requires_gpu=True,
             min_gpu_memory_mb=2048.0,
             preferred_gpu_memory_mb=8192.0,
-            max_execution_time_seconds=120.0,  # Web search + LLM can take time
-            requires_network=True  # Web search requires internet access
+            max_execution_time_seconds=120.0,
+            requires_network=True
         )
     
     async def execute(self, data: Any, context: PluginExecutionContext) -> PluginExecutionResult:
-        """
-        Execute the LLMWebSearchPlugin with direct data structure.
-        
-        Expected data structure:
-        {
-            'field_name': str,
-            'field_value': Any,
-            'config': Dict[str, Any]
-        }
-        """
         logger.info(f"🔍 LLMWebSearchPlugin.execute: Called with data type={type(data)}")
         logger.info(f"🔍 LLMWebSearchPlugin.execute: data keys={list(data.keys()) if isinstance(data, dict) else 'not dict'}")
         
@@ -74,7 +63,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
         
         try:
             if isinstance(data, dict) and 'field_name' in data and 'field_value' in data and 'config' in data:
-                # Direct field enrichment call
                 field_name = data['field_name']
                 field_value = data['field_value']
                 config = data['config']
@@ -95,7 +83,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
                     }
                 )
             else:
-                # Fall back to base class behavior for standard enrichment
                 return await super().execute(data, context)
                 
         except Exception as e:
@@ -118,20 +105,8 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
         field_value: Any, 
         config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Enrich a field using web search + LLM processing.
-        
-        Args:
-            field_name: Name of the field being enriched
-            field_value: Value of the field (used for template variables)
-            config: Plugin configuration including search templates and LLM prompts
-            
-        Returns:
-            Dict containing web search results and LLM analysis
-        """
         logger.info(f"🔍 LLMWebSearchPlugin.enrich_field called for field '{field_name}' with value '{field_value}'")
         try:
-            # Extract configuration
             search_templates = config.get("search_templates", [])
             llm_processing = config.get("llm_processing", {})
             rate_limiting = config.get("rate_limiting", {})
@@ -144,13 +119,10 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
                 self._logger.warning(f"No LLM processing prompt provided for field {field_name}")
                 return self._empty_result(field_name, "no_llm_prompt")
             
-            # Prepare template variables from field context
             template_variables = self._prepare_template_variables(field_name, field_value, config)
             
-            # Get web search service URL
             service_url = await self.get_plugin_service_url()
             
-            # Prepare search templates list (extract from config structure)
             search_template_list = []
             max_results_per_template = config.get("max_results_per_template", 10)
             domains = config.get("domains", None)
@@ -158,19 +130,16 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             for template_config in search_templates:
                 if isinstance(template_config, dict):
                     template = template_config.get("template", "")
-                    # Override per-template settings if provided
                     template_max_results = template_config.get("max_results", max_results_per_template)
                     template_domains = template_config.get("domains", domains)
                     
                     search_template_list.append(template)
                     
-                    # Store per-template settings (we'll use global settings for simplicity)
                     if template_domains and not domains:
                         domains = template_domains
                 elif isinstance(template_config, str):
                     search_template_list.append(template_config)
             
-            # Prepare request data for combined web search + LLM processing
             request_data = {
                 "search_templates": search_template_list,
                 "template_variables": template_variables,
@@ -184,10 +153,7 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Executing web search + LLM for field {field_name} with {len(search_template_list)} templates")
             
-            # Call LLM service web search endpoint (service_url already includes the endpoint)
             response = await self.http_post(service_url, request_data)
-            
-            # Process response - handle both full success and partial success (search works, LLM fails)
             search_results = response.get("search_results", [])
             processed_content = response.get("processed_content", {})
             metadata = response.get("metadata", {})
@@ -198,7 +164,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
                     f"{len(search_results)} results, {metadata.get('execution_time_ms', 0):.1f}ms"
                 )
             elif search_results:
-                # Partial success: search worked but LLM processing failed
                 error_msg = response.get("error_message", "Unknown error")
                 self._logger.warning(
                     f"Web search succeeded but LLM processing failed for field {field_name}: {error_msg}. "
@@ -206,13 +171,11 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
                 )
                 processed_content = {"error": f"LLM processing failed: {error_msg}"}
             else:
-                # Complete failure: no search results
                 error_msg = response.get("error_message", "Unknown error")
                 self._logger.error(f"Web search failed for field {field_name}: {error_msg}")
                 result = self._empty_result(field_name, f"websearch_failed: {error_msg}")
                 return self.normalize_text(result)
             
-            # Build result for success or partial success cases
             result = {
                 "websearch_results": search_results,
                 "llm_analysis": processed_content,
@@ -226,7 +189,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
                 }
             }
             
-            # Normalize all Unicode text in the result
             return self.normalize_text(result)
             
         except Exception as e:
@@ -234,14 +196,10 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             return self.normalize_text(self._empty_result(field_name, str(e)))
     
     def _prepare_template_variables(self, field_name: str, field_value: Any, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare template variables for search query substitution."""
         template_variables = config.get("template_variables", {})
         
-        # Add field-specific variables
         template_variables[field_name] = str(field_value) if field_value else ""
         
-        # Add common field mappings that might be useful for templates
-        # These would typically come from the media item being enriched
         common_fields = ["Name", "Title", "OriginalTitle", "ProductionYear", "Year", 
                         "Director", "Genres", "Tags", "Overview", "Plot", "Studio", "Studios"]
         
@@ -252,7 +210,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
         return template_variables
     
     def _empty_result(self, field_name: str, error_reason: str) -> Dict[str, Any]:
-        """Return empty result structure on error."""
         return {
             "websearch_results": [],
             "llm_analysis": {},
@@ -272,18 +229,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
         max_results_per_template: int = 10,
         domains: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """
-        Perform web search only without LLM processing.
-        
-        Args:
-            search_templates: List of search query templates
-            template_variables: Variables for template substitution
-            max_results_per_template: Maximum results per search template
-            domains: Optional list of domains to filter
-            
-        Returns:
-            Search results only
-        """
         try:
             service_url = await self.get_plugin_service_url()
             
@@ -326,19 +271,6 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
         expected_format: str = "dict",
         fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """
-        Process search results with LLM only (no web search).
-        
-        Args:
-            search_results: Raw search results to process
-            processing_prompt: LLM prompt for processing
-            template_variables: Variables for prompt substitution
-            expected_format: Expected output format
-            fields: Expected output fields
-            
-        Returns:
-            LLM processed results
-        """
         try:
             service_url = await self.get_plugin_service_url()
             
@@ -375,15 +307,12 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             }
     
     async def health_check(self) -> Dict[str, Any]:
-        """Check plugin and service health."""
         base_health = await super().health_check()
         
         try:
-            # Test web search service connectivity
             service_url = self.get_service_url("llm", "health")
             health_response = await self.http_get(service_url)
             
-            # Test a simple web search (without LLM processing)
             test_search_url = f"{self.get_plugin_service_url()}/websearch/search"
             test_data = {
                 "search_templates": ["test search"],

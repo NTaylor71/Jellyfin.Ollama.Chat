@@ -92,19 +92,19 @@ class DynamicServiceDiscovery:
         async with self._discovery_lock:
             settings = get_settings()
             
-            # Method 1: Network-based discovery (truly dynamic)
+
             discovered_services = {}
             
             if settings.ENV == "docker":
-                # Docker environment - scan network subnet
+
                 logger.info("Using network-based service discovery for Docker environment")
                 discovered_services = await self._discover_via_network_scan()
             else:
-                # Development environment - scan localhost
+
                 logger.info("Using localhost-based service discovery for development environment")
                 discovered_services = await self._discover_via_localhost_scan(settings)
             
-            # Method 2: Fallback to environment variables if network scan fails
+
             if not discovered_services:
                 logger.warning("Network scan found no services, trying environment variable fallback")
                 discovered_services = await self._discover_via_environment_variables()
@@ -119,7 +119,7 @@ class DynamicServiceDiscovery:
         discovered_services = {}
         
         try:
-            # Get our IP to determine network subnet
+            
             import socket
             hostname = socket.gethostname()
             our_ip = socket.gethostbyname(hostname)
@@ -127,34 +127,34 @@ class DynamicServiceDiscovery:
             
             logger.info(f"Scanning Docker network {network_prefix}.x for services")
             
-            # Scan network range for HTTP services on known ports
-            service_ports = [8001, 8002, 8006, 8007, 8008, 8009]  # Common microservice ports
+
+            service_ports = [8001, 8002, 8006, 8007, 8008, 8009]
             
-            for ip_last in range(2, 20):  # Skip .1 (gateway), scan reasonable range
+            for ip_last in range(2, 20):
                 ip = f"{network_prefix}.{ip_last}"
                 if ip == our_ip:
-                    continue  # Skip ourselves
+                    continue
                 
                 for port in service_ports:
                     try:
-                        # Test if service responds to /health
+
                         base_url = f"http://{ip}:{port}"
                         health_response = await self.http_client.get(f"{base_url}/health", timeout=2.0)
                         
                         if health_response.status_code == 200:
                             health_data = health_response.json()
                             
-                            # Extract service name from health response
+
                             service_name = self._extract_service_name_from_health(health_data, port)
                             
-                            # Discover full service capabilities
+
                             service_info = await self._discover_single_service(service_name, base_url)
-                            if service_info:  # Include all responding services, regardless of health status
+                            if service_info:
                                 discovered_services[service_name] = service_info
                                 logger.info(f"Discovered service: {service_name} at {ip}:{port} (status: {service_info.status})")
                                 
                     except Exception:
-                        # Service not responding on this IP:port - continue
+
                         continue
                         
         except Exception as e:
@@ -167,7 +167,7 @@ class DynamicServiceDiscovery:
         discovered_services = {}
         
         try:
-            # Scan localhost ports for services
+
             for port in range(settings.SERVICE_SCAN_START_PORT, settings.SERVICE_SCAN_END_PORT):
                 try:
                     base_url = f"http://localhost:{port}"
@@ -178,7 +178,7 @@ class DynamicServiceDiscovery:
                         service_name = self._extract_service_name_from_health(health_data, port)
                         
                         service_info = await self._discover_single_service(service_name, base_url)
-                        if service_info:  # Include all responding services, regardless of health status
+                        if service_info:
                             discovered_services[service_name] = service_info
                             logger.info(f"Discovered service: {service_name} at localhost:{port} (status: {service_info.status})")
                             
@@ -197,14 +197,14 @@ class DynamicServiceDiscovery:
         try:
             import os
             
-            # Look for SERVICE_URL environment variables
+
             for key, value in os.environ.items():
                 if key.endswith('_SERVICE_URL'):
-                    # Extract service name: CONCEPTNET_SERVICE_URL -> conceptnet
+
                     service_name = key.replace('_SERVICE_URL', '').lower()
                     
                     try:
-                        # Test if service is reachable
+
                         health_response = await self.http_client.get(f"{value}/health", timeout=2.0)
                         if health_response.status_code == 200:
                             service_info = await self._discover_single_service(service_name, value)
@@ -221,7 +221,7 @@ class DynamicServiceDiscovery:
     
     def _extract_service_name_from_health(self, health_data: dict, port: int) -> str:
         """Extract service name from health response."""
-        # Try to derive name from providers in health response
+
         if "providers" in health_data:
             provider_names = list(health_data["providers"].keys())
             if provider_names:
@@ -229,23 +229,23 @@ class DynamicServiceDiscovery:
         elif "llm_provider" in health_data:
             return "llm-service"
         
-        # Fallback to port-based naming
+
         return f"service-{port}"
     
     def _get_service_base_url(self, service_name: str, port: int) -> str:
         """Get base URL for service based on environment."""
         settings = get_settings()
         
-        # Environment-aware URL generation
+
         if settings.ENV == "localhost":
             return f"http://localhost:{port}"
-        else:  # docker environment
+        else:
             return f"http://{service_name}:{port}"
     
     async def _discover_single_service(self, service_name: str, base_url: str) -> ServiceCapabilityInfo:
         """Discover capabilities of a single service."""
         try:
-            # Get health info
+            
             health_url = f"{base_url}/health"
             health_response = await self.http_client.get(health_url)
             
@@ -254,7 +254,7 @@ class DynamicServiceDiscovery:
             
             health_data = health_response.json()
             
-            # Get available endpoints from OpenAPI
+            
             openapi_url = f"{base_url}/openapi.json"
             openapi_response = await self.http_client.get(openapi_url)
             
@@ -263,7 +263,7 @@ class DynamicServiceDiscovery:
                 openapi_data = openapi_response.json()
                 available_endpoints = list(openapi_data.get("paths", {}).keys())
             
-            # Parse service info from health response
+
             service_info = ServiceCapabilityInfo(
                 service_name=service_name,
                 base_url=base_url,
@@ -275,14 +275,14 @@ class DynamicServiceDiscovery:
                 }
             )
             
-            # Extract providers and capabilities dynamically
+
             self._extract_providers_and_capabilities(service_info, health_data, available_endpoints)
             
             return service_info
             
         except Exception as e:
             logger.warning(f"Failed to discover service {service_name} at {base_url}: {e}")
-            # Return minimal info for unreachable services
+
             return ServiceCapabilityInfo(
                 service_name=service_name,
                 base_url=base_url,
@@ -293,29 +293,29 @@ class DynamicServiceDiscovery:
     def _extract_providers_and_capabilities(self, service_info: ServiceCapabilityInfo, health_data: Dict[str, Any], available_endpoints: List[str]) -> None:
         """Extract providers and capabilities from health data and available endpoints."""
         
-        # Handle different health response formats
+
         if "providers" in health_data:
-            # ConceptNet, Gensim, Spacy, Heideltime format
+
             service_info.providers = health_data["providers"]
             
-            # Derive service type and capabilities from providers
+
             provider_types = [p.get("type", "unknown") for p in service_info.providers.values()]
             service_info.service_type = provider_types[0] if provider_types else "unknown"
             service_info.capabilities = list(service_info.providers.keys())
             
         elif "llm_provider" in health_data:
-            # LLM service format
+
             llm_provider = health_data["llm_provider"]
             service_info.providers = {"llm_provider": llm_provider}
             service_info.service_type = llm_provider.get("type", "unknown")
             
-            # Extract capabilities from available endpoints instead of hard-coding
+
             llm_capabilities = []
             for endpoint in available_endpoints:
                 if "/providers/llm/" in endpoint:
-                    # Extract capability from endpoint path dynamically
+
                     parts = endpoint.split("/")
-                    if len(parts) >= 4:  # /providers/llm/capability
+                    if len(parts) >= 4:
                         capability = parts[3]
                         if capability not in llm_capabilities:
                             llm_capabilities.append(capability)
@@ -323,22 +323,22 @@ class DynamicServiceDiscovery:
             service_info.capabilities = ["llm_provider"] + llm_capabilities
             
         else:
-            # Unknown format - derive capabilities from endpoints
+
             service_info.service_type = "unknown"
             capabilities = []
             
-            # Extract capabilities from provider endpoints
+
             for endpoint in available_endpoints:
                 if "/providers/" in endpoint:
                     parts = endpoint.split("/")
-                    if len(parts) >= 3:  # /providers/capability
+                    if len(parts) >= 3:
                         capability = parts[2]
                         if capability not in capabilities and capability != "":
                             capabilities.append(capability)
             
             service_info.capabilities = capabilities
     
-    # Public API Methods
+
     
     async def get_service_by_name(self, service_name: str, force_refresh: bool = False) -> Optional[ServiceCapabilityInfo]:
         """Get service information by name."""
@@ -387,7 +387,7 @@ class DynamicServiceDiscovery:
         
         plugin_name_lower = plugin_name.lower()
         
-        # Pattern-based routing (same logic as endpoint_config.py but dynamic)
+
         if "conceptnet" in plugin_name_lower:
             services = await self.get_services_by_capability("conceptnet")
             return services[0] if services else None
@@ -404,7 +404,7 @@ class DynamicServiceDiscovery:
             services = await self.get_services_by_capability("llm_provider")
             return services[0] if services else None
         
-        # Default fallback
+
         healthy_services = await self.get_healthy_services()
         return healthy_services[0] if healthy_services else None
     
@@ -429,11 +429,11 @@ class DynamicServiceDiscovery:
         available_endpoints = service_info.metadata.get("available_endpoints", [])
         plugin_lower = plugin_name.lower()
         
-        # Find matching endpoint based on plugin name
+
         best_match = None
         for endpoint in available_endpoints:
             if "/providers/" in endpoint:
-                # Check if endpoint matches plugin type
+                
                 if "conceptnet" in plugin_lower and "conceptnet" in endpoint:
                     best_match = endpoint
                     break
@@ -454,7 +454,7 @@ class DynamicServiceDiscovery:
                         best_match = endpoint
                         break
                     elif "llm/" in endpoint and "/expand" in endpoint:
-                        best_match = endpoint  # General LLM endpoint
+                        best_match = endpoint
         
         return best_match.lstrip('/') if best_match else None
     
@@ -474,7 +474,7 @@ class DynamicServiceDiscovery:
         }
 
 
-# Global singleton instance
+
 _service_discovery: Optional[DynamicServiceDiscovery] = None
 
 
