@@ -51,13 +51,6 @@ class TestHealthEndpoints:
 class TestMediaTypeEndpoints:
     """Test media type configuration endpoints."""
     
-    def test_list_media_types_legacy(self, client):
-        """Test legacy media types endpoint."""
-        response = client.get("/media-types")
-        assert response.status_code == 200
-        data = response.json()
-        assert "media_types" in data
-        assert isinstance(data["media_types"], list)
     
     def test_list_media_types_v1(self, client):
         """Test new API v1 media types endpoint."""

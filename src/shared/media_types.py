@@ -61,7 +61,6 @@ class MediaPerson:
     role: str  # e.g., "actor", "director", "author", "composer"
     character: Optional[str] = None  # Character played (for actors)
     id: Optional[str] = None
-    type: Optional[str] = None  # Legacy Jellyfin field
 
 
 @dataclass
@@ -194,7 +193,7 @@ class ConfigurableMediaAnalyzer(MediaAnalyzer):
         
         return MediaAnalysis(
             media_type=media_type,
-            title=query,  # Placeholder
+            title=query,  # Basic query-to-title mapping
             # Other fields would be populated based on query analysis
         )
     

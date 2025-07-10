@@ -81,9 +81,7 @@ def _serialize_media_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
 async def _expand_query(query: str, media_type: str) -> str:
     """Expand query using available enrichment plugins."""
-    # This is a placeholder for query expansion
-    # In the full implementation, this would call the plugin system
-    # For now, we'll return the original query
+    # TODO: Implement query expansion using enrichment plugins
     return query
 
 
@@ -125,9 +123,7 @@ async def _text_search(manager: IngestionManager, query: str, limit: int, filter
 
 async def _semantic_search(manager: IngestionManager, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Perform semantic search using available embeddings."""
-    # This is a placeholder for semantic search
-    # In the full implementation, this would use FAISS or vector search
-    # For now, we'll fall back to text search
+    # TODO: Implement semantic search using FAISS or vector search
     return await _text_search(manager, query, limit, filters)
 
 

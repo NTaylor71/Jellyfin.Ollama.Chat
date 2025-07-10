@@ -238,6 +238,126 @@ async def enrich_media_item(media_type: str, request: EnrichmentRequest):
         )
 
 
+@router.post("/analyze", response_model=EnrichmentResponse)
+@track_enrichment_metrics
+async def analyze_media_item(request: EnrichmentRequest):
+    """Analyze media item without storing to database."""
+    try:
+        start_time = asyncio.get_event_loop().time()
+        
+        # Get or create manager for media type
+        manager = await get_or_create_manager(request.media_type)
+        
+        # Convert to MediaData
+        media_item = manager.dynamic_model(**request.media_data)
+        
+        # Enrich the item (without storing)
+        enriched_data = await manager.enrich_media_item(media_item)
+        
+        # Calculate execution time
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        # Get enriched fields
+        original_fields = set(request.media_data.keys())
+        enriched_fields = [field for field in enriched_data.keys() if field not in original_fields]
+        
+        return EnrichmentResponse(
+            status="success",
+            media_type=request.media_type,
+            enriched_data=enriched_data,
+            enriched_fields=enriched_fields,
+            execution_time_ms=execution_time_ms
+        )
+        
+    except Exception as e:
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        return EnrichmentResponse(
+            status="error",
+            media_type=request.media_type,
+            execution_time_ms=execution_time_ms,
+            errors=[str(e)]
+        )
+
+
+class FieldEnrichmentRequest(BaseModel):
+    """Request for enriching specific fields only."""
+    media_type: str = "movie"
+    media_data: Dict[str, Any]
+    target_fields: List[str] = Field(..., description="Specific fields to enrich")
+
+
+@router.post("/enrich/field", response_model=EnrichmentResponse)
+@track_enrichment_metrics
+async def enrich_specific_fields(request: FieldEnrichmentRequest):
+    """Enrich only specific fields of a media item."""
+    try:
+        start_time = asyncio.get_event_loop().time()
+        
+        # Get or create manager for media type
+        manager = await get_or_create_manager(request.media_type)
+        
+        # Convert to MediaData
+        media_item = manager.dynamic_model(**request.media_data)
+        
+        # Selective field enrichment - only run plugins for requested fields
+        media_config = manager.media_config
+        
+        # Get field configurations for only the requested fields
+        field_configs = {}
+        for field in request.target_fields:
+            if field in media_config.fields:
+                field_configs[field] = media_config.fields[field]
+        
+        if not field_configs:
+            # No valid fields requested, return original data
+            filtered_data = request.media_data.copy()
+        else:
+            # Create temporary config with only target fields
+            from src.shared.media_field_config import MediaFieldConfig
+            temp_config = MediaFieldConfig(
+                name=media_config.name,
+                description=f"Selective enrichment for: {', '.join(request.target_fields)}",
+                fields=field_configs,
+                output=media_config.output
+            )
+            
+            # Override manager's config temporarily
+            original_config = manager.media_config
+            manager.media_config = temp_config
+            
+            try:
+                # Enrich with selective field configuration
+                enriched_data = await manager.enrich_media_item(media_item)
+                filtered_data = enriched_data
+            finally:
+                # Restore original config
+                manager.media_config = original_config
+        
+        # Calculate execution time
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        
+        # Get enriched fields (only the ones we targeted)
+        original_fields = set(request.media_data.keys())
+        enriched_fields = [field for field in request.target_fields if field in enriched_data and field not in original_fields]
+        
+        return EnrichmentResponse(
+            status="success",
+            media_type=request.media_type,
+            enriched_data=filtered_data,
+            enriched_fields=enriched_fields,
+            execution_time_ms=execution_time_ms
+        )
+        
+    except Exception as e:
+        execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+        return EnrichmentResponse(
+            status="error",
+            media_type=request.media_type,
+            execution_time_ms=execution_time_ms,
+            errors=[str(e)]
+        )
+
+
 @router.get("/{media_type}/verify")
 async def verify_media_ingestion(media_type: str):
     """Verify ingestion results for a media type."""

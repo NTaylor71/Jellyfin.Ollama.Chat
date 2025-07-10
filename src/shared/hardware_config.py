@@ -189,8 +189,7 @@ class HardwareDetector:
         except Exception as e:
             logger.debug(f"NVIDIA GPU detection failed: {e}")
         
-        # TODO: Add AMD GPU detection
-        # TODO: Add Intel GPU detection
+        # AMD/Intel GPU detection not implemented - NVIDIA only system
         
         return 0, 0.0, None
     

@@ -112,45 +112,6 @@ def create_app() -> FastAPI:
             "docs_url": "/docs" if settings.ENABLE_API_DOCS else None
         }
     
-    # Legacy endpoints for backward compatibility
-    @app.get("/media-types")
-    async def list_media_types():
-        """List available media type configurations (legacy endpoint)."""
-        try:
-            config_dir = Path("config/media_types")
-            if not config_dir.exists():
-                return {"media_types": [], "error": "Configuration directory not found"}
-            
-            media_types = []
-            for config_file in config_dir.glob("*.yaml"):
-                if config_file.name not in ["movie_new_format.yaml", "media_detection.yaml"]:  # Skip template files
-                    media_type = config_file.stem
-                    try:
-                        with open(config_file, 'r') as f:
-                            config_data = yaml.safe_load(f)
-                        media_types.append({
-                            "media_type": media_type,
-                            "name": config_data.get("name", media_type),
-                            "description": config_data.get("description", ""),
-                            "fields": list(config_data.get("fields", {}).keys())
-                        })
-                    except Exception as e:
-                        print(f"Error loading {config_file}: {e}")
-            
-            return {"media_types": media_types}
-            
-        except Exception as e:
-            return {"media_types": [], "error": str(e)}
-    
-    @app.get("/verify/{media_type}")
-    async def verify_ingestion(media_type: str):
-        """Verify ingestion results for a media type (legacy endpoint)."""
-        try:
-            manager = await get_or_create_manager(media_type)
-            results = await manager.verify_ingestion()
-            return {"status": "success", **results}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
     
     return app
 

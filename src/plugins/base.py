@@ -157,8 +157,8 @@ class BasePlugin(ABC):
                 self._logger.info(f"Loaded configuration for plugin {self.metadata.name}")
             
             # Call plugin-specific initialization
-            legacy_config = self._current_config.model_dump() if self._current_config else {}
-            success = await self.initialize(legacy_config)
+            config_dict = self._current_config.model_dump() if self._current_config else {}
+            success = await self.initialize(config_dict)
             
             if success:
                 self._is_initialized = True

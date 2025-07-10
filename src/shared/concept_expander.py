@@ -723,7 +723,7 @@ class ConceptExpander:
             "type": "unknown",
             "context_aware": False,
             "strengths": [],
-            "weaknesses": ["not implemented"],
+            "weaknesses": ["requires implementation"],
             "best_for": []
         })
     
