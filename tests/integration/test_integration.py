@@ -250,7 +250,7 @@ async def test_service_configuration():
     
     # Check if all required services are healthy
     # Note: FAISS service not fully implemented yet, so it's optional for now
-    required_services = ["ollama_chat", "redis"]
+    required_services = ["ollama_ingestion", "redis"]
     optional_services = ["faiss"]
     failed_services = [service for service in required_services if not health_status.get(service, False)]
     
@@ -283,7 +283,7 @@ async def test_service_configuration():
                     logger.error("   Try: docker build -t jelly-faiss -f docker/faiss/Dockerfile .")
                 elif service == "redis":
                     logger.error("💡 Redis may be starting up - wait a few seconds and try again")
-                elif service == "ollama_chat":
+                elif service == "ollama_ingestion":
                     logger.error("💡 Ollama service not running - start with: ollama serve")
                     
             raise AssertionError(f"Integration test requires these services: {failed_services}")

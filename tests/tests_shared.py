@@ -13,7 +13,7 @@ def settings_to_console():
     # Core environment
     logger.info(f"✅ Environ Switch: {settings.ENV}")
     logger.info(f"🔗 Redis: {settings.redis_url}")
-    logger.info(f"🤖 Ollama Chat: {settings.OLLAMA_CHAT_BASE_URL}")
+    logger.info(f"🤖 Ollama Ingestion: {settings.OLLAMA_INGESTION_BASE_URL}")
     logger.info(f"🌐 API: {settings.api_url}")
     logger.info(f"📊 VectorDB: {settings.vectordb_url}")
     logger.info(f"🗄️ MongoDB: {settings.mongodb_url}")

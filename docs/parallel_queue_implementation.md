@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implementation of parallel CPU and GPU task execution for the Jellyfin.Ollama.Chat queue system. The system now supports running multiple CPU tasks in parallel while GPU tasks are executing, significantly improving throughput.
+This document describes the implementation of parallel CPU and GPU task execution for the Universal.Media.Ingestion queue system. The system now supports running multiple CPU tasks in parallel while GPU tasks are executing, significantly improving throughput.
 
 ## Key Features
 

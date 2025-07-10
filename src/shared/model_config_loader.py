@@ -82,15 +82,15 @@ class ModelConfigLoader:
         """Parse simplified Ollama configuration."""
         models = {}
         
-        if "chat_model" in config_data:
-            models["chat_model"] = ModelConfig(
-                name=config_data["chat_model"],
+        if "ingestion_model" in config_data:
+            models["ingestion_model"] = ModelConfig(
+                name=config_data["ingestion_model"],
                 required=True,
                 size_mb=2000,  # Default size
-                description="Main chat model",
+                description="Main ingestion model",
                 storage_path="external",
                 service_type="ollama",
-                use_cases=["chat", "concept_expansion"]
+                use_cases=["ingestion", "concept_expansion"]
             )
         
         if "embedding_model" in config_data:
@@ -106,7 +106,7 @@ class ModelConfigLoader:
         
         # Handle any additional models
         for key, value in config_data.items():
-            if key not in ["chat_model", "embedding_model"] and not key.startswith("#"):
+            if key not in ["ingestion_model", "embedding_model"] and not key.startswith("#"):
                 models[key] = ModelConfig(
                     name=value,
                     required=False,
@@ -300,9 +300,9 @@ if __name__ == "__main__":
     
     # Test use case lookup
     print("\n=== Use Case Examples ===")
-    chat_model = loader.get_model_by_use_case("ollama", "chat")
-    if chat_model:
-        print(f"Chat model: {chat_model.name}")
+    ingestion_model = loader.get_model_by_use_case("ollama", "ingestion")
+    if ingestion_model:
+        print(f"Ingestion model: {ingestion_model.name}")
     
     embedding_model = loader.get_model_by_use_case("ollama", "embeddings")
     if embedding_model:

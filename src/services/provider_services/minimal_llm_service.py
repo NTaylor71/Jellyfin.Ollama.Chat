@@ -97,14 +97,14 @@ class MinimalLLMManager(BaseService):
         self.error_count = 0
         self.start_time = asyncio.get_event_loop().time()
         self.settings = get_settings()
-        self.ollama_url = self.settings.OLLAMA_CHAT_BASE_URL
-        self.model = self._get_chat_model()
+        self.ollama_url = self.settings.OLLAMA_INGESTION_BASE_URL
+        self.model = self._get_ingestion_model()
         self.initialization_state = "starting"  # starting -> connecting_ollama -> ready
         self.initialization_progress = {}
         logger.info(f"Initialized LLM manager with Ollama URL: {self.ollama_url}, model: {self.model}")
     
-    def _get_chat_model(self) -> str:
-        """Get chat model from YAML config, fallback to env var."""
+    def _get_ingestion_model(self) -> str:
+        """Get ingestion model from YAML config, fallback to env var."""
         if CONFIG_LOADER_AVAILABLE:
             try:
                 config_loader = get_model_config_loader()
@@ -113,21 +113,21 @@ class MinimalLLMManager(BaseService):
                 # Look for chat model in YAML config
                 chat_model_config = ollama_models.get('chat_model')
                 if chat_model_config:
-                    logger.info(f"Using chat model from YAML config: {chat_model_config.name}")
+                    logger.info(f"Using ingestion model from YAML config: {chat_model_config.name}")
                     return chat_model_config.name
                     
             except Exception as e:
-                logger.warning(f"Failed to load chat model from YAML config: {e}")
+                logger.warning(f"Failed to load ingestion model from YAML config: {e}")
         
         # Fallback to environment variable or default
         try:
-            model_name = self.settings.OLLAMA_CHAT_MODEL
-            logger.info(f"Using chat model from environment variable: {model_name}")
+            model_name = self.settings.OLLAMA_INGESTION_MODEL
+            logger.info(f"Using ingestion model from environment variable: {model_name}")
             return model_name
         except AttributeError:
             # Final fallback if env var is not defined
             default_model = "mistral:latest"
-            logger.info(f"Using default chat model: {default_model}")
+            logger.info(f"Using default ingestion model: {default_model}")
             return default_model
     
     async def initialize_provider(self):

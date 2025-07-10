@@ -219,10 +219,10 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
             ))
         
         # Ollama service
-        if settings.OLLAMA_CHAT_BASE_URL:
+        if settings.OLLAMA_INGESTION_BASE_URL:
             endpoints.append(ServiceEndpoint(
                 name="ollama",
-                url=settings.OLLAMA_CHAT_BASE_URL,
+                url=settings.OLLAMA_INGESTION_BASE_URL,
                 timeout_seconds=10.0,
                 retry_attempts=1,
                 health_check_path="/api/tags",  # Ollama-specific health check

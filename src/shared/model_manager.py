@@ -79,7 +79,7 @@ class ModelManager:
         
         # Load models from configuration
         self.models = self._load_models_from_config()
-        self.ollama_base_url = self.settings.OLLAMA_CHAT_BASE_URL
+        self.ollama_base_url = self.settings.OLLAMA_INGESTION_BASE_URL
     
     def _define_required_models(self) -> Dict[str, ModelInfo]:
         """Define all required models and their properties."""
@@ -128,7 +128,7 @@ class ModelManager:
             # Ollama Models (external, check-only)
             # NOTE: These are fallback values when YAML config is not available
             # Primary configuration should come from config/models/ollama_models.yaml
-            "ollama_chat": ModelInfo(
+            "ollama_ingestion": ModelInfo(
                 name="mistral:latest",  # Updated to match current YAML config
                 package="ollama",
                 storage_path="external",

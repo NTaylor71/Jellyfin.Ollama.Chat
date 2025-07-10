@@ -242,7 +242,7 @@ class HTTPBasePlugin(BasePlugin):
                 connector=connector,
                 timeout=timeout,
                 headers={
-                    "User-Agent": f"JellyfinOllamaChat/{self.metadata.version}",
+                    "User-Agent": f"UniversalMediaIngestion/{self.metadata.version}",
                     "Accept": "application/json",
                     "Content-Type": "application/json"
                 }

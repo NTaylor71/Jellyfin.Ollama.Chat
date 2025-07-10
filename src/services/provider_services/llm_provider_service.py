@@ -81,9 +81,9 @@ class LLMProviderManager:
                 }
                 logger.info("✅ LLM provider initialized")
             else:
-                self.initialization_error = "LLM provider initialization failed"
-                self.initialization_progress["error"] = "LLM provider initialization failed"
-                logger.error("❌ LLM provider initialization failed")
+                self.initialization_error = "LLM provider waiting for models"
+                self.initialization_progress["error"] = "Models not ready yet - waiting for model-manager"
+                logger.info("⏳ LLM provider waiting for models to download (this is normal during startup)")
         except ImportError as e:
             self.initialization_error = f"Import error: {e}"
             self.initialization_progress["error"] = f"Import error: {e}"
@@ -874,7 +874,7 @@ async def get_models_status():
         import httpx
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(f"{settings.OLLAMA_CHAT_BASE_URL}/api/tags")
+                response = await client.get(f"{settings.OLLAMA_INGESTION_BASE_URL}/api/tags")
                 ollama_models = response.json().get("models", [])
             except Exception as e:
                 logger.warning(f"Failed to get Ollama models: {e}")
@@ -977,7 +977,7 @@ async def download_models(request: ModelDownloadRequest):
         import httpx
         async with httpx.AsyncClient(timeout=600.0) as client:
             try:
-                response = await client.get(f"{settings.OLLAMA_CHAT_BASE_URL}/api/tags")
+                response = await client.get(f"{settings.OLLAMA_INGESTION_BASE_URL}/api/tags")
                 current_models = {model["name"] for model in response.json().get("models", [])}
             except Exception as e:
                 logger.warning(f"Failed to get current models: {e}")
@@ -996,7 +996,7 @@ async def download_models(request: ModelDownloadRequest):
                 # Pull model using Ollama API
                 async with httpx.AsyncClient(timeout=600.0) as client:
                     response = await client.post(
-                        f"{settings.OLLAMA_CHAT_BASE_URL}/api/pull",
+                        f"{settings.OLLAMA_INGESTION_BASE_URL}/api/pull",
                         json={"name": model_name},
                         timeout=600.0
                     )

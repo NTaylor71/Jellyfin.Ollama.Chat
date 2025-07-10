@@ -335,7 +335,7 @@ services:
     environment:
       - ENV=docker
       - LOG_LEVEL=DEBUG
-      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
+      - OLLAMA_INGESTION_BASE_URL=http://ollama:11434
     networks:
       - rag-network
     depends_on:
@@ -372,7 +372,7 @@ services:
       - LOG_LEVEL=DEBUG
       - REDIS_HOST=redis
       - MONGODB_HOST=mongodb
-      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
+      - OLLAMA_INGESTION_BASE_URL=http://ollama:11434
       - NLTK_DATA=/app/models/nltk_data
       - GENSIM_DATA_DIR=/app/models/gensim_data
       # Service discovery endpoints for microservices
@@ -441,7 +441,7 @@ services:
       - LOG_LEVEL=DEBUG
       - ENABLE_CORS=true
       - ENABLE_API_DOCS=true
-      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
+      - OLLAMA_INGESTION_BASE_URL=http://ollama:11434
       - CONTAINER_TYPE=api
     networks:
       - rag-network
@@ -483,7 +483,7 @@ services:
       - REDIS_HOST=redis
       - MONGODB_HOST=mongodb
       - LOG_LEVEL=DEBUG
-      - OLLAMA_CHAT_BASE_URL=http://ollama:11434
+      - OLLAMA_INGESTION_BASE_URL=http://ollama:11434
       - CONTAINER_TYPE=worker
     networks:
       - rag-network

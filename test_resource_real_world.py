@@ -199,9 +199,9 @@ async def test_queue_behavior():
         )
         
         # Check current queue state
-        cpu_queue_size = await redis_client.zcard("chat:queue:cpu")
-        gpu_queue_size = await redis_client.zcard("chat:queue:gpu")
-        dead_letter_size = await redis_client.llen("chat:dead_letter")
+        cpu_queue_size = await redis_client.zcard("ingestion:queue:cpu")
+        gpu_queue_size = await redis_client.zcard("ingestion:queue:gpu")
+        dead_letter_size = await redis_client.llen("ingestion:dead_letter")
         
         logger.info(f"📊 Current queue state:")
         logger.info(f"   CPU queue: {cpu_queue_size} tasks")

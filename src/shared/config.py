@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int = Field(default=6379)
     REDIS_PASSWORD: Optional[str] = Field(default=None)
     REDIS_DB: int = Field(default=0)
-    REDIS_QUEUE: str = Field(default="chat:queue")
-    REDIS_RESULT_QUEUE: str = Field(default="chat:results")
-    REDIS_DEAD_LETTER_QUEUE: str = Field(default="chat:failed")
+    REDIS_QUEUE: str = Field(default="ingestion:queue")
+    REDIS_RESULT_QUEUE: str = Field(default="ingestion:results")
+    REDIS_DEAD_LETTER_QUEUE: str = Field(default="ingestion:failed")
     
     # Docker overrides
     DOCKER_REDIS_HOST: str = Field(default="redis")
@@ -97,9 +97,9 @@ class Settings(BaseSettings):
     # OLLAMA CONFIGURATION
     # ==========================================================================
     
-    OLLAMA_CHAT_BASE_URL: str = Field(default="http://localhost:11434")
-    # NOTE: OLLAMA_CHAT_MODEL moved to YAML config at config/models/ollama_models.yaml
-    OLLAMA_CHAT_TIMEOUT: int = Field(default=300)
+    OLLAMA_INGESTION_BASE_URL: str = Field(default="http://localhost:11434")
+    # NOTE: OLLAMA_INGESTION_MODEL moved to YAML config at config/models/ollama_models.yaml
+    OLLAMA_INGESTION_TIMEOUT: int = Field(default=300)
     
     # ==========================================================================
     # VECTOR DATABASE (FAISS) CONFIGURATION
@@ -491,14 +491,14 @@ class Settings(BaseSettings):
         import httpx
         
         try:
-            # Test chat service
+            # Test ingestion service
             with httpx.Client(timeout=5.0) as client:
-                response = client.get(f"{self.OLLAMA_CHAT_BASE_URL}/api/tags")
+                response = client.get(f"{self.OLLAMA_INGESTION_BASE_URL}/api/tags")
                 if response.status_code != 200:
                     return False
                 
                 # Test embed service
-                response = client.get(f"{self.OLLAMA_CHAT_BASE_URL}/api/tags")
+                response = client.get(f"{self.OLLAMA_INGESTION_BASE_URL}/api/tags")
                 return response.status_code == 200
                 
         except Exception:
@@ -534,7 +534,7 @@ class Settings(BaseSettings):
     def get_health_status(self) -> dict:
         """Get health status of all services."""
         return {
-            "ollama_chat": self.validate_ollama_connection(),
+            "ollama_ingestion": self.validate_ollama_connection(),
             "redis": self.validate_redis_connection(),
             "faiss": self.validate_faiss_service(),
             "environment": self.ENV,
@@ -550,8 +550,8 @@ class Settings(BaseSettings):
         return {
             "api": self.api_url,
             "vectordb": self.vectordb_url,
-            "ollama_chat": self.OLLAMA_CHAT_BASE_URL,
-            "ollama_embed": self.OLLAMA_CHAT_BASE_URL,
+            "ollama_ingestion": self.OLLAMA_INGESTION_BASE_URL,
+            "ollama_embed": self.OLLAMA_INGESTION_BASE_URL,
             "redis": self.redis_url,
             "prometheus": f"http://localhost:{self.PROMETHEUS_PORT}" if self.PROMETHEUS_ENABLED else None
         }

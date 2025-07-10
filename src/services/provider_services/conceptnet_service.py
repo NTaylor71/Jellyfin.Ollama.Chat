@@ -75,9 +75,9 @@ class ConceptNetProviderManager(BaseService):
                 self.initialization_state = "ready"
                 logger.info("✅ ConceptNet provider initialized successfully")
             else:
-                self.initialization_error = "Provider initialization failed"
-                self.initialization_state = "failed"
-                logger.error("❌ ConceptNet provider initialization failed")
+                self.initialization_error = "ConceptNet provider not ready"
+                self.initialization_state = "waiting"
+                logger.info("⏳ ConceptNet provider not ready yet (this is normal during startup)")
                 
         except ImportError as e:
             self.initialization_error = f"Import error: {e}"

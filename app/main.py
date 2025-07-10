@@ -158,8 +158,8 @@ class QueueMonitorThread(QThread):
             
             # Check queue sizes (using ZCARD for sorted sets)
             # Use the same queue names as the Docker worker
-            cpu_queue_size = redis_client.zcard("chat:queue:cpu")
-            gpu_queue_size = redis_client.zcard("chat:queue:gpu") 
+            cpu_queue_size = redis_client.zcard("ingestion:queue:cpu")
+            gpu_queue_size = redis_client.zcard("ingestion:queue:gpu") 
             dead_letter_size = redis_client.llen("rag:dead_letter")
             
             # Also check for completed tasks (check recent results)
@@ -627,10 +627,10 @@ class QueueMonitorApp(QMainWindow):
                     for task in test_tasks:
                         # Route LLM tasks to GPU queue, others to CPU queue
                         if 'llm_' in task['plugin_name']:
-                            queue_name = "chat:queue:gpu"
+                            queue_name = "ingestion:queue:gpu"
                             queue_type = "GPU"
                         else:
-                            queue_name = "chat:queue:cpu"
+                            queue_name = "ingestion:queue:cpu"
                             queue_type = "CPU"
                         
                         task_json = json.dumps(task)

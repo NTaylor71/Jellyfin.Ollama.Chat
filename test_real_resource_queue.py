@@ -139,9 +139,9 @@ async def test_queue_stats():
         )
         
         # Check queue sizes
-        cpu_queue = "chat:queue:cpu"
-        gpu_queue = "chat:queue:gpu"
-        dead_letter = "chat:dead_letter"
+        cpu_queue = "ingestion:queue:cpu"
+        gpu_queue = "ingestion:queue:gpu"
+        dead_letter = "ingestion:dead_letter"
         
         cpu_count = await redis_client.zcard(cpu_queue)
         gpu_count = await redis_client.zcard(gpu_queue)

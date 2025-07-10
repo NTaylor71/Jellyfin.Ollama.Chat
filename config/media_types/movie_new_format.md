@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the new YAML configuration format for the movie media type in the Jellyfin.Ollama.Chat project. The configuration leverages the HTTP-only plugin architecture implemented as part of Issue #1, providing a powerful and flexible system for enriching movie metadata through various AI and NLP services.
+This document describes the new YAML configuration format for the movie media type in the Universal.Media.Ingestion project. The configuration leverages the HTTP-only plugin architecture implemented as part of Issue #1, providing a powerful and flexible system for enriching movie metadata through various AI and NLP services.
 
 ## Table of Contents
 

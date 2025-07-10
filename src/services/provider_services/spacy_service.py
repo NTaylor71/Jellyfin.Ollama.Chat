@@ -109,9 +109,9 @@ class SpacyProviderManager(BaseService):
                 self.initialization_state = "ready"
                 logger.info("✅ SpaCy provider initialized successfully")
             else:
-                self.initialization_error = "Provider initialization failed"
-                self.initialization_state = "failed"
-                logger.error("❌ SpaCy provider initialization failed")
+                self.initialization_error = "SpaCy provider waiting for models"
+                self.initialization_state = "waiting_for_models"
+                logger.info("⏳ SpaCy provider waiting for models to download (this is normal during startup)")
                 
         except ImportError as e:
             self.initialization_error = f"Import error: {e}"

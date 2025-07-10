@@ -132,9 +132,9 @@ class GensimProviderManager(BaseService):
                 self.initialization_state = "ready"
                 logger.info("✅ Gensim provider initialized successfully")
             else:
-                self.initialization_error = "Provider initialization failed"
-                self.initialization_state = "failed"
-                logger.error("❌ Gensim provider initialization failed")
+                self.initialization_error = "Gensim provider waiting for models"
+                self.initialization_state = "waiting_for_models"
+                logger.info("⏳ Gensim provider waiting for models to download (this is normal during startup)")
                 
         except ImportError as e:
             self.initialization_error = f"Import error: {e}"

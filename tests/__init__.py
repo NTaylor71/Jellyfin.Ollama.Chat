@@ -1,5 +1,5 @@
 """
-Test module for Jellyfin.Ollama.Chat
+Test module for Universal.Media.Ingestion
 
 This module contains all test scripts organized by category:
 - ingestion: Tests for data ingestion and processing
