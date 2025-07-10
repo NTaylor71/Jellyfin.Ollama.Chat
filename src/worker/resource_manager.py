@@ -26,6 +26,7 @@ class ResourceType(Enum):
 class ResourceRequirement:
     """Resource requirements for a task."""
     cpu_cores: float = 1.0          # Can be fractional (0.5 = half core)
+    cpu_threads: int = 1            # Number of CPU threads needed
     gpu_count: int = 0              # Number of GPUs needed (0 or 1 for home setup)
     memory_mb: int = 512            # Memory in MB
     exclusive_gpu: bool = True      # GPU tasks run exclusively (no other tasks)
@@ -46,12 +47,14 @@ class ResourcePool:
     """Available and used resources on a worker."""
     # Total available resources
     total_cpu_cores: int
+    total_cpu_threads: int
     total_gpus: int
     total_memory_mb: int
     worker_id: str = "default"
     
     # Current usage
     used_cpu_cores: float = 0.0
+    used_cpu_threads: int = 0
     used_gpus: int = 0
     used_memory_mb: int = 0
     
@@ -70,33 +73,39 @@ class ResourcePool:
         """
         # Check CPU capacity
         if self.used_cpu_cores + req.cpu_cores > self.total_cpu_cores:
-            logger.debug(f"CPU check failed: {self.used_cpu_cores} + {req.cpu_cores} > {self.total_cpu_cores}")
+            logger.debug(f"CPU cores check failed: {self.used_cpu_cores} + {req.cpu_cores} > {self.total_cpu_cores}")
             return False
             
-        # Check if exclusive GPU task is running - blocks ALL other tasks
-        gpu_tasks_running = any(
-            alloc.requirement.gpu_count > 0 and alloc.requirement.exclusive_gpu
-            for alloc in self.running_tasks.values()
-        )
-        if gpu_tasks_running:
-            logger.debug("Exclusive GPU task running, cannot schedule any other task")
+        # Check CPU thread capacity
+        if self.used_cpu_threads + req.cpu_threads > self.total_cpu_threads:
+            logger.debug(f"CPU threads check failed: {self.used_cpu_threads} + {req.cpu_threads} > {self.total_cpu_threads}")
             return False
-        
-        # Check GPU capacity
-        if req.gpu_count > 0:
-            if self.used_gpus + req.gpu_count > self.total_gpus:
-                logger.debug(f"GPU count check failed: {self.used_gpus} + {req.gpu_count} > {self.total_gpus}")
-                return False
-                
-            # Exclusive GPU mode - if GPU is requested and exclusive, no other tasks can run
-            if req.exclusive_gpu and len(self.running_tasks) > 0:
-                logger.debug("GPU exclusive mode: other tasks running, cannot schedule GPU task")
-                return False
-                
+            
         # Check memory capacity
         if self.used_memory_mb + req.memory_mb > self.total_memory_mb:
             logger.debug(f"Memory check failed: {self.used_memory_mb} + {req.memory_mb} > {self.total_memory_mb}")
             return False
+        
+        # GPU-specific checks
+        if req.gpu_count > 0:
+            # Check GPU capacity
+            if self.used_gpus + req.gpu_count > self.total_gpus:
+                logger.debug(f"GPU count check failed: {self.used_gpus} + {req.gpu_count} > {self.total_gpus}")
+                return False
+                
+            # Exclusive GPU mode - only blocks other GPU tasks, not CPU tasks
+            if req.exclusive_gpu:
+                gpu_tasks_running = any(
+                    alloc.requirement.gpu_count > 0
+                    for alloc in self.running_tasks.values()
+                )
+                if gpu_tasks_running:
+                    logger.debug("GPU exclusive mode: other GPU tasks running, cannot schedule this GPU task")
+                    return False
+        else:
+            # CPU task - check if exclusive GPU task is running
+            # CPU tasks CAN run alongside GPU tasks
+            pass  # No blocking for CPU tasks
             
         return True
     
@@ -119,6 +128,7 @@ class ResourcePool:
         
         # Update usage counters
         self.used_cpu_cores += req.cpu_cores
+        self.used_cpu_threads += req.cpu_threads
         self.used_gpus += req.gpu_count
         self.used_memory_mb += req.memory_mb
         
@@ -132,8 +142,8 @@ class ResourcePool:
         
         self.running_tasks[task_id] = allocation
         
-        logger.info(f"Allocated resources for task {task_id}: CPU={req.cpu_cores}, GPU={req.gpu_count}, Mem={req.memory_mb}MB")
-        logger.debug(f"Resource usage: CPU={self.used_cpu_cores}/{self.total_cpu_cores}, GPU={self.used_gpus}/{self.total_gpus}, Mem={self.used_memory_mb}/{self.total_memory_mb}")
+        logger.info(f"Allocated resources for task {task_id}: CPU={req.cpu_cores} cores/{req.cpu_threads} threads, GPU={req.gpu_count}, Mem={req.memory_mb}MB")
+        logger.debug(f"Resource usage: CPU={self.used_cpu_cores}/{self.total_cpu_cores} cores, Threads={self.used_cpu_threads}/{self.total_cpu_threads}, GPU={self.used_gpus}/{self.total_gpus}, Mem={self.used_memory_mb}/{self.total_memory_mb}MB")
         
         return allocation
         
@@ -156,6 +166,7 @@ class ResourcePool:
         
         # Update usage counters
         self.used_cpu_cores -= req.cpu_cores
+        self.used_cpu_threads -= req.cpu_threads
         self.used_gpus -= req.gpu_count
         self.used_memory_mb -= req.memory_mb
         
@@ -164,13 +175,14 @@ class ResourcePool:
         
         # Ensure no negative values due to floating point errors
         self.used_cpu_cores = max(0.0, self.used_cpu_cores)
+        self.used_cpu_threads = max(0, self.used_cpu_threads)
         self.used_gpus = max(0, self.used_gpus)
         self.used_memory_mb = max(0, self.used_memory_mb)
         
         runtime_seconds = (datetime.utcnow() - allocation.allocated_at).total_seconds()
         
         logger.info(f"Released resources for task {task_id} after {runtime_seconds:.1f}s")
-        logger.debug(f"Resource usage: CPU={self.used_cpu_cores}/{self.total_cpu_cores}, GPU={self.used_gpus}/{self.total_gpus}, Mem={self.used_memory_mb}/{self.total_memory_mb}")
+        logger.debug(f"Resource usage: CPU={self.used_cpu_cores}/{self.total_cpu_cores} cores, Threads={self.used_cpu_threads}/{self.total_cpu_threads}, GPU={self.used_gpus}/{self.total_gpus}, Mem={self.used_memory_mb}/{self.total_memory_mb}MB")
         
         return True
     
@@ -178,6 +190,7 @@ class ResourcePool:
         """Get current resource utilization percentages."""
         return {
             "cpu_utilization": (self.used_cpu_cores / self.total_cpu_cores) * 100 if self.total_cpu_cores > 0 else 0,
+            "thread_utilization": (self.used_cpu_threads / self.total_cpu_threads) * 100 if self.total_cpu_threads > 0 else 0,
             "gpu_utilization": (self.used_gpus / self.total_gpus) * 100 if self.total_gpus > 0 else 0,
             "memory_utilization": (self.used_memory_mb / self.total_memory_mb) * 100 if self.total_memory_mb > 0 else 0,
             "active_tasks": len(self.running_tasks)
@@ -201,11 +214,13 @@ class ResourcePool:
             "worker_id": self.worker_id,
             "total_resources": {
                 "cpu_cores": self.total_cpu_cores,
+                "cpu_threads": self.total_cpu_threads,
                 "gpus": self.total_gpus,
                 "memory_mb": self.total_memory_mb
             },
             "current_usage": {
                 "cpu_cores": round(self.used_cpu_cores, 2),
+                "cpu_threads": self.used_cpu_threads,
                 "gpus": self.used_gpus,
                 "memory_mb": self.used_memory_mb
             },
@@ -219,6 +234,7 @@ class ResourcePool:
                 {
                     "task_id": alloc.task_id,
                     "cpu_cores": alloc.requirement.cpu_cores,
+                    "cpu_threads": alloc.requirement.cpu_threads,
                     "gpu_count": alloc.requirement.gpu_count,
                     "memory_mb": alloc.requirement.memory_mb,
                     "runtime_seconds": (datetime.utcnow() - alloc.allocated_at).total_seconds()
@@ -291,8 +307,13 @@ class ResourceManager:
 
 def create_resource_pool_from_config(config: Dict[str, Any], worker_id: str = "default") -> ResourcePool:
     """Create a ResourcePool from configuration."""
+    # If threads not specified, assume 2 threads per core as default
+    cpu_cores = config.get("cpu_cores", 3)
+    cpu_threads = config.get("cpu_threads", cpu_cores * 2)
+    
     return ResourcePool(
-        total_cpu_cores=config.get("cpu_cores", 3),
+        total_cpu_cores=cpu_cores,
+        total_cpu_threads=cpu_threads,
         total_gpus=config.get("gpu_count", 1),
         total_memory_mb=config.get("memory_mb", 8192),
         worker_id=worker_id
@@ -303,12 +324,32 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
     """
     Get resource requirements for a plugin.
     
-    This should eventually be loaded from plugin metadata,
-    but for now we'll use reasonable defaults.
+    Checks hardware config for plugin overrides first,
+    then falls back to default requirements.
     """
+    # Try to load from hardware config first
+    try:
+        from src.shared.hardware_config_loader import get_hardware_config_loader
+        loader = get_hardware_config_loader()
+        overrides = loader.get_plugin_overrides()
+        
+        if plugin_name in overrides:
+            override_config = overrides[plugin_name]
+            return ResourceRequirement(
+                cpu_cores=override_config.get("cpu_cores", 1.0),
+                cpu_threads=override_config.get("cpu_threads", 2),
+                gpu_count=override_config.get("gpu_count", 0),
+                memory_mb=override_config.get("memory_mb", 512),
+                exclusive_gpu=override_config.get("exclusive_gpu", True),
+                estimated_runtime_seconds=override_config.get("estimated_runtime_seconds", 30)
+            )
+    except Exception as e:
+        logger.debug(f"Could not load plugin overrides from hardware config: {e}")
+    
     # Default requirements
     default_req = ResourceRequirement(
         cpu_cores=0.5,
+        cpu_threads=1,
         gpu_count=0,
         memory_mb=256,
         exclusive_gpu=False
@@ -319,6 +360,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         # LLM plugins need GPU
         "LLMKeywordPlugin": ResourceRequirement(
             cpu_cores=1.0,
+            cpu_threads=2,
             gpu_count=1,
             memory_mb=2048,
             exclusive_gpu=True,
@@ -326,6 +368,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "LLMQuestionAnswerPlugin": ResourceRequirement(
             cpu_cores=1.0,
+            cpu_threads=2,
             gpu_count=1,
             memory_mb=2048,
             exclusive_gpu=True,
@@ -333,15 +376,25 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "LLMTemporalIntelligencePlugin": ResourceRequirement(
             cpu_cores=1.0,
+            cpu_threads=2,
             gpu_count=1,
             memory_mb=2048,
             exclusive_gpu=True,
             estimated_runtime_seconds=45
         ),
+        "LLMWebSearchPlugin": ResourceRequirement(
+            cpu_cores=1.0,
+            cpu_threads=2,
+            gpu_count=1,
+            memory_mb=2048,
+            exclusive_gpu=True,
+            estimated_runtime_seconds=90
+        ),
         
         # CPU-only plugins
         "ConceptNetKeywordPlugin": ResourceRequirement(
             cpu_cores=0.2,
+            cpu_threads=1,
             gpu_count=0,
             memory_mb=128,
             exclusive_gpu=False,
@@ -349,6 +402,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "GensimSimilarityPlugin": ResourceRequirement(
             cpu_cores=0.8,
+            cpu_threads=4,
             gpu_count=0,
             memory_mb=1024,
             exclusive_gpu=False,
@@ -356,6 +410,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "SpacyTemporalPlugin": ResourceRequirement(
             cpu_cores=0.6,
+            cpu_threads=2,
             gpu_count=0,
             memory_mb=512,
             exclusive_gpu=False,
@@ -363,6 +418,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "HeidelTimeTemporalPlugin": ResourceRequirement(
             cpu_cores=0.4,
+            cpu_threads=2,
             gpu_count=0,
             memory_mb=256,
             exclusive_gpu=False,
@@ -370,6 +426,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "SUTimeTemporalPlugin": ResourceRequirement(
             cpu_cores=0.4,
+            cpu_threads=2,
             gpu_count=0,
             memory_mb=256,
             exclusive_gpu=False,
@@ -377,6 +434,7 @@ def get_plugin_resource_requirements(plugin_name: str) -> ResourceRequirement:
         ),
         "MergeKeywordsPlugin": ResourceRequirement(
             cpu_cores=0.1,
+            cpu_threads=1,
             gpu_count=0,
             memory_mb=64,
             exclusive_gpu=False,

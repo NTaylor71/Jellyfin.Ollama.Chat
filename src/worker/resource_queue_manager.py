@@ -107,6 +107,7 @@ class ResourceAwareQueueManager:
             "plugin_name": plugin_name,
             "resource_requirements": {
                 "cpu_cores": resource_req.cpu_cores,
+                "cpu_threads": resource_req.cpu_threads,
                 "gpu_count": resource_req.gpu_count,
                 "memory_mb": resource_req.memory_mb,
                 "exclusive_gpu": resource_req.exclusive_gpu,

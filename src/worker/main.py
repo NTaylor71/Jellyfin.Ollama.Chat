@@ -14,6 +14,7 @@ import time
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 from src.shared.config import get_settings
+from src.shared.hardware_config_loader import get_hardware_config_loader
 from src.worker.resource_queue_manager import ResourceAwareQueueManager
 from src.worker.resource_manager import ResourcePool, ResourceRequirement, create_resource_pool_from_config
 from src.worker.plugin_loader import PluginLoader
@@ -38,12 +39,24 @@ class WorkerService:
     def __init__(self):
         self.settings = get_settings()
         
-        # Initialize resource pool from configuration
-        resource_config = {
-            "cpu_cores": getattr(self.settings, "WORKER_CPU_CORES", 3),
-            "gpu_count": getattr(self.settings, "WORKER_GPU_COUNT", 1),
-            "memory_mb": getattr(self.settings, "WORKER_MEMORY_MB", 8192)
-        }
+        # Load hardware configuration from YAML
+        hardware_loader = get_hardware_config_loader()
+        config_name = getattr(self.settings, "HARDWARE_CONFIG", "default")
+        
+        try:
+            resource_config = hardware_loader.get_resource_pool_config(config_name)
+            logger.info(f"Loaded hardware config '{config_name}': {resource_config}")
+        except Exception as e:
+            logger.warning(f"Failed to load hardware config '{config_name}': {e}")
+            logger.warning("Falling back to default configuration")
+            # Fallback to hardcoded defaults
+            resource_config = {
+                "cpu_cores": getattr(self.settings, "WORKER_CPU_CORES", 3),
+                "cpu_threads": getattr(self.settings, "WORKER_CPU_THREADS", 6),
+                "gpu_count": getattr(self.settings, "WORKER_GPU_COUNT", 1),
+                "memory_mb": getattr(self.settings, "WORKER_MEMORY_MB", 8192)
+            }
+        
         self.resource_pool = create_resource_pool_from_config(resource_config, worker_id=f"worker_{id(self)}")
         
         # Use resource-aware queue manager

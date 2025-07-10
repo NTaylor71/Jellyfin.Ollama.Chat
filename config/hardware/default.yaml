@@ -1,0 +1,117 @@
+# Hardware Configuration for Queue Resource Management
+# This file defines available hardware resources and task group configurations
+
+hardware:
+  # CPU Configuration
+  cpu:
+    cores: 24               # Number of physical CPU cores
+    threads: 48             # Number of hardware threads (hyperthreading)
+    max_concurrent_tasks: 8 # Maximum number of CPU tasks that can run simultaneously
+    
+  # GPU Configuration  
+  gpu:
+    count: 1                # Number of GPUs available
+    model: "NVIDIA GeForce RTX 4090"
+    memory_gb: 24           # GPU memory in GB
+    exclusive_mode: true    # GPU tasks run exclusively (no other GPU tasks)
+    
+  # System Memory
+  memory:
+    total_gb: 125.26        # Total system RAM in GB
+    
+  # Storage Configuration
+  storage:
+    type: "ssd"             # Storage type (ssd/hdd)
+    
+# Task Group Definitions
+# Define resource pools for different types of CPU tasks
+task_groups:
+  # Default CPU task group
+  cpu_task:
+    threads: 4              # Threads per task
+    memory_mb: 4096         # Memory per task in MB (4GB)
+    max_instances: 8        # Maximum parallel instances of this task type
+    cpu_cores: 2.0          # CPU cores per task (can be fractional)
+    
+  # Light CPU task group (for quick operations)
+  cpu_task_light:
+    threads: 2
+    memory_mb: 2048         # 2GB
+    max_instances: 16
+    cpu_cores: 1.0
+    
+  # Heavy CPU task group (for intensive processing)
+  cpu_task_heavy:
+    threads: 8
+    memory_mb: 8192         # 8GB
+    max_instances: 4
+    cpu_cores: 4.0
+    
+  # GPU task group
+  gpu_task:
+    threads: 2              # CPU threads for GPU task
+    memory_mb: 4096         # System RAM for GPU task
+    max_instances: 1        # Only 1 GPU task at a time
+    cpu_cores: 1.0
+    gpu_count: 1
+    
+# Resource Allocation Strategy
+allocation:
+  # Strategy for CPU task scheduling
+  cpu_strategy: "balanced"  # Options: balanced, performance, efficiency
+  
+  # Thread oversubscription ratio (1.0 = no oversubscription)
+  thread_oversubscription: 1.0
+  
+  # Memory overcommit ratio (1.0 = no overcommit)
+  memory_overcommit: 0.9    # Use 90% of available memory max
+  
+  # Task priority levels
+  priority_levels:
+    high: 100
+    medium: 50
+    low: 10
+    
+# Plugin Resource Overrides
+# Override default resource requirements for specific plugins
+plugin_overrides:
+  LLMKeywordPlugin:
+    cpu_cores: 1.0
+    cpu_threads: 2
+    memory_mb: 2048
+    gpu_count: 1
+    
+  GensimSimilarityPlugin:
+    cpu_cores: 1.0
+    cpu_threads: 4
+    memory_mb: 2048
+    gpu_count: 0
+    
+  SpacyTemporalPlugin:
+    cpu_cores: 0.5
+    cpu_threads: 2
+    memory_mb: 1024
+    gpu_count: 0
+    
+  ConceptNetKeywordPlugin:
+    cpu_cores: 0.25
+    cpu_threads: 1
+    memory_mb: 512
+    gpu_count: 0
+    
+# Worker Configuration
+worker:
+  # Number of worker processes to spawn
+  count: 1
+  
+  # Worker health check interval (seconds)
+  health_check_interval: 30
+  
+  # Task timeout (seconds)
+  task_timeout: 300
+  
+  # Enable resource monitoring
+  enable_monitoring: true
+  
+  # Prometheus metrics port
+  metrics_port: 8090
