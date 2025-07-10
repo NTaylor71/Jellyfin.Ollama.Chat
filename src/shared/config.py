@@ -231,17 +231,31 @@ class Settings(BaseSettings):
     # MICROSERVICES CONFIGURATION  
     # ==========================================================================
     
-    # LLM Provider Service
+    # Microservice configurations
     LLM_SERVICE_URL: str = Field(default="http://localhost:8002")
     LLM_SERVICE_PORT: int = Field(default=8002)
+    CONCEPTNET_SERVICE_URL: str = Field(default="http://localhost:8001")
+    CONCEPTNET_SERVICE_PORT: int = Field(default=8001)
+    GENSIM_SERVICE_URL: str = Field(default="http://localhost:8006")
+    GENSIM_SERVICE_PORT: int = Field(default=8006)
+    SPACY_SERVICE_URL: str = Field(default="http://localhost:8007")
+    SPACY_SERVICE_PORT: int = Field(default=8007)
+    HEIDELTIME_SERVICE_URL: str = Field(default="http://localhost:8008")
+    HEIDELTIME_SERVICE_PORT: int = Field(default=8008)
     
-    # Plugin Router Service
-    ROUTER_SERVICE_URL: str = Field(default="http://localhost:8003")
-    ROUTER_SERVICE_PORT: int = Field(default=8003)
+    # Service discovery configuration
+    SERVICE_SCAN_START_PORT: int = Field(default=8001)
+    SERVICE_SCAN_END_PORT: int = Field(default=8010)
+    
+    # External services
+    SEARXNG_URL: str = Field(default="http://searxng:8080")
     
     # Docker overrides
     DOCKER_LLM_SERVICE_URL: str = Field(default="http://llm-service:8002")
-    DOCKER_ROUTER_SERVICE_URL: str = Field(default="http://router-service:8003")
+    DOCKER_CONCEPTNET_SERVICE_URL: str = Field(default="http://conceptnet-service:8001")
+    DOCKER_GENSIM_SERVICE_URL: str = Field(default="http://gensim-service:8006")
+    DOCKER_SPACY_SERVICE_URL: str = Field(default="http://spacy-service:8007")
+    DOCKER_HEIDELTIME_SERVICE_URL: str = Field(default="http://heideltime-service:8008")
     
     @property
     def llm_service_url(self) -> str:
@@ -251,11 +265,33 @@ class Settings(BaseSettings):
         return self.LLM_SERVICE_URL
     
     @property
-    def router_service_url(self) -> str:
-        """Get Router service URL based on environment."""
+    def conceptnet_service_url(self) -> str:
+        """Get ConceptNet service URL based on environment."""
         if self.is_docker:
-            return self.DOCKER_ROUTER_SERVICE_URL
-        return self.ROUTER_SERVICE_URL
+            return self.DOCKER_CONCEPTNET_SERVICE_URL
+        return self.CONCEPTNET_SERVICE_URL
+    
+    @property
+    def gensim_service_url(self) -> str:
+        """Get Gensim service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_GENSIM_SERVICE_URL
+        return self.GENSIM_SERVICE_URL
+    
+    @property
+    def spacy_service_url(self) -> str:
+        """Get SpaCy service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_SPACY_SERVICE_URL
+        return self.SPACY_SERVICE_URL
+    
+    @property
+    def heideltime_service_url(self) -> str:
+        """Get HeidelTime service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_HEIDELTIME_SERVICE_URL
+        return self.HEIDELTIME_SERVICE_URL
+    
     
     # ==========================================================================
     # PLUGIN SYSTEM

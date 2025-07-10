@@ -72,7 +72,7 @@ class WorkerService:
     
     async def process_task(self, task_data: Dict[str, Any]) -> None:
         """
-        Process a single task from the queue using plugin-based routing with resource management.
+        Process a single task from the queue using direct plugin execution with resource management.
         
         Args:
             task_data: Task data from queue

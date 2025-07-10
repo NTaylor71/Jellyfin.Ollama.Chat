@@ -120,32 +120,39 @@ def get_service_endpoints():
     
     endpoints = {}
     
-    # Split architecture service endpoints (default configuration)
-    split_service_defaults = {
-        "conceptnet-service": "http://conceptnet-service:8001",
-        "gensim-service": "http://gensim-service:8006", 
-        "spacy-service": "http://spacy-service:8007",
-        "heideltime-service": "http://heideltime-service:8008"
-    }
-    
-    # Environment variables for split services (optional override)
-    split_service_env_vars = {
-        "conceptnet-service": "CONCEPTNET_SERVICE_URL",
-        "gensim-service": "GENSIM_SERVICE_URL", 
-        "spacy-service": "SPACY_SERVICE_URL",
-        "heideltime-service": "HEIDELTIME_SERVICE_URL"
-    }
-    
-    # Use split architecture services
-    for service_name, default_url in split_service_defaults.items():
-        # Check for environment variable override, otherwise use default
-        env_var = split_service_env_vars[service_name]
-        service_url = os.getenv(env_var, default_url)
-        endpoints[service_name] = service_url
-        logger.info(f"Split service: {service_name} -> {service_url}")
-    
-    # Always include LLM service
-    endpoints["llm-service"] = "http://llm-service:8002"
+    # Use dynamic service discovery instead of hard-coded endpoints
+    try:
+        from src.shared.dynamic_service_discovery import get_service_discovery
+        import asyncio
+        
+        # Get or create event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Discover services dynamically
+        async def discover_endpoints():
+            discovery = await get_service_discovery()
+            discovered = await discovery.discover_all_services()
+            return {name: info.base_url for name, info in discovered.items()}
+        
+        if loop.is_running():
+            # If in async context, use the services directly
+            logger.info("Using dynamic service discovery")
+        else:
+            # If not in async context, run discovery
+            dynamic_endpoints = loop.run_until_complete(discover_endpoints())
+            endpoints.update(dynamic_endpoints)
+            logger.info(f"Dynamically discovered services: {list(dynamic_endpoints.keys())}")
+            
+    except Exception as e:
+        logger.warning(f"Dynamic service discovery failed: {e}")
+        
+        # No fallback - fail gracefully if discovery fails
+        logger.error("Service discovery failed and no fallback configured")
+        logger.error("Services will be discovered on-demand when accessed")
     
     return endpoints
 

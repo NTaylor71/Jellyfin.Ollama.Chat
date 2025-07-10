@@ -74,7 +74,7 @@ class ConceptNetKeywordPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Expanding {len(keywords)} keywords using ConceptNet")
             
-            # Call ConceptNet provider using configuration-driven routing
+            # Call ConceptNet service using direct HTTPBasePlugin routing
             service_url = self.get_plugin_service_url()
             
             # ConceptNet provider expects single concept string, not keywords array

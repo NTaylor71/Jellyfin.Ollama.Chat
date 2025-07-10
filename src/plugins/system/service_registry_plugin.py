@@ -167,42 +167,34 @@ class ServiceRegistryPlugin(BasePlugin):
             )
     
     async def _register_default_services(self):
-        """Register default known services."""
-        settings = get_settings()
+        """Register services discovered dynamically from health endpoints."""
+        from src.shared.dynamic_service_discovery import get_service_discovery
         
-        # Split NLP Provider Services  
-        split_services = [
-            ("conceptnet_provider", "http://conceptnet-service:8001", ["concept_expansion"]),
-            ("gensim_provider", "http://gensim-service:8006", ["gensim_similarity"]),
-            ("spacy_provider", "http://spacy-service:8007", ["spacy_temporal"]),
-            ("heideltime_provider", "http://heideltime-service:8008", ["heideltime_temporal"])
-        ]
-        
-        for service_name, service_url, capabilities in split_services:
-            self.services[service_name] = ServiceInfo(
-                name=service_name,
-                url=service_url,
-                service_type="nlp",
-                capabilities=capabilities
-            )
-        
-        # LLM Provider Service
-        self.services["llm_provider"] = ServiceInfo(
-            name="llm_provider",
-            url=settings.llm_service_url,
-            service_type="llm",
-            capabilities=["concept_expansion", "semantic_understanding", "question_expansion"]
-        )
-        
-        # Plugin Router Service
-        self.services["plugin_router"] = ServiceInfo(
-            name="plugin_router",
-            url=settings.router_service_url,
-            service_type="router",
-            capabilities=["plugin_routing", "service_orchestration"]
-        )
-        
-        logger.info(f"Registered {len(self.services)} default services")
+        try:
+            # Use dynamic service discovery instead of hard-coded registration
+            discovery = await get_service_discovery()
+            discovered_services = await discovery.discover_all_services()
+            
+            # Convert discovered services to ServiceInfo format
+            for service_name, capability_info in discovered_services.items():
+                self.services[service_name] = ServiceInfo(
+                    name=service_name,
+                    url=capability_info.base_url,
+                    service_type=capability_info.service_type,
+                    capabilities=capability_info.capabilities
+                )
+                
+                # Update status from discovery
+                self.services[service_name].status = capability_info.status
+                self.services[service_name].last_health_check = capability_info.last_discovery
+                self.services[service_name].metadata = capability_info.metadata
+            
+            logger.info(f"Dynamically registered {len(self.services)} services via discovery")
+            
+        except Exception as e:
+            logger.error(f"Dynamic service registration failed: {e}")
+            # Fallback to empty registry rather than hard-coded values
+            logger.warning("Operating with empty service registry - services will be discovered on demand")
     
     async def _health_monitor_loop(self):
         """Background task for continuous health monitoring."""
@@ -361,7 +353,7 @@ class ServiceRegistryPlugin(BasePlugin):
     
     def get_best_service_for_plugin(self, plugin_name: str, plugin_type: str) -> Optional[ServiceInfo]:
         """Get the best service for executing a specific plugin."""
-        # Plugin-specific routing logic
+        # Legacy fallback - plugins now route themselves via HTTPBasePlugin
         if plugin_type in ["concept_expansion", "temporal_analysis"]:
             return self.get_service_by_capability("concept_expansion")
         elif plugin_type in ["query_processing", "llm_concept"]:

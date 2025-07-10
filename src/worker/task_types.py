@@ -1,8 +1,8 @@
 """
 Task Types - Definitions for all supported task types in the queue system.
 
-Provides standardized task type definitions and routing information
-for the worker's plugin dispatcher.
+Provides standardized task type definitions for the worker's
+direct plugin execution system.
 """
 
 from enum import Enum
@@ -37,7 +37,7 @@ class TaskType(str, Enum):
 
 @dataclass
 class TaskDefinition:
-    """Definition of a task type with routing information."""
+    """Definition of a task type for direct plugin execution."""
     
     task_type: TaskType
     plugin_name: str
@@ -54,7 +54,7 @@ class TaskDefinition:
             self.optional_fields = []
 
 
-# Task type definitions with routing information
+# Task type definitions for direct plugin execution
 TASK_DEFINITIONS: Dict[TaskType, TaskDefinition] = {
     
     TaskType.PLUGIN_EXECUTION: TaskDefinition(

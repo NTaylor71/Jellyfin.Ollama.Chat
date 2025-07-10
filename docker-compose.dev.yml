@@ -407,43 +407,6 @@ services:
         max-file: "3"
 
 
-  router-service:
-    build:
-      context: .
-      dockerfile: docker/services/Dockerfile.router
-    image: jelly-router-service
-    container_name: rag-router-service
-    restart: unless-stopped
-    ports:
-      - "8003:8003"
-    volumes:
-      - ./src:/app/src:ro  # Hot reload
-      - ./logs:/app/logs
-      - ./.env:/app/.env:ro
-    environment:
-      - ENV=docker
-      - LOG_LEVEL=DEBUG
-      - LLM_SERVICE_URL=http://llm-service:8002
-      # Split service endpoints
-      - CONCEPTNET_SERVICE_URL=http://conceptnet-service:8001
-      - GENSIM_SERVICE_URL=http://gensim-service:8006
-      - SPACY_SERVICE_URL=http://spacy-service:8007
-      - HEIDELTIME_SERVICE_URL=http://heideltime-service:8008
-    networks:
-      - rag-network
-    depends_on:
-      model-manager:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health/ready"]
-      interval: 15s
-      timeout: 10s
-      start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 
   # ===========================================================================
@@ -508,6 +471,7 @@ services:
       - "8004:8004"  # Metrics endpoint
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Plugin routing config
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
     environment:
@@ -517,7 +481,6 @@ services:
       - LOG_LEVEL=DEBUG
       - OLLAMA_CHAT_BASE_URL=http://ollama:11434
       - CONTAINER_TYPE=worker
-      - ROUTER_SERVICE_URL=http://router-service:8003
     networks:
       - rag-network
     depends_on:
@@ -526,8 +489,6 @@ services:
       mongodb:
         condition: service_healthy
       ollama:
-        condition: service_healthy
-      router-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/metrics"]
@@ -605,6 +566,39 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ===========================================================================
+  # WEB SEARCH SERVICE
+  # ===========================================================================
+
+  searxng:
+    build:
+      context: .
+      dockerfile: docker/searxng/Dockerfile
+    image: jelly-searxng
+    container_name: rag-searxng
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_SECRET=your-secret-key-change-in-production
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles:
+      - search  # Only start with --profile search
 
   # ===========================================================================
   # FUTURE SERVICES

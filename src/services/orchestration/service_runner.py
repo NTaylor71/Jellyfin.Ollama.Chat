@@ -128,12 +128,22 @@ class ServiceRunner:
         """Configure all services."""
         logger.info("Configuring services...")
         
-        # Split NLP Provider Services
+        # Split NLP Provider Services - ports from environment or defaults
+        import os
+        
+        # Use centralized configuration
+        from src.shared.config import get_settings
+        settings = get_settings()
+        
         split_services = [
-            ("conceptnet_provider", "ConceptNet Service", "src.services.provider_services.conceptnet_service", 8001),
-            ("gensim_provider", "Gensim Service", "src.services.provider_services.gensim_service", 8006),
-            ("spacy_provider", "SpaCy Service", "src.services.provider_services.spacy_service", 8007),
-            ("heideltime_provider", "HeidelTime Service", "src.services.provider_services.heideltime_service", 8008)
+            ("conceptnet_provider", "ConceptNet Service", "src.services.provider_services.conceptnet_service", 
+             settings.CONCEPTNET_SERVICE_PORT),
+            ("gensim_provider", "Gensim Service", "src.services.provider_services.gensim_service", 
+             settings.GENSIM_SERVICE_PORT),
+            ("spacy_provider", "SpaCy Service", "src.services.provider_services.spacy_service", 
+             settings.SPACY_SERVICE_PORT),
+            ("heideltime_provider", "HeidelTime Service", "src.services.provider_services.heideltime_service", 
+             settings.HEIDELTIME_SERVICE_PORT)
         ]
         
         for service_key, service_name, module_name, port in split_services:
@@ -152,13 +162,6 @@ class ServiceRunner:
             env={"PORT": "8002"}
         )
         
-        # Plugin Router Service
-        self.services["plugin_router"] = ServiceProcess(
-            name="Plugin Router Service",
-            module="src.services.orchestration.plugin_router_service",
-            port=8003,
-            env={"PORT": "8003"}
-        )
         
         logger.info(f"Configured {len(self.services)} services")
     

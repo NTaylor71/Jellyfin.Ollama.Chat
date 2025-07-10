@@ -43,7 +43,6 @@ class MicroservicesValidator:
         await self._test("SpaCy Service", self._test_spacy_service)
         await self._test("HeidelTime Service", self._test_heideltime_service)
         await self._test("LLM Service", self._test_llm_service)
-        await self._test("Router Service", self._test_router_service)
         
         # Provider tests
         await self._test("Gensim Provider", self._test_gensim_provider)
@@ -52,8 +51,8 @@ class MicroservicesValidator:
         await self._test("Ollama LLM Provider", self._test_ollama_provider)
         
         # Routing tests
-        await self._test("ConceptExpansion Routing", self._test_concept_expansion_routing)
-        await self._test("QuestionExpansion Routing", self._test_question_expansion_routing)
+        await self._test("ConceptExpansion Direct", self._test_concept_expansion_direct)
+        await self._test("QuestionExpansion Direct", self._test_question_expansion_direct)
         
         # Queue tests
         await self._test("Queue Submission", self._test_queue_submission)
@@ -196,30 +195,6 @@ class MicroservicesValidator:
         
         return {"status": "healthy", "model": "llama3.2:3b"}
     
-    async def _test_router_service(self) -> Dict[str, Any]:
-        """Test router service health and discovery."""
-        response = await self.client.get("http://localhost:8003/health")
-        if response.status_code != 200:
-            raise Exception(f"Health check failed: {response.status_code}")
-        
-        health_data = response.json()
-        if health_data.get("status") != "healthy":
-            raise Exception(f"Service unhealthy: {health_data}")
-        
-        # Check service discovery
-        response = await self.client.get("http://localhost:8003/services")
-        if response.status_code != 200:
-            raise Exception(f"Services endpoint failed: {response.status_code}")
-        
-        services_data = response.json()
-        services = services_data.get("services", {})
-        
-        expected_services = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider"]
-        for service in expected_services:
-            if service not in services:
-                raise Exception(f"Missing service: {service}")
-        
-        return {"status": "healthy", "services": len(services)}
     
     async def _test_gensim_provider(self) -> Dict[str, Any]:
         """Test Gensim provider through dedicated Gensim service."""
@@ -331,8 +306,8 @@ class MicroservicesValidator:
         
         return {"concepts": concepts[:3], "model": "llama3.2:3b"}
     
-    async def _test_concept_expansion_routing(self) -> Dict[str, Any]:
-        """Test ConceptExpansion plugin routing through router service."""
+    async def _test_concept_expansion_direct(self) -> Dict[str, Any]:
+        """Test ConceptExpansion plugin using direct service routing."""
         request_data = {
             "plugin_name": "ConceptExpansionPlugin",
             "plugin_type": "concept_expansion",
@@ -375,8 +350,8 @@ class MicroservicesValidator:
             "execution_time": data.get("execution_time_ms", 0)
         }
     
-    async def _test_question_expansion_routing(self) -> Dict[str, Any]:
-        """Test QuestionExpansion plugin routing through router service."""
+    async def _test_question_expansion_direct(self) -> Dict[str, Any]:
+        """Test QuestionExpansion plugin using direct service routing."""
         request_data = {
             "plugin_name": "QuestionExpansionPlugin",
             "plugin_type": "query_processing",

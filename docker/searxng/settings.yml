@@ -1,0 +1,119 @@
+# SearXNG Configuration for Media Search
+use_default_settings: true
+
+general:
+  instance_name: "Media Search Engine"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "change-this-secret-key-in-production"
+  limiter: false
+  public_instance: false
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  default_locale: en
+  theme_args:
+    simple_style: auto
+
+# Enable specific engines for movie/media search
+engines:
+  - name: bing
+    engine: bing
+    shortcut: bi
+    categories: [general, web]
+    disabled: false
+
+  - name: google
+    engine: google
+    shortcut: go
+    categories: [general, web]
+    disabled: false
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    categories: [general, web]
+    disabled: false
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    categories: [general]
+    disabled: false
+
+# Disable engines we don't need
+  - name: ahmia
+    disabled: true
+  - name: archive is
+    disabled: true
+  - name: arxiv
+    disabled: true
+  - name: bandcamp
+    disabled: true
+  - name: bitbucket
+    disabled: true
+  - name: btdigg
+    disabled: true
+  - name: currency
+    disabled: true
+  - name: deviantart
+    disabled: true
+  - name: digg
+    disabled: true
+  - name: flickr
+    disabled: true
+  - name: github
+    disabled: true
+  - name: gitlab
+    disabled: true
+  - name: google images
+    disabled: true
+  - name: google news
+    disabled: true
+  - name: google scholar
+    disabled: true
+  - name: google videos
+    disabled: true
+  - name: invidious
+    disabled: true
+  - name: openstreetmap
+    disabled: true
+  - name: pdbe
+    disabled: true
+  - name: piratebay
+    disabled: true
+  - name: pubmed
+    disabled: true
+  - name: qwant
+    disabled: true
+  - name: reddit
+    disabled: true
+  - name: soundcloud
+    disabled: true
+  - name: stackoverflow
+    disabled: true
+  - name: startpage
+    disabled: true
+  - name: twitter
+    disabled: true
+  - name: yahoo
+    disabled: true
+  - name: yahoo news
+    disabled: true
+  - name: youtube
+    disabled: true

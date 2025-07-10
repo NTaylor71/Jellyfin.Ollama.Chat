@@ -376,7 +376,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.services.provider_services.heideltime_service:app",
         host="0.0.0.0",
-        port=8008,
+        port=settings.HEIDELTIME_SERVICE_PORT,
         reload=False,
         log_level=settings.LOG_LEVEL.lower()
     )

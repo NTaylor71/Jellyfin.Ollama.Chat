@@ -7,6 +7,7 @@ making it the lightest service in the NLP provider ecosystem.
 
 import asyncio
 import logging
+import os
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
@@ -334,7 +335,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.services.provider_services.conceptnet_service:app",
         host="0.0.0.0",
-        port=8001,
+        port=settings.CONCEPTNET_SERVICE_PORT,
         reload=False,
         log_level=settings.LOG_LEVEL.lower()
     )

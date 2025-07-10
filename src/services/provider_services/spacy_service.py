@@ -7,6 +7,7 @@ capabilities for entity extraction and temporal intelligence.
 
 import asyncio
 import logging
+import os
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
@@ -143,10 +144,16 @@ class SpacyProviderManager(BaseService):
     async def check_models_ready(self) -> bool:
         """Check if all required models are available."""
         try:
-            # Call our own models status endpoint
+            # Call our own models status endpoint using environment-aware URL
             import httpx
+            from src.shared.config import get_settings
+            settings = get_settings()
+            
+            # Use centralized service URL configuration
+            our_url = settings.spacy_service_url
+            
             async with httpx.AsyncClient() as client:
-                response = await client.get("http://localhost:8007/models/status")
+                response = await client.get(f"{our_url}/models/status")
                 if response.status_code == 200:
                     status_data = response.json()
                     missing_required = status_data.get("summary", {}).get("missing_required", 0)
@@ -514,7 +521,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.services.provider_services.spacy_service:app",
         host="0.0.0.0",
-        port=8007,
+        port=settings.SPACY_SERVICE_PORT,
         reload=False,
         log_level=settings.LOG_LEVEL.lower()
     )

@@ -147,23 +147,33 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
         
         endpoints = []
         
-        # Core application services - Split architecture
-        split_services = [
-            ("conceptnet_service", "http://conceptnet-service:8001"),
-            ("gensim_service", "http://gensim-service:8006"),
-            ("spacy_service", "http://spacy-service:8007"),
-            ("heideltime_service", "http://heideltime-service:8008")
-        ]
-        
-        for service_name, service_url in split_services:
-            endpoints.append(ServiceEndpoint(
-                name=service_name,
-                url=service_url,
-                timeout_seconds=10.0,
-                retry_attempts=1,
-                health_check_path="/health",
-                circuit_breaker_enabled=False  # Monitor only, don't circuit break
-            ))
+        # Use dynamic service discovery instead of hard-coded services
+        try:
+            from src.shared.dynamic_service_discovery import get_service_discovery
+            import asyncio
+            
+            # Discover services dynamically
+            loop = asyncio.get_event_loop()
+            if not loop.is_running():
+                discovery = loop.run_until_complete(get_service_discovery())
+                discovered_services = loop.run_until_complete(discovery.discover_all_services())
+                
+                for service_name, service_info in discovered_services.items():
+                    if service_info.is_healthy():
+                        endpoints.append(ServiceEndpoint(
+                            name=service_name,
+                            url=service_info.base_url,
+                            timeout_seconds=10.0,
+                            retry_attempts=1,
+                            health_check_path="/health",
+                            circuit_breaker_enabled=False
+                        ))
+            else:
+                logger.warning("Cannot discover services synchronously in async context")
+                
+        except Exception as e:
+            logger.error(f"Dynamic service discovery failed in health monitor: {e}")
+            # No fallback - services will be discovered when needed
         
         if settings.llm_service_url:
             endpoints.append(ServiceEndpoint(
@@ -175,15 +185,6 @@ class ServiceHealthMonitorPlugin(HTTPProviderPlugin):
                 circuit_breaker_enabled=False
             ))
         
-        if settings.router_service_url:
-            endpoints.append(ServiceEndpoint(
-                name="router_service",
-                url=settings.router_service_url,
-                timeout_seconds=5.0,
-                retry_attempts=1,
-                health_check_path="/health",
-                circuit_breaker_enabled=False
-            ))
         
         # Infrastructure services
         endpoints.append(ServiceEndpoint(

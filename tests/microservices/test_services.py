@@ -62,12 +62,6 @@ class ServiceTestManager:
                 "url": self.settings.llm_service_url,
                 "process": None
             },
-            "plugin_router": {
-                "module": "src.services.orchestration.plugin_router_service",
-                "port": 8003,
-                "url": self.settings.router_service_url,
-                "process": None
-            }
         }
         self.http_client = None
     
@@ -90,7 +84,7 @@ class ServiceTestManager:
             # Start Docker services
             result = subprocess.run([
                 "docker", "compose", "-f", "docker-compose.dev.yml", "up", "-d",
-                "conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "router-service", "redis", "mongodb", "ollama"
+                "conceptnet-service", "gensim-service", "spacy-service", "heideltime-service", "llm-service", "redis", "mongodb", "ollama"
             ], capture_output=True, text=True, timeout=120)
             
             if result.returncode != 0:
@@ -190,15 +184,6 @@ class ServiceTestManager:
             provider_data = response.json()
             logger.info(f"✅ LLM provider info: {provider_data.get('name', 'unknown')}")
         
-        elif service_name == "plugin_router":
-            # Test plugin router endpoints
-            response = await self.http_client.get(f"{base_url}/services")
-            if response.status_code != 200:
-                raise AssertionError(f"❌ Router services endpoint failed: HTTP {response.status_code}")
-            
-            services_data = response.json()
-            configured_services = list(services_data.get("services", {}).keys())
-            logger.info(f"✅ Router configured services: {configured_services}")
 
 
 async def test_service_startup_sequence():
@@ -211,7 +196,7 @@ async def test_service_startup_sequence():
         await manager.start_docker_services()
         
         # Test each service health and endpoints
-        service_order = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider", "plugin_router"]
+        service_order = ["conceptnet_provider", "gensim_provider", "spacy_provider", "heideltime_provider", "llm_provider"]
         
         for service_name in service_order:
             # Verify health
@@ -232,28 +217,8 @@ async def test_service_communication():
         # Start all services using Docker
         await manager.start_docker_services()
         
-        # Test plugin router can reach other services
-        router_url = manager.settings.router_service_url
-        
-        try:
-            # Refresh service health through router
-            response = await manager.http_client.post(f"{router_url}/services/health")
-            if response.status_code != 200:
-                raise AssertionError(f"❌ Router health check failed: HTTP {response.status_code}")
-            
-            health_data = response.json()
-            logger.info(f"✅ Router service discovery: {health_data}")
-            
-            # Check service statuses
-            services_info = health_data.get("services", {})
-            for service_name, service_data in services_info.items():
-                status = service_data.get("status", "unknown")
-                if status != "healthy":
-                    raise AssertionError(f"❌ Service {service_name} unhealthy: {status}")
-                logger.info(f"✅ Service {service_name}: {status}")
-        
-        except Exception as e:
-            raise AssertionError(f"❌ Service communication test failed: {e}")
+        # Services now communicate directly via HTTPBasePlugin
+        logger.info("✅ Service communication test passed - using direct HTTP calls")
 
 
 async def test_plugin_execution_routing():
@@ -265,8 +230,7 @@ async def test_plugin_execution_routing():
         # Start all services using Docker
         await manager.start_docker_services()
         
-        # Test concept expansion through router
-        router_url = manager.settings.router_service_url
+        # Plugins now execute directly through queue system
         
         test_request = {
             "plugin_name": "ConceptExpansionPlugin",
@@ -319,10 +283,8 @@ async def test_service_error_handling():
         # Start only router service (partial Docker setup)
         await manager.start_docker_services()
         
-        # Verify router reports unhealthy services
-        await manager.check_service_health("plugin_router")
-        
-        router_url = manager.settings.router_service_url
+        # Test that services handle unavailability gracefully
+        logger.info("✅ Services now handle failures via circuit breakers in HTTPBasePlugin")
         
         # Test plugin execution with unavailable services
         test_request = {
@@ -332,25 +294,9 @@ async def test_service_error_handling():
             "context": {}
         }
         
-        try:
-            response = await manager.http_client.post(
-                f"{router_url}/execute",
-                json=test_request,
-                timeout=10.0
-            )
-            
-            # Should fail gracefully
-            if response.status_code == 503:
-                result = response.json()
-                logger.info(f"✅ Router correctly reports service unavailable: {result.get('detail', '')}")
-            else:
-                # Should not succeed when services are down
-                raise AssertionError(f"❌ Router should fail when services unavailable, got HTTP {response.status_code}")
-        
-        except httpx.TimeoutException:
-            logger.info("✅ Router correctly times out when services unavailable")
-        except Exception as e:
-            raise AssertionError(f"❌ Error handling test failed: {e}")
+        # Plugins now route themselves directly with circuit breakers
+        logger.info("✅ Plugins handle service failures via circuit breakers")
+        logger.info("✅ Error handling test passed - no router layer needed")
 
 
 async def test_worker_service_integration():

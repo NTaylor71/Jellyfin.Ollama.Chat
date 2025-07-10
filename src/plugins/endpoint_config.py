@@ -31,10 +31,7 @@ class DefaultRouting(BaseModel):
 class ServiceEndpointConfig(BasePluginConfig):
     """Configuration for service endpoint mapping."""
     
-    conceptnet_endpoints: Dict[str, str] = Field(default_factory=dict, description="ConceptNet service endpoint mappings")
-    gensim_endpoints: Dict[str, str] = Field(default_factory=dict, description="Gensim service endpoint mappings")
-    spacy_endpoints: Dict[str, str] = Field(default_factory=dict, description="SpaCy service endpoint mappings")
-    heideltime_endpoints: Dict[str, str] = Field(default_factory=dict, description="HeidelTime service endpoint mappings")
+    nlp_endpoints: Dict[str, str] = Field(default_factory=dict, description="Combined NLP service endpoint mappings")
     llm_endpoints: Dict[str, str] = Field(default_factory=dict, description="LLM service endpoint mappings")
     routing_patterns: List[RoutingPattern] = Field(default_factory=list, description="Pattern-based routing rules")
     default_routing: Optional[DefaultRouting] = Field(default=None, description="Default routing fallback")
@@ -68,8 +65,16 @@ class ServiceEndpointMapper:
             default_data = config_data.get('plugin_routing', {}).get('default', {})
             default_routing = DefaultRouting(**default_data) if default_data else None
             
+            # Merge all NLP endpoints from individual service sections
+            nlp_endpoints = {}
+            nlp_endpoints.update(config_data.get('conceptnet_endpoints', {}))
+            nlp_endpoints.update(config_data.get('gensim_endpoints', {}))
+            nlp_endpoints.update(config_data.get('spacy_endpoints', {}))
+            nlp_endpoints.update(config_data.get('heideltime_endpoints', {}))
+            nlp_endpoints.update(config_data.get('sutime_endpoints', {}))
+            
             self.config = ServiceEndpointConfig(
-                nlp_endpoints=config_data.get('nlp_endpoints', {}),
+                nlp_endpoints=nlp_endpoints,
                 llm_endpoints=config_data.get('llm_endpoints', {}),
                 routing_patterns=patterns,
                 default_routing=default_routing
@@ -87,31 +92,21 @@ class ServiceEndpointMapper:
             return False
     
     def _load_default_config(self):
-        """Load fallback configuration if file loading fails."""
-        logger.info("Loading default service endpoint configuration")
+        """Load minimal fallback configuration - no hard-coded endpoints."""
+        logger.warning("Loading minimal fallback configuration - endpoints will be discovered dynamically")
         
         self.config = ServiceEndpointConfig(
-            nlp_endpoints={
-                "conceptnet": "providers/conceptnet/expand",
-                "gensim": "providers/gensim/similarity", 
-                "spacy_temporal": "providers/spacy_temporal/expand",
-                "heideltime": "providers/heideltime/expand",
-                "sutime": "providers/sutime/expand"
-            },
-            llm_endpoints={
-                "keywords": "providers/llm/keywords/expand",
-                "general": "providers/llm/expand"
-            },
+            nlp_endpoints={},  # Empty - will be discovered
+            llm_endpoints={},  # Empty - will be discovered
             routing_patterns=[
-                RoutingPattern(pattern="conceptnet", service="conceptnet", endpoint="conceptnet"),
-                RoutingPattern(pattern="gensim", service="gensim", endpoint="gensim"),
-                RoutingPattern(pattern="spacy", service="spacy", endpoint="spacy_temporal"),
-                RoutingPattern(pattern="heideltime", service="heideltime", endpoint="heideltime"),
-                RoutingPattern(pattern="sutime", service="sutime", endpoint="sutime"),
-                RoutingPattern(pattern="llm.*keyword", service="llm", endpoint="keywords"),
-                RoutingPattern(pattern="llm", service="llm", endpoint="general"),
+                # Pattern matching only - no hard-coded endpoints
+                RoutingPattern(pattern="conceptnet", service="conceptnet", endpoint=""),
+                RoutingPattern(pattern="gensim", service="gensim", endpoint=""),
+                RoutingPattern(pattern="spacy", service="spacy", endpoint=""),
+                RoutingPattern(pattern="heideltime", service="heideltime", endpoint=""),
+                RoutingPattern(pattern="llm", service="llm", endpoint=""),
             ],
-            default_routing=DefaultRouting(service="conceptnet", endpoint="conceptnet")
+            default_routing=DefaultRouting(service="", endpoint="")  # Empty - will be discovered
         )
         
         self._compile_patterns()
@@ -130,9 +125,9 @@ class ServiceEndpointMapper:
             except re.error as e:
                 logger.warning(f"Invalid regex pattern '{pattern.pattern}': {e}")
     
-    def get_service_and_endpoint(self, plugin_name: str) -> Tuple[str, str]:
+    async def get_service_and_endpoint(self, plugin_name: str) -> Tuple[str, str]:
         """
-        Get service name and endpoint path for a plugin.
+        Get service name and endpoint path for a plugin using dynamic discovery.
         
         Args:
             plugin_name: Name of the plugin
@@ -140,6 +135,22 @@ class ServiceEndpointMapper:
         Returns:
             Tuple of (service_name, endpoint_path)
         """
+        # Try dynamic service discovery first
+        try:
+            from src.shared.dynamic_service_discovery import get_service_discovery
+            discovery = await get_service_discovery()
+            service_info = await discovery.get_service_for_plugin(plugin_name)
+            
+            if service_info and service_info.is_healthy():
+                # Derive endpoint from plugin name and service capabilities
+                endpoint_path = self._derive_endpoint_from_plugin(plugin_name, service_info)
+                logger.debug(f"Dynamic routing: plugin '{plugin_name}' -> {service_info.service_name}/{endpoint_path}")
+                return service_info.service_name, endpoint_path
+        
+        except Exception as e:
+            logger.warning(f"Dynamic routing failed for '{plugin_name}': {e}")
+        
+        # Fallback to pattern matching
         if not self.config:
             self.load_config()
         
@@ -147,7 +158,7 @@ class ServiceEndpointMapper:
         for compiled_pattern, service, endpoint_key in self._compiled_patterns:
             if compiled_pattern.search(plugin_name):
                 endpoint_path = self._get_endpoint_path(service, endpoint_key)
-                logger.debug(f"Matched plugin '{plugin_name}' to {service}/{endpoint_path}")
+                logger.debug(f"Pattern matched plugin '{plugin_name}' to {service}/{endpoint_path}")
                 return service, endpoint_path
         
         # Fall back to default
@@ -158,9 +169,39 @@ class ServiceEndpointMapper:
             logger.debug(f"Using default routing for plugin '{plugin_name}': {service}/{endpoint_path}")
             return service, endpoint_path
         
-        # Ultimate fallback
-        logger.warning(f"No routing found for plugin '{plugin_name}', using hardcoded fallback")
-        return "conceptnet", "providers/conceptnet/expand"
+        # Ultimate fallback - use dynamic discovery
+        logger.warning(f"No routing found for plugin '{plugin_name}', attempting dynamic discovery")
+        try:
+            from src.shared.dynamic_service_discovery import get_service_discovery
+            discovery = await get_service_discovery()
+            service_info = await discovery.get_service_for_plugin(plugin_name)
+            if service_info:
+                endpoint = await discovery.get_endpoint_for_plugin(plugin_name)
+                return service_info.service_name, endpoint or ""
+        except Exception as e:
+            logger.error(f"Dynamic fallback failed for '{plugin_name}': {e}")
+        
+        # Final fallback - return empty to let service handle
+        logger.error(f"All routing methods failed for plugin '{plugin_name}'")
+        return "", ""
+    
+    async def _derive_endpoint_from_plugin(self, plugin_name: str, service_info) -> str:
+        """Derive endpoint path from plugin name by discovering available endpoints."""
+        try:
+            from src.shared.dynamic_service_discovery import get_service_discovery
+            discovery = await get_service_discovery()
+            
+            # Get the actual endpoint from service discovery
+            endpoint = await discovery.get_endpoint_for_plugin(plugin_name)
+            if endpoint:
+                return endpoint
+                
+        except Exception as e:
+            logger.warning(f"Failed to discover endpoint for {plugin_name}: {e}")
+        
+        # Fallback: return empty string to let service handle routing
+        logger.warning(f"No endpoint discovered for plugin '{plugin_name}', using service default")
+        return ""
     
     def _get_endpoint_path(self, service: str, endpoint_key: str) -> str:
         """Get the actual endpoint path for a service and endpoint key."""

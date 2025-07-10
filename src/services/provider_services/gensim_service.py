@@ -7,6 +7,7 @@ for semantic similarity and concept expansion.
 
 import asyncio
 import logging
+import os
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
@@ -169,7 +170,13 @@ class GensimProviderManager(BaseService):
             # Call our own models status endpoint
             import httpx
             async with httpx.AsyncClient() as client:
-                response = await client.get("http://localhost:8006/models/status")
+                # Use centralized service URL configuration
+                from src.shared.config import get_settings
+                settings = get_settings()
+                
+                our_url = settings.gensim_service_url
+                
+                response = await client.get(f"{our_url}/models/status")
                 if response.status_code == 200:
                     status_data = response.json()
                     missing_required = status_data.get("summary", {}).get("missing_required", 0)
@@ -647,7 +654,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "src.services.provider_services.gensim_service:app",
         host="0.0.0.0",
-        port=8006,
+        port=settings.GENSIM_SERVICE_PORT,
         reload=False,
         log_level=settings.LOG_LEVEL.lower()
     )

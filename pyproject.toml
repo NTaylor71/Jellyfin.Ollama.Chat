@@ -92,6 +92,12 @@ heideltime = [
     "py-heideltime"
 ]
 
+# Web search - dependencies for LLM web search functionality
+websearch = [
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0"
+]
+
 # MongoDB - document storage and data pipeline
 mongodb = [
     "motor>=3.3.0",
@@ -100,7 +106,7 @@ mongodb = [
 
 # Microservice-specific dependency groups
 llm = [
-    "production-rag-system[api,ollama,monitoring]"
+    "production-rag-system[api,ollama,monitoring,websearch]"
 ]
 
 router = [

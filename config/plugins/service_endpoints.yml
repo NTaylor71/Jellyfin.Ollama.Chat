@@ -17,10 +17,15 @@ spacy_endpoints:
 heideltime_endpoints:
   heideltime: "providers/heideltime/expand"
 
+# SUTime Service Endpoints (sutime-service:8009)
+sutime_endpoints:
+  sutime: "providers/sutime/expand"
+
 # LLM Service Endpoints (llm-service:8002)
 llm_endpoints:
   keywords: "providers/llm/keywords/expand"
   general: "providers/llm/expand"
+  websearch: "providers/llm/websearch/full"
 
 # Plugin to Service Mapping Rules (Split Architecture)
 plugin_routing:
@@ -38,6 +43,12 @@ plugin_routing:
     - pattern: "heideltime"
       service: "heideltime"
       endpoint: "heideltime"
+    - pattern: "sutime"
+      service: "sutime"
+      endpoint: "sutime"
+    - pattern: "llm.*websearch"
+      service: "llm"
+      endpoint: "websearch"
     - pattern: "llm.*keyword"
       service: "llm"
       endpoint: "keywords"

@@ -262,7 +262,6 @@ class HTTPBasePlugin(BasePlugin):
             "spacy_service",       # Port 8007: SpaCy NLP
             "heideltime_service",  # Port 8008: HeidelTime temporal
             "llm_service",         # Port 8002: LLM/Ollama operations  
-            "router_service"       # Port 8003: Plugin coordination
         ]
         
         for service_name in services:
@@ -324,23 +323,25 @@ class HTTPBasePlugin(BasePlugin):
     
     def _extract_service_name(self, url: str) -> str:
         """Extract service name from URL for circuit breaker tracking."""
-        # Map ports to correct services based on docker-compose.dev.yml
-        if ":8001" in url or "conceptnet" in url:
-            return "conceptnet_service"  # Port 8001: ConceptNet Service
-        elif ":8006" in url or "gensim" in url:
-            return "gensim_service"      # Port 8006: Gensim Service
-        elif ":8007" in url or "spacy" in url:
-            return "spacy_service"       # Port 8007: SpaCy Service
-        elif ":8008" in url or "heideltime" in url:
-            return "heideltime_service"  # Port 8008: HeidelTime Service
-        elif ":8002" in url or "llm" in url:
-            return "llm_service"         # Port 8002: LLM Provider Service  
-        elif ":8003" in url or "router" in url:
-            return "router_service"      # Port 8003: Plugin Router Service
-        elif ":8004" in url:
-            return "worker_service"     # Port 8004: Worker metrics
-        else:
-            return "unknown_service"
+        from urllib.parse import urlparse
+        import re
+        
+        parsed = urlparse(url)
+        
+        # Extract service name from hostname if present
+        if parsed.hostname and parsed.hostname != "localhost":
+            # Remove common suffixes and extract service name
+            hostname = parsed.hostname
+            if hostname.endswith("-service"):
+                return hostname.replace("-", "_")
+            else:
+                return f"{hostname.replace('-', '_')}_service"
+        
+        # Extract from port if localhost
+        if parsed.port:
+            return f"service_port_{parsed.port}"
+        
+        return "unknown_service"
     
     async def _call_service_with_retries(
         self, 
@@ -542,22 +543,20 @@ class HTTPBasePlugin(BasePlugin):
         Returns:
             Complete service URL
         """
-        # Get URLs from environment-aware configuration (no hard-coding)
-        service_urls = {
-            "conceptnet": "http://conceptnet-service:8001",
-            "gensim": "http://gensim-service:8006", 
-            "spacy": "http://spacy-service:8007",
-            "heideltime": "http://heideltime-service:8008",
-            "llm": self.settings.llm_service_url,      # Environment-aware: localhost or docker
-            "router": self.settings.router_service_url, # Environment-aware: localhost or docker
-        }
+        # Use dynamic service discovery instead of hard-coded URLs
+        from src.shared.dynamic_service_discovery import get_service_discovery
         
-        base_url = service_urls.get(service_name, f"http://localhost:8000")
+        try:
+            discovery = await get_service_discovery()
+            service_url = await discovery.get_service_url(f"{service_name}-service", endpoint)
+            if service_url:
+                return service_url
+        except Exception as e:
+            self._logger.warning(f"Dynamic discovery failed for {service_name}: {e}")
         
-        if endpoint:
-            return f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
-        else:
-            return base_url
+        # No fallback - return None if dynamic discovery fails
+        self._logger.error(f"No service URL found for {service_name}")
+        return None
     
     def get_plugin_service_url(self, plugin_name: Optional[str] = None) -> str:
         """
