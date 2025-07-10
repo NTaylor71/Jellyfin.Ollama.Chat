@@ -255,6 +255,15 @@ see Stage 5
     - [x] Enhanced service endpoints: `/entities`, `/linguistic`, `/similarity`
     - [x] Multi-model support (en_core_web_sm/md/lg) with model management
     - [x] Complete API documentation with working examples
+  - [x] **Critical Service Fixes Applied** ✅ COMPLETED (2025-07-10)
+    - [x] Fixed SpaCy provider CacheType.SPACY_NLP → CacheType.SPACY_NER attribute error
+    - [x] Fixed ConceptNet provider text_utils.py indentation error (line 214)
+    - [x] Verified all NLP service endpoints working correctly:
+      - SpaCy NER: Entity extraction with structured categories (6ms response)
+      - SpaCy Linguistic: POS tagging and dependency parsing (5ms response)
+      - ConceptNet: Concept expansion and semantic relationships (445ms response)
+      - LLM: Concept expansion via Ollama backend (2783ms response)
+    - [x] Full enrichment pipeline operational with proper error handling
   - [ ] Consider adding Flair NLP or Stanford NER as alternative local NER service
     - Note: SpaCy implementation now provides comprehensive coverage; evaluate if additional NER needed
 
@@ -262,7 +271,7 @@ see Stage 5
 - [ ] **Statistical Keyphrase Extraction** 
   - [ ] Implement YAKE! (Yet Another Keyword Extractor) - statistical, no model needed
   - [ ] Or implement PKE (Python Keyphrase Extraction) with multiple algorithms
-  - [ ] Create new plugin: "statistical_keyphrase_plugin" 
+  - [ ] Create new plugin (and required service/provider): "statistical_keyphrase_plugin" 
   - [ ] Better keyword quality than current ConceptNet approach
   - [ ] Add to enrichment pipeline for all text fields
   - [ ] Compare against existing ConceptNet and LLM keyword extraction
@@ -297,6 +306,8 @@ see Stage 5
 #### 5.9.6 IMDb Reference Data Integration
 - [ ] **Authoritative Media Metadata Enhancement** (NON-COMMERCIAL)
   - [ ] Download and process IMDb non-commercial datasets (7 core datasets)
+    - examine the light docker setup here : /home/ap/coding/radarr_peeps
+      - translate the simple docker setup into this project's more sophisticated approach, eg new container, but keep this model set only in the db, no model manager as the data takes too long to translate to our local db from imdb's gz source
     - [ ] title.basics.tsv - Core movie/TV metadata (genres, runtime, release years)
     - [ ] title.ratings.tsv - User ratings and vote counts
     - [ ] name.basics.tsv - Person information with professions
@@ -329,6 +340,24 @@ see Stage 5
     - [ ] Incremental updates to avoid full reprocessing
     - [ ] Memory-efficient processing for large datasets
     - [ ] Parallel processing for bulk enrichment operations
+
+#### 5.9.7 Task dependency chaining in the queue
+- [ ] **Investigate queue tasks & task-dependencies**
+  - the movie.yaml has 'plugin groups' that can end, currently, in a merge results op
+  - we need improved dependency control for this kind of op
+  - both in the yaml and in the queue
+  - we want easy chaining of plugins that can pass-forward results, from yaml techniques in the movie.yaml
+  - [ ] **full audit of the architecture to make this easier to use/define**
+
+#### 5.9.8 Using Claude to build the best ingestion movie.yaml possible
+- [ ] Can we leverage claude code to semi automate the creation of new input types or improve existing ones
+  - 1. Claude learns all current plugin abilities, including chained processing
+  - 2. Claude examines raw input data
+  - 3. Claude loops through testing endpoints with field input data, judging quality of outputs with regards to intended subsequent embedding and search usage, assiging weights accordingly and building up an industrial grade ingestion yaml, using the current movie.yaml as a starting point
+- [ ] Can this trick be replicated by the system itself without claude
+  - [ ] what are the pros/cons to semi automated ingestion construction for new mediaTypes and improving existing ones
+ 
+
 
 ## Stage 6: Embedding Cook - Search Index Generation
 
@@ -554,12 +583,8 @@ see Stage 5
 - [ ] Add performance benchmarks
 - [ ] Create load testing scenarios
 
-### 10.2 Docker Stack Validation
-- [ ] Full docker purge and rebuild test
-- [ ] Verify all services start correctly
-- [ ] Test inter-service communication
-- [ ] Validate resource constraints
-- [ ] Ensure GPU support works
+### 10.2 Docker Stack Validation - only edit this after 10.1 completed
+- [ ] **Full docker purge and rebuild test** 
 
 ## Stage 11: Documentation and Deployment
 
