@@ -258,6 +258,186 @@ fields:
     plugins: ["nlp_analysis", "sentiment_analysis"]
 ```
 
+## 💻 System Requirements
+
+### 🏷️ **TL;DR Quick Reference**
+
+| **System Tier** | **CPU** | **RAM** | **Storage** | **Use Case** |
+|------------------|---------|---------|-------------|--------------|
+| **Minimum** | 4 cores | 8GB | 50GB SSD | Small collections, basic enrichment |
+| **Recommended** | 8 cores | 16GB | 100GB SSD | Medium collections, full features |
+| **High-Performance** | 16+ cores | 32GB+ | 200GB+ SSD | Large collections, maximum quality |
+
+### 🎯 **Detailed Requirements by Deployment Tier**
+
+#### 🥉 **Minimum Requirements** (Budget/Testing)
+*"Getting your feet wet with a small media collection"*
+
+| Component | Specification | Explanation |
+|-----------|---------------|-------------|
+| **CPU** | 4 cores, 8 threads | Core services need 2-4 threads each |
+| **RAM** | 8GB total | Base services (2GB) + MongoDB (1GB) + models (3GB) + OS (2GB) |
+| **Storage** | 50GB SSD | Docker images (10GB) + models (15GB) + data (25GB) |
+| **GPU** | None required | CPU-only LLM models available |
+
+**Model Optimizations for Minimum Systems:**
+- Ollama: Use `llama3.2:1b` (1.3GB) instead of `llama3.2:3b` (2.0GB)
+- SpaCy: Use `en_core_web_sm` (15MB) instead of `en_core_web_lg` (750MB)
+- Disable GPU-intensive services in docker-compose
+
+#### 🥈 **Recommended Requirements** (Balanced Performance)
+*"Sweet spot for most users with medium collections"*
+
+| Component | Specification | Explanation |
+|-----------|---------------|-------------|
+| **CPU** | 8 cores, 16 threads | Parallel processing of multiple media items |
+| **RAM** | 16GB total | All services (8GB) + larger models (4GB) + caching (4GB) |
+| **Storage** | 100GB SSD | Full model set (30GB) + growing media database (70GB) |
+| **GPU** | 4GB VRAM (optional) | Accelerates LLM processing, 3-5x speed improvement |
+
+**Optimal Model Configuration:**
+- Ollama: `llama3.2:3b` for good quality/speed balance
+- SpaCy: `en_core_web_md` (50MB) for good accuracy with word vectors
+- All enrichment services enabled
+
+#### 🥇 **High-Performance Requirements** (Maximum Quality)
+*"Professional setups and large media libraries"*
+
+| Component | Specification | Explanation |
+|-----------|---------------|-------------|
+| **CPU** | 16+ cores, 32+ threads | Concurrent processing of many items |
+| **RAM** | 32GB+ total | Large models in memory + extensive caching |
+| **Storage** | 200GB+ NVMe SSD | Full model collection + large database + logs |
+| **GPU** | 8GB+ VRAM | Large LLM models, batch processing |
+
+**Maximum Quality Configuration:**
+- Ollama: `llama3.1:8b` or larger models for best quality
+- SpaCy: `en_core_web_lg` (750MB) for maximum accuracy
+- All services with increased resource limits
+
+### 🔧 **Why Each Component Matters**
+
+#### 🧠 **CPU Requirements Explained**
+- **15 Microservices**: Each service needs 1-2 CPU threads minimum
+- **AI Processing**: NLP analysis, keyword extraction, and text processing are CPU-intensive
+- **Parallel Processing**: Multiple media items can be processed simultaneously
+- **Background Tasks**: Queue management, health checks, and monitoring
+
+#### 🐏 **Memory Requirements Breakdown**
+```
+Base Docker Services:          ~2GB
+├── MongoDB + Redis:           ~1GB
+├── Monitoring (Prometheus):   ~512MB
+└── Base containers:           ~512MB
+
+AI Models in Memory:           ~3-15GB
+├── Ollama LLM:               ~1-8GB (model dependent)
+├── SpaCy NLP:                ~15MB-750MB (model dependent)
+├── Other AI models:          ~1-2GB
+└── Model caching:            ~1-4GB
+
+Application Runtime:           ~2-8GB
+├── Service processes:        ~2GB
+├── Request processing:       ~1-2GB
+├── Result caching:          ~1-2GB
+└── OS overhead:             ~2GB
+```
+
+#### 💾 **Storage Requirements Detail**
+```
+Docker Images:                 ~10GB
+├── Base Python images:       ~3GB
+├── Service images:           ~4GB
+└── Infrastructure images:    ~3GB
+
+AI Models:                     ~5-30GB
+├── Ollama models:            ~1-20GB
+├── SpaCy models:             ~15MB-750MB per language
+├── NLTK data:                ~500MB
+└── Gensim models:            ~1-5GB
+
+Application Data:              ~Growing
+├── MongoDB collections:      ~Varies by usage
+├── Logs and metrics:         ~1-5GB
+├── Cache storage:            ~2-10GB
+└── Backup space:             ~20% of total
+```
+
+### ⚡ **Performance vs Resource Trade-offs**
+
+#### 🎛️ **Model Size Impact on Performance**
+
+| Model Choice | Size | Quality | Speed | Memory | Best For |
+|--------------|------|---------|--------|---------|----------|
+| `llama3.2:1b` | 1.3GB | Good | Fast | Low | Testing, small collections |
+| `llama3.2:3b` | 2.0GB | Very Good | Medium | Medium | General use, balanced |
+| `llama3.1:8b` | 4.7GB | Excellent | Slower | High | Large collections, quality-focused |
+
+#### 🔄 **Service Scaling Options**
+
+**Resource-Constrained Setup:**
+```yaml
+# Disable optional services
+profiles: ["core"]  # Skip search, monitoring
+deploy:
+  resources:
+    limits:
+      memory: 512M    # Limit per service
+      cpus: 0.5       # Limit CPU usage
+```
+
+**High-Performance Setup:**
+```yaml
+# Scale up resources
+deploy:
+  resources:
+    limits:
+      memory: 4G      # More memory per service
+      cpus: 2.0       # More CPU allocation
+    reservations:
+      devices:
+        - capabilities: ["gpu"]  # GPU acceleration
+```
+
+### 🏥 **Hardware Compatibility Notes**
+
+#### 🖥️ **CPU Compatibility**
+- **Minimum**: Intel Core i5 4th gen / AMD Ryzen 3000 series
+- **Recommended**: Intel Core i7 8th gen / AMD Ryzen 5000 series
+- **Architecture**: x86_64 required (ARM64 experimental)
+
+#### 🎮 **GPU Support**
+- **NVIDIA**: GTX 1060 6GB or newer (CUDA support)
+- **AMD**: Limited support via ROCm (experimental)
+- **Apple Silicon**: CPU-only mode (Metal acceleration coming)
+- **Setup**: Requires NVIDIA Container Toolkit
+
+#### 💿 **Storage Recommendations**
+- **SSD Strongly Recommended**: 5-10x faster model loading
+- **Network Storage**: Possible but may impact performance
+- **Backup Strategy**: Regular MongoDB dumps recommended
+
+### 🚀 **Getting Started with Your Hardware**
+
+#### 📏 **Step 1: Assess Your System**
+```bash
+# Check your system specs
+lscpu | grep -E "CPU|Thread|Core"
+free -h
+df -h
+nvidia-smi  # If you have NVIDIA GPU
+```
+
+#### ⚙️ **Step 2: Choose Your Configuration**
+- **8GB RAM or less**: Use minimum configuration
+- **16GB RAM**: Standard recommended setup
+- **32GB+ RAM**: High-performance configuration
+
+#### 🎯 **Step 3: Optimize for Your Hardware**
+- Edit `config/hardware/default.yaml` to match your specs
+- Adjust `config/models/ollama_models.yaml` for model selection
+- Modify docker-compose resource limits if needed
+
 ## 🚀 Getting Started: Your First Media Enhancement
 
 ### 1. 🏗️ Set Up Your Workshop
