@@ -12,16 +12,12 @@ from datetime import datetime
 import re
 from enum import Enum
 
-from src.plugins.base_concept import BaseConceptPlugin, ProcessingStrategy
+from src.plugins.http_base import HTTPBasePlugin
 from src.plugins.base import (
     PluginMetadata, PluginResourceRequirements, PluginExecutionContext,
     PluginExecutionResult, PluginType, ExecutionPriority
 )
-from src.providers.llm.llm_provider import LLMProvider
-from src.providers.knowledge.conceptnet_provider import ConceptNetProvider
-from src.providers.nlp.base_provider import ExpansionRequest
-from src.shared.plugin_contracts import PluginResult, CacheType
-from src.storage.cache_manager import CacheStrategy
+from src.shared.plugin_contracts import PluginResult
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +32,7 @@ class QuestionType(Enum):
     SEARCH = "search"                     # "Find movies with X"
 
 
-class QuestionExpansionPlugin(BaseConceptPlugin):
+class QuestionExpansionPlugin(HTTPBasePlugin):
     """
     Plugin that handles natural language questions about media content.
     
@@ -72,17 +68,6 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
             can_use_distributed_resources=True
         )
     
-    async def _initialize_providers(self) -> None:
-        """Initialize question handling providers."""
-        # Primary: LLM for understanding
-        self.providers["llm"] = LLMProvider()
-        await self.providers["llm"].initialize()
-        
-        # Secondary: ConceptNet for keyword expansion
-        self.providers["conceptnet"] = ConceptNetProvider()
-        await self.providers["conceptnet"].initialize()
-        
-        self._logger.info("Initialized question handling providers")
     
     async def embellish_query(
         self,
@@ -100,26 +85,21 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
                 # Not a question - pass through
                 return query
             
-            # Select processing strategy
-            strategy = self._select_processing_strategy(context)
-            
             # Classify question type
-            question_type = await self._classify_question(query, strategy)
+            question_type = await self._classify_question(query)
             
-            self._logger.info(
-                f"Processing {question_type.value} question with {strategy.value} strategy"
-            )
+            self._logger.info(f"Processing {question_type.value} question")
             
-            # Process based on question type and strategy
+            # Process based on question type
             if question_type == QuestionType.RECOMMENDATION:
-                enhanced = await self._handle_recommendation_question(query, strategy, context)
+                enhanced = await self._handle_recommendation_question(query, context)
             elif question_type == QuestionType.SEARCH:
-                enhanced = await self._handle_search_question(query, strategy, context)
+                enhanced = await self._handle_search_question(query, context)
             elif question_type == QuestionType.INFORMATION:
-                enhanced = await self._handle_information_question(query, strategy, context)
+                enhanced = await self._handle_information_question(query, context)
             else:
                 # Other types need different handling
-                enhanced = await self._handle_generic_question(query, strategy, context)
+                enhanced = await self._handle_generic_question(query, context)
             
             self._logger.info(
                 f"Question expansion complete in "
@@ -149,11 +129,7 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         first_word = text.lower().split()[0] if text else ""
         return any(text.lower().startswith(starter) for starter in question_starters)
     
-    async def _classify_question(
-        self,
-        query: str,
-        strategy: ProcessingStrategy
-    ) -> QuestionType:
+    async def _classify_question(self, query: str) -> QuestionType:
         """Classify the type of question."""
         query_lower = query.lower()
         
@@ -171,18 +147,13 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         elif any(word in query_lower for word in ["why", "how come", "reason"]):
             return QuestionType.ANALYTICAL
         
-        # LLM classification for ambiguous cases (if high resource)
-        if strategy == ProcessingStrategy.HIGH_RESOURCE and self.providers.get("llm"):
-            # Queue LLM classification
-            # For now, default to SEARCH
-            pass
+        # Default to SEARCH for ambiguous cases
         
         return QuestionType.SEARCH
     
     async def _handle_recommendation_question(
         self,
         query: str,
-        strategy: ProcessingStrategy,
         context: PluginExecutionContext
     ) -> str:
         """
@@ -191,53 +162,23 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         # Extract key parameters
         params = self._extract_recommendation_params(query)
         
-        if strategy == ProcessingStrategy.HIGH_RESOURCE:
-            # Queue LLM for deep understanding
-            if self.queue_manager:
-                task_data = {
-                    "question": query,
-                    "question_type": "recommendation",
-                    "params": params
-                }
-                task_id = await self._queue_task(
-                    "question_understanding",
-                    task_data,
-                    ExecutionPriority.HIGH
-                )
-                self._logger.debug(f"Queued recommendation analysis: {task_id}")
-            
-            # Parallel concept expansion for immediate response
-            expanded_concepts = await self._expand_recommendation_concepts(params)
-            
-            # Build enhanced query
-            enhanced_parts = []
-            if params["genre"]:
-                enhanced_parts.extend(expanded_concepts.get(params["genre"], [params["genre"]]))
-            if params["count"]:
-                enhanced_parts.append(f"top {params['count']}")
-            if params["modifiers"]:
-                enhanced_parts.extend(params["modifiers"])
-            
-            return " ".join(enhanced_parts)
-            
-        else:
-            # Simple extraction and expansion
-            genre = params.get("genre", "")
-            if genre and "conceptnet" in self.providers:
-                try:
-                    result = await self._expand_with_provider("conceptnet", genre, "movie")
-                    if result and result.success:
-                        expansions = result.enhanced_data.get("expanded_concepts", [])[:3]
-                        return f"{genre} {' '.join(expansions)}"
-                except Exception:
-                    pass
-            
-            return query
+        # Expand concepts using ConceptNet service
+        expanded_concepts = await self._expand_recommendation_concepts(params)
+        
+        # Build enhanced query
+        enhanced_parts = []
+        if params["genre"]:
+            enhanced_parts.extend(expanded_concepts.get(params["genre"], [params["genre"]]))
+        if params["count"]:
+            enhanced_parts.append(f"top {params['count']}")
+        if params["modifiers"]:
+            enhanced_parts.extend(params["modifiers"])
+        
+        return " ".join(enhanced_parts) if enhanced_parts else query
     
     async def _handle_search_question(
         self,
         query: str,
-        strategy: ProcessingStrategy,
         context: PluginExecutionContext
     ) -> str:
         """
@@ -251,24 +192,16 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         
         expanded_terms = []
         
-        if strategy in [ProcessingStrategy.HIGH_RESOURCE, ProcessingStrategy.MEDIUM_RESOURCE]:
-            # Expand each search term
-            for term in search_terms[:5]:  # Limit
-                if "conceptnet" in self.providers:
-                    try:
-                        result = await self._expand_with_provider("conceptnet", term, "movie")
-                        if result and result.success:
-                            expansions = result.enhanced_data.get("expanded_concepts", [])[:2]
-                            expanded_terms.append(term)
-                            expanded_terms.extend(expansions)
-                        else:
-                            expanded_terms.append(term)
-                    except Exception:
-                        expanded_terms.append(term)
-                else:
-                    expanded_terms.append(term)
-        else:
-            expanded_terms = search_terms
+        # Expand each search term using ConceptNet service
+        for term in search_terms[:5]:  # Limit to avoid too many calls
+            expanded_terms.append(term)
+            try:
+                result = await self._expand_with_conceptnet_service(term, "movie")
+                if result:
+                    expansions = result[:2]  # Limit expansions per term
+                    expanded_terms.extend(expansions)
+            except Exception as e:
+                self._logger.debug(f"Failed to expand term '{term}': {e}")
         
         # Remove duplicates while preserving order
         unique_terms = list(dict.fromkeys(expanded_terms))
@@ -277,7 +210,6 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
     async def _handle_information_question(
         self,
         query: str,
-        strategy: ProcessingStrategy,
         context: PluginExecutionContext
     ) -> str:
         """
@@ -286,43 +218,25 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         # Extract subject and topic
         subject, topic = self._extract_information_components(query)
         
-        if strategy == ProcessingStrategy.HIGH_RESOURCE and self.queue_manager:
-            # Queue for detailed analysis
-            task_data = {
-                "question": query,
-                "subject": subject,
-                "topic": topic,
-                "question_type": "information"
-            }
-            task_id = await self._queue_task(
-                "information_extraction",
-                task_data,
-                ExecutionPriority.HIGH
-            )
-            self._logger.debug(f"Queued information extraction: {task_id}")
-        
         # Build search query from components
         search_parts = []
         if subject:
             search_parts.append(subject)
         if topic:
             search_parts.append(topic)
-            # Expand topic if possible
-            if "conceptnet" in self.providers:
-                try:
-                    result = await self._expand_with_provider("conceptnet", topic, "movie")
-                    if result and result.success:
-                        expansions = result.enhanced_data.get("expanded_concepts", [])[:2]
-                        search_parts.extend(expansions)
-                except Exception:
-                    pass
+            # Expand topic using ConceptNet service
+            try:
+                expansions = await self._expand_with_conceptnet_service(topic, "movie")
+                if expansions:
+                    search_parts.extend(expansions[:2])
+            except Exception as e:
+                self._logger.debug(f"Failed to expand topic '{topic}': {e}")
         
         return " ".join(search_parts) if search_parts else query
     
     async def _handle_generic_question(
         self,
         query: str,
-        strategy: ProcessingStrategy,
         context: PluginExecutionContext
     ) -> str:
         """
@@ -338,14 +252,12 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         expanded = []
         for keyword in keywords[:3]:
             expanded.append(keyword)
-            if "conceptnet" in self.providers and strategy != ProcessingStrategy.LOW_RESOURCE:
-                try:
-                    result = await self._expand_with_provider("conceptnet", keyword, "movie")
-                    if result and result.success:
-                        expansions = result.enhanced_data.get("expanded_concepts", [])[:1]
-                        expanded.extend(expansions)
-                except Exception:
-                    pass
+            try:
+                expansions = await self._expand_with_conceptnet_service(keyword, "movie")
+                if expansions:
+                    expanded.extend(expansions[:1])  # One expansion per keyword
+            except Exception as e:
+                self._logger.debug(f"Failed to expand keyword '{keyword}': {e}")
         
         return " ".join(expanded)
     
@@ -434,72 +346,57 @@ class QuestionExpansionPlugin(BaseConceptPlugin):
         expanded = {}
         
         # Expand genre if present
-        if params["genre"] and "conceptnet" in self.providers:
+        if params["genre"]:
             try:
-                result = await self._expand_with_provider(
-                    "conceptnet",
-                    params["genre"],
-                    "movie"
-                )
-                if result and result.success:
-                    expanded[params["genre"]] = result.enhanced_data.get(
-                        "expanded_concepts", []
-                    )[:5]
-            except Exception:
-                pass
+                expansions = await self._expand_with_conceptnet_service(params["genre"], "movie")
+                if expansions:
+                    expanded[params["genre"]] = expansions[:5]
+            except Exception as e:
+                self._logger.debug(f"Failed to expand genre '{params['genre']}': {e}")
         
         # Expand modifiers
         for modifier in params.get("modifiers", []):
-            if "conceptnet" in self.providers:
-                try:
-                    result = await self._expand_with_provider(
-                        "conceptnet",
-                        modifier,
-                        "movie"
-                    )
-                    if result and result.success:
-                        expanded[modifier] = result.enhanced_data.get(
-                            "expanded_concepts", []
-                        )[:3]
-                except Exception:
-                    pass
+            try:
+                expansions = await self._expand_with_conceptnet_service(modifier, "movie")
+                if expansions:
+                    expanded[modifier] = expansions[:3]
+            except Exception as e:
+                self._logger.debug(f"Failed to expand modifier '{modifier}': {e}")
         
         return expanded
     
-    async def _expand_with_provider(
+    async def _expand_with_conceptnet_service(
         self,
-        provider_name: str,
         concept: str,
         media_context: str
-    ) -> Optional[PluginResult]:
-        """Expand concept using specified provider."""
-        provider = self.providers.get(provider_name)
-        if not provider:
-            return None
-        
+    ) -> Optional[List[str]]:
+        """Expand concept using ConceptNet service via HTTP."""
         try:
-            request = ExpansionRequest(
-                concept=concept,
-                media_context=media_context,
-                max_concepts=5
-            )
+            # Get ConceptNet service URL
+            service_url = self.get_service_url("conceptnet", "expand")
             
-            # Use cache
-            cache_key = self.cache_manager.generate_cache_key(
-                cache_type=CacheType.CONCEPTNET if provider_name == "conceptnet" else CacheType.LLM_CONCEPT,
-                field_name="question_concept",
-                input_value=concept,
-                media_context=media_context
-            )
+            request_data = {
+                "concept": concept,
+                "media_context": media_context,
+                "max_concepts": 5,
+                "field_name": "question_concept",
+                "options": {
+                    "relation_types": ["RelatedTo", "IsA", "PartOf"],
+                    "language": "en"
+                }
+            }
             
-            result = await self.cache_manager.get_or_compute(
-                cache_key=cache_key,
-                compute_func=lambda: provider.expand_concept(request),
-                strategy=CacheStrategy.CACHE_FIRST
-            )
+            response = await self.http_post(service_url, request_data)
             
-            return result
-            
+            # Process response from ProviderResponse format
+            if response.get("success", False):
+                result_data = response.get("result", {})
+                expanded_concepts = result_data.get("expanded_concepts", [])
+                return expanded_concepts if isinstance(expanded_concepts, list) else []
+            else:
+                self._logger.debug(f"ConceptNet service failed for '{concept}': {response.get('error', 'Unknown error')}")
+                return []
+                
         except Exception as e:
-            self._logger.error(f"Provider '{provider_name}' failed: {e}")
-            return None
+            self._logger.debug(f"ConceptNet service call failed for '{concept}': {e}")
+            return []
