@@ -2,7 +2,7 @@
 # ConceptNet Provider Service - Minimal API-only service
 # =============================================================================
 
-FROM python:3.12-slim as runtime
+FROM python:3.12-slim AS runtime
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

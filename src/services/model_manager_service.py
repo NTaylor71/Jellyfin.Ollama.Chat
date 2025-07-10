@@ -115,7 +115,7 @@ http_client: Optional[httpx.AsyncClient] = None
 
 # Service endpoints for coordination - build dynamically from environment
 def get_service_endpoints():
-    """Get service endpoints for split architecture."""
+    """Get service endpoints for microservices architecture."""
     import os
     
     endpoints = {}
@@ -125,10 +125,11 @@ def get_service_endpoints():
         from src.shared.dynamic_service_discovery import get_service_discovery
         import asyncio
         
-        # Get or create event loop
+        # Get or create event loop (avoid deprecated get_event_loop)
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
         except RuntimeError:
+            # No running loop, create a new one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         
@@ -195,23 +196,33 @@ async def lifespan(app: FastAPI):
         logger.info("Checking model status across all services...")
         models_status = await get_all_models_status()
         
-        # Count missing required models
-        total_missing = sum(status.get("summary", {}).get("missing_required", 0) for status in models_status.values())
-        
-        if total_missing > 0:
-            initialization_progress["current_task"] = f"orchestrating download of {total_missing} missing models"
-            logger.info(f"Orchestrating download of {total_missing} missing required models...")
-            
-            download_success = await orchestrate_model_downloads()
-            if download_success:
-                initialization_progress["model_download_status"] = "completed"
-                logger.info("✅ All required models downloaded successfully")
-            else:
-                initialization_progress["model_download_status"] = "partial"
-                logger.warning("⚠️ Some model downloads failed, but service will continue")
+        # Check if we found any services
+        services_found = len(models_status)
+        if services_found == 0:
+            logger.warning("⚠️ No services discovered for model coordination")
+            logger.warning("⚠️ Service discovery may be failing - no models will be downloaded")
+            initialization_progress["model_download_status"] = "skipped_no_services"
+            initialization_progress["services_found"] = 0
         else:
-            initialization_progress["model_download_status"] = "not_needed"
-            logger.info("✅ All required models already available")
+            logger.info(f"Found {services_found} services for model coordination")
+            
+            # Count missing required models
+            total_missing = sum(status.get("summary", {}).get("missing_required", 0) for status in models_status.values())
+            
+            if total_missing > 0:
+                initialization_progress["current_task"] = f"orchestrating download of {total_missing} missing models"
+                logger.info(f"Orchestrating download of {total_missing} missing required models...")
+                
+                download_success = await orchestrate_model_downloads()
+                if download_success:
+                    initialization_progress["model_download_status"] = "completed"
+                    logger.info("✅ All required models downloaded successfully")
+                else:
+                    initialization_progress["model_download_status"] = "partial"
+                    logger.warning("⚠️ Some model downloads failed, but service will continue")
+            else:
+                initialization_progress["model_download_status"] = "not_needed"
+                logger.info("✅ All required models already available")
         
         # Mark as ready
         initialization_state = "ready"
@@ -418,7 +429,7 @@ async def discover_services():
     
     return {
         "success": True,
-        "architecture": "split",
+        "architecture": "microservices",
         "services": SERVICE_ENDPOINTS,
         "total_services": len(SERVICE_ENDPOINTS)
     }

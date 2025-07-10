@@ -5,7 +5,7 @@
 # =============================================================================
 # STAGE 1: BUILDER - Install all dependencies and build tools
 # =============================================================================
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Install build dependencies (needed for compiling packages)
 RUN apt-get update && apt-get install -y \
@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # =============================================================================
 # STAGE 2: RUNTIME - Copy only necessary files from builder
 # =============================================================================
-FROM python:3.12-slim as runtime
+FROM python:3.12-slim AS runtime
 
 # Install only runtime dependencies (no build tools)
 RUN apt-get update && apt-get install -y \

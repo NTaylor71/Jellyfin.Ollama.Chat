@@ -85,7 +85,7 @@ class LLMTemporalIntelligencePlugin(HTTPBasePlugin):
             
             # Call LLM service (using general expand endpoint for temporal analysis)
             # LLM expand endpoint expects LLMRequest format
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
                 "media_context": "movie",

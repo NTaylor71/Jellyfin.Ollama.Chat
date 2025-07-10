@@ -1,5 +1,5 @@
 # Service Endpoint Mapping Configuration
-# Maps plugin types to their corresponding split architecture service endpoints
+# Maps plugin types to their corresponding microservice endpoints
 
 # ConceptNet Service Endpoints (conceptnet-service:8001)
 conceptnet_endpoints:
@@ -27,7 +27,7 @@ llm_endpoints:
   general: "providers/llm/expand"
   websearch: "providers/llm/websearch/full"
 
-# Plugin to Service Mapping Rules (Split Architecture)
+# Plugin to Service Mapping Rules (Microservices)
 plugin_routing:
   # Pattern-based routing (case-insensitive)
   patterns:

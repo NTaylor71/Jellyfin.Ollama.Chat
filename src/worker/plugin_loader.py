@@ -152,8 +152,11 @@ class PluginLoader:
         context: PluginExecutionContext
     ) -> PluginExecutionResult:
         """Execute plugin directly without routing layers."""
+        logger.info(f"🔍 EXECUTE_PLUGIN: Called with plugin_name={plugin_name}")
+        logger.info(f"🔍 EXECUTE_PLUGIN: data type={type(data)}, data keys={list(data.keys()) if isinstance(data, dict) else 'not dict'}")
         
         if plugin_name not in self.plugins:
+            logger.error(f"❌ EXECUTE_PLUGIN: Plugin {plugin_name} not found in loaded plugins")
             return PluginExecutionResult(
                 success=False,
                 error_message=f"Plugin {plugin_name} not found in loaded plugins"
@@ -162,11 +165,13 @@ class PluginLoader:
         try:
             # Get the plugin instance
             plugin = self.plugins[plugin_name]
+            logger.info(f"🔍 EXECUTE_PLUGIN: Found plugin instance: {plugin.__class__.__name__}")
             
             # Execute the plugin directly
+            logger.info(f"🔍 EXECUTE_PLUGIN: About to call plugin.execute() with data type {type(data)}")
             result = await plugin.execute(data, context)
             
-            logger.debug(f"Direct plugin execution: {plugin_name} -> {result.success}")
+            logger.info(f"🔍 EXECUTE_PLUGIN: plugin.execute() returned: success={result.success}, exec_time={result.execution_time_ms}ms")
             return result
                 
         except Exception as e:
@@ -176,28 +181,36 @@ class PluginLoader:
                 error_message=f"Plugin execution error: {str(e)}"
             )
     
-    def list_available_plugins(self) -> Dict[str, Any]:
+    async def list_available_plugins(self) -> Dict[str, Any]:
         """List all available plugins."""
+        plugins_info = {}
+        for name, plugin in self.plugins.items():
+            plugins_info[name] = {
+                "class_name": plugin.__class__.__name__,
+                "initialized": True,
+                "service_url": await plugin.get_plugin_service_url()
+            }
+        
         return {
-            "plugins": {
-                name: {
-                    "class_name": plugin.__class__.__name__,
-                    "initialized": True,
-                    "service_url": plugin.get_plugin_service_url()
-                }
-                for name, plugin in self.plugins.items()
-            },
+            "plugins": plugins_info,
             "total_count": len(self.plugins)
         }
     
     async def route_task_to_plugin(self, task_type: str, task_data: Dict[str, Any]) -> PluginExecutionResult:
         """Route task directly to plugin without intermediate layers."""
+        logger.info(f"🔍 PLUGIN_LOADER: route_task_to_plugin called with task_type={task_type}")
+        logger.info(f"🔍 PLUGIN_LOADER: task_data keys: {list(task_data.keys())}")
+        
         # Extract plugin info from task data
         inner_data = task_data.get("data", {})
         plugin_name = inner_data.get("plugin_name")
         plugin_type = inner_data.get("plugin_type")
         
+        logger.info(f"🔍 PLUGIN_LOADER: extracted plugin_name={plugin_name}, plugin_type={plugin_type}")
+        logger.info(f"🔍 PLUGIN_LOADER: available plugins: {list(self.plugins.keys())}")
+        
         if not plugin_name or not plugin_type:
+            logger.error(f"❌ PLUGIN_LOADER: Missing plugin_name or plugin_type")
             return PluginExecutionResult(
                 success=False,
                 error_message="Missing plugin_name or plugin_type"
@@ -212,9 +225,12 @@ class PluginLoader:
         )
         
         # Execute plugin directly (no routing layers)
-        return await self.execute_plugin(
+        logger.info(f"🔍 PLUGIN_LOADER: About to call execute_plugin with data keys: {list(inner_data.get('data', {}).keys())}")
+        result = await self.execute_plugin(
             plugin_name=plugin_name,
             plugin_type=plugin_type,
             data=inner_data.get("data", {}),
             context=context
         )
+        logger.info(f"🔍 PLUGIN_LOADER: execute_plugin returned success={result.success}")
+        return result

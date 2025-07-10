@@ -5,7 +5,7 @@
 # =============================================================================
 # STAGE 1: BUILDER - Install dependencies
 # =============================================================================
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -35,7 +35,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # =============================================================================
 # STAGE 2: RUNTIME - Copy only necessary files from builder
 # =============================================================================
-FROM python:3.12-slim as runtime
+FROM python:3.12-slim AS runtime
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

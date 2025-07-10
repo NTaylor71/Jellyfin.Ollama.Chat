@@ -5,10 +5,14 @@ HTTP-only plugin that combines web search with LLM processing for real-time data
 
 import logging
 import asyncio
+import time
 from typing import Dict, Any, List, Optional
 
 from src.plugins.http_base import HTTPBasePlugin
-from src.plugins.base import PluginMetadata, PluginResourceRequirements, PluginType, ExecutionPriority
+from src.plugins.base import (
+    PluginMetadata, PluginResourceRequirements, PluginType, ExecutionPriority,
+    PluginExecutionContext, PluginExecutionResult
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +56,62 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             requires_network=True  # Web search requires internet access
         )
     
+    async def execute(self, data: Any, context: PluginExecutionContext) -> PluginExecutionResult:
+        """
+        Execute the LLMWebSearchPlugin with direct data structure.
+        
+        Expected data structure:
+        {
+            'field_name': str,
+            'field_value': Any,
+            'config': Dict[str, Any]
+        }
+        """
+        logger.info(f"🔍 LLMWebSearchPlugin.execute: Called with data type={type(data)}")
+        logger.info(f"🔍 LLMWebSearchPlugin.execute: data keys={list(data.keys()) if isinstance(data, dict) else 'not dict'}")
+        
+        start_time = time.time()
+        
+        try:
+            if isinstance(data, dict) and 'field_name' in data and 'field_value' in data and 'config' in data:
+                # Direct field enrichment call
+                field_name = data['field_name']
+                field_value = data['field_value']
+                config = data['config']
+                
+                logger.info(f"🔍 LLMWebSearchPlugin.execute: About to call enrich_field({field_name}, {field_value})")
+                enrichment_result = await self.enrich_field(field_name, field_value, config)
+                
+                execution_time_ms = (time.time() - start_time) * 1000
+                
+                return PluginExecutionResult(
+                    success=True,
+                    data=enrichment_result,
+                    execution_time_ms=execution_time_ms,
+                    metadata={
+                        "plugin": self.metadata.name,
+                        "field_name": field_name,
+                        "enrichment_type": "websearch_llm"
+                    }
+                )
+            else:
+                # Fall back to base class behavior for standard enrichment
+                return await super().execute(data, context)
+                
+        except Exception as e:
+            execution_time_ms = (time.time() - start_time) * 1000
+            logger.error(f"🔍 LLMWebSearchPlugin.execute: Error - {e}")
+            
+            return PluginExecutionResult(
+                success=False,
+                error_message=str(e),
+                execution_time_ms=execution_time_ms,
+                metadata={
+                    "plugin": self.metadata.name,
+                    "error_type": type(e).__name__
+                }
+            )
+    
     async def enrich_field(
         self, 
         field_name: str, 
@@ -69,6 +129,7 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
         Returns:
             Dict containing web search results and LLM analysis
         """
+        logger.info(f"🔍 LLMWebSearchPlugin.enrich_field called for field '{field_name}' with value '{field_value}'")
         try:
             # Extract configuration
             search_templates = config.get("search_templates", [])
@@ -87,7 +148,7 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             template_variables = self._prepare_template_variables(field_name, field_value, config)
             
             # Get web search service URL
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             
             # Prepare search templates list (extract from config structure)
             search_template_list = []
@@ -123,36 +184,47 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             
             self._logger.debug(f"Executing web search + LLM for field {field_name} with {len(search_template_list)} templates")
             
-            # Call LLM service web search endpoint
-            websearch_url = f"{service_url}/websearch/full"
-            response = await self.http_post(websearch_url, request_data)
+            # Call LLM service web search endpoint (service_url already includes the endpoint)
+            response = await self.http_post(service_url, request_data)
             
-            # Process response
+            # Process response - handle both full success and partial success (search works, LLM fails)
+            search_results = response.get("search_results", [])
+            processed_content = response.get("processed_content", {})
+            metadata = response.get("metadata", {})
+            
             if response.get("success", False):
-                search_results = response.get("search_results", [])
-                processed_content = response.get("processed_content", {})
-                metadata = response.get("metadata", {})
-                
                 self._logger.info(
                     f"Web search + LLM completed for field {field_name}: "
                     f"{len(search_results)} results, {metadata.get('execution_time_ms', 0):.1f}ms"
                 )
-                
-                result = {
-                    "websearch_results": search_results,
-                    "llm_analysis": processed_content,
-                    "search_metadata": {
-                        "templates_used": search_template_list,
-                        "total_results": len(search_results),
-                        "domains_filtered": domains,
-                        "field_name": field_name,
-                        **metadata
-                    }
-                }
-            else:
+            elif search_results:
+                # Partial success: search worked but LLM processing failed
                 error_msg = response.get("error_message", "Unknown error")
-                self._logger.error(f"Web search + LLM failed for field {field_name}: {error_msg}")
+                self._logger.warning(
+                    f"Web search succeeded but LLM processing failed for field {field_name}: {error_msg}. "
+                    f"Returning {len(search_results)} search results without LLM analysis."
+                )
+                processed_content = {"error": f"LLM processing failed: {error_msg}"}
+            else:
+                # Complete failure: no search results
+                error_msg = response.get("error_message", "Unknown error")
+                self._logger.error(f"Web search failed for field {field_name}: {error_msg}")
                 result = self._empty_result(field_name, f"websearch_failed: {error_msg}")
+                return self.normalize_text(result)
+            
+            # Build result for success or partial success cases
+            result = {
+                "websearch_results": search_results,
+                "llm_analysis": processed_content,
+                "search_metadata": {
+                    "templates_used": search_template_list,
+                    "total_results": len(search_results),
+                    "domains_filtered": domains,
+                    "field_name": field_name,
+                    "processing_status": "complete" if response.get("success", False) else "partial",
+                    **metadata
+                }
+            }
             
             # Normalize all Unicode text in the result
             return self.normalize_text(result)
@@ -213,7 +285,7 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             Search results only
         """
         try:
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             
             request_data = {
                 "search_templates": search_templates,
@@ -268,7 +340,7 @@ class LLMWebSearchPlugin(HTTPBasePlugin):
             LLM processed results
         """
         try:
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             
             request_data = {
                 "search_results": search_results,

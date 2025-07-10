@@ -165,6 +165,7 @@ services:
       - "8001:8001"
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Model configs
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
     environment:
@@ -204,6 +205,7 @@ services:
       - "8006:8006"
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Model configs
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
       - model-data:/app/models  # Unified model storage
@@ -245,6 +247,7 @@ services:
       - "8007:8007"
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Model configs
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
       - model-data:/app/models  # Unified model storage
@@ -285,6 +288,7 @@ services:
       - "8008:8008"
     volumes:
       - ./src:/app/src:ro  # Hot reload
+      - ./config:/app/config:ro  # Model configs
       - ./logs:/app/logs
       - ./.env:/app/.env:ro
     environment:
@@ -371,7 +375,7 @@ services:
       - OLLAMA_CHAT_BASE_URL=http://ollama:11434
       - NLTK_DATA=/app/models/nltk_data
       - GENSIM_DATA_DIR=/app/models/gensim_data
-      # Service discovery endpoints for split architecture
+      # Service discovery endpoints for microservices
       - CONCEPTNET_SERVICE_URL=http://conceptnet-service:8001
       - GENSIM_SERVICE_URL=http://gensim-service:8006
       - SPACY_SERVICE_URL=http://spacy-service:8007
@@ -385,7 +389,7 @@ services:
         condition: service_healthy
       llm-service:
         condition: service_healthy
-      # Dependencies for split architecture
+      # Dependencies for microservices
       conceptnet-service:
         condition: service_healthy
       gensim-service:

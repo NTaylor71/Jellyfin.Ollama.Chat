@@ -88,62 +88,149 @@ class DynamicServiceDiscovery:
             await self.http_client.aclose()
     
     async def discover_all_services(self) -> Dict[str, ServiceCapabilityInfo]:
-        """Discover all services dynamically by scanning known ports."""
+        """Discover all services dynamically by scanning Docker network."""
         async with self._discovery_lock:
             settings = get_settings()
             
-            # Discover services by scanning for active services
-            # No hard-coded ports - scan port range for responding services
-            service_ports = {}
+            # Method 1: Network-based discovery (truly dynamic)
+            discovered_services = {}
             
-            # Scan configurable microservice port range from settings
+            if settings.ENV == "docker":
+                # Docker environment - scan network subnet
+                logger.info("Using network-based service discovery for Docker environment")
+                discovered_services = await self._discover_via_network_scan()
+            else:
+                # Development environment - scan localhost
+                logger.info("Using localhost-based service discovery for development environment")
+                discovered_services = await self._discover_via_localhost_scan(settings)
+            
+            # Method 2: Fallback to environment variables if network scan fails
+            if not discovered_services:
+                logger.warning("Network scan found no services, trying environment variable fallback")
+                discovered_services = await self._discover_via_environment_variables()
+            
+            self.services = discovered_services
+            logger.info(f"Service discovery complete: found {len(discovered_services)} services")
+            
+            return discovered_services
+    
+    async def _discover_via_network_scan(self) -> Dict[str, ServiceCapabilityInfo]:
+        """Discover services via Docker network scanning."""
+        discovered_services = {}
+        
+        try:
+            # Get our IP to determine network subnet
+            import socket
+            hostname = socket.gethostname()
+            our_ip = socket.gethostbyname(hostname)
+            network_prefix = '.'.join(our_ip.split('.')[:-1])
+            
+            logger.info(f"Scanning Docker network {network_prefix}.x for services")
+            
+            # Scan network range for HTTP services on known ports
+            service_ports = [8001, 8002, 8006, 8007, 8008, 8009]  # Common microservice ports
+            
+            for ip_last in range(2, 20):  # Skip .1 (gateway), scan reasonable range
+                ip = f"{network_prefix}.{ip_last}"
+                if ip == our_ip:
+                    continue  # Skip ourselves
+                
+                for port in service_ports:
+                    try:
+                        # Test if service responds to /health
+                        base_url = f"http://{ip}:{port}"
+                        health_response = await self.http_client.get(f"{base_url}/health", timeout=2.0)
+                        
+                        if health_response.status_code == 200:
+                            health_data = health_response.json()
+                            
+                            # Extract service name from health response
+                            service_name = self._extract_service_name_from_health(health_data, port)
+                            
+                            # Discover full service capabilities
+                            service_info = await self._discover_single_service(service_name, base_url)
+                            if service_info:  # Include all responding services, regardless of health status
+                                discovered_services[service_name] = service_info
+                                logger.info(f"Discovered service: {service_name} at {ip}:{port} (status: {service_info.status})")
+                                
+                    except Exception:
+                        # Service not responding on this IP:port - continue
+                        continue
+                        
+        except Exception as e:
+            logger.error(f"Network scan failed: {e}")
+            
+        return discovered_services
+    
+    async def _discover_via_localhost_scan(self, settings) -> Dict[str, ServiceCapabilityInfo]:
+        """Discover services via localhost port scanning."""
+        discovered_services = {}
+        
+        try:
+            # Scan localhost ports for services
             for port in range(settings.SERVICE_SCAN_START_PORT, settings.SERVICE_SCAN_END_PORT):
-                # Try to connect and see if service responds to /health
                 try:
-                    base_url = self._get_service_base_url(f"unknown-service-{port}", port)
+                    base_url = f"http://localhost:{port}"
                     health_response = await self.http_client.get(f"{base_url}/health", timeout=2.0)
                     
                     if health_response.status_code == 200:
-                        # Service found! Extract name from health response only
                         health_data = health_response.json()
+                        service_name = self._extract_service_name_from_health(health_data, port)
                         
-                        # Extract service name from health data dynamically
-                        service_name = f"service-{port}"  # Default fallback
-                        
-                        # Try to derive name from providers in health response
-                        if "providers" in health_data:
-                            provider_names = list(health_data["providers"].keys())
-                            if provider_names:
-                                service_name = f"{provider_names[0]}-service"
-                        elif "llm_provider" in health_data:
-                            service_name = "llm-service"
-                        
-                        service_ports[service_name] = port
-                        logger.info(f"Discovered active service: {service_name} on port {port}")
-                        
+                        service_info = await self._discover_single_service(service_name, base_url)
+                        if service_info:  # Include all responding services, regardless of health status
+                            discovered_services[service_name] = service_info
+                            logger.info(f"Discovered service: {service_name} at localhost:{port} (status: {service_info.status})")
+                            
                 except Exception:
-                    # Service not responding on this port - skip
                     continue
+                    
+        except Exception as e:
+            logger.error(f"Localhost scan failed: {e}")
             
-            discovered_services = {}
+        return discovered_services
+    
+    async def _discover_via_environment_variables(self) -> Dict[str, ServiceCapabilityInfo]:
+        """Discover services via environment variables as fallback."""
+        discovered_services = {}
+        
+        try:
+            import os
             
-            # Discover services in parallel
-            tasks = []
-            for service_name, port in service_ports.items():
-                base_url = self._get_service_base_url(service_name, port)
-                tasks.append(self._discover_single_service(service_name, base_url))
+            # Look for SERVICE_URL environment variables
+            for key, value in os.environ.items():
+                if key.endswith('_SERVICE_URL'):
+                    # Extract service name: CONCEPTNET_SERVICE_URL -> conceptnet
+                    service_name = key.replace('_SERVICE_URL', '').lower()
+                    
+                    try:
+                        # Test if service is reachable
+                        health_response = await self.http_client.get(f"{value}/health", timeout=2.0)
+                        if health_response.status_code == 200:
+                            service_info = await self._discover_single_service(service_name, value)
+                            if service_info:
+                                discovered_services[service_name] = service_info
+                                logger.info(f"Discovered service via env var: {service_name} at {value}")
+                    except Exception:
+                        logger.warning(f"Service {service_name} at {value} not reachable")
+                        
+        except Exception as e:
+            logger.error(f"Environment variable discovery failed: {e}")
             
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            for result in results:
-                if isinstance(result, ServiceCapabilityInfo):
-                    discovered_services[result.service_name] = result
-                    logger.info(f"Discovered service: {result.service_name} with capabilities: {result.capabilities}")
-                elif isinstance(result, Exception):
-                    logger.warning(f"Service discovery failed: {result}")
-            
-            self.services = discovered_services
-            return discovered_services
+        return discovered_services
+    
+    def _extract_service_name_from_health(self, health_data: dict, port: int) -> str:
+        """Extract service name from health response."""
+        # Try to derive name from providers in health response
+        if "providers" in health_data:
+            provider_names = list(health_data["providers"].keys())
+            if provider_names:
+                return f"{provider_names[0]}-service"
+        elif "llm_provider" in health_data:
+            return "llm-service"
+        
+        # Fallback to port-based naming
+        return f"service-{port}"
     
     def _get_service_base_url(self, service_name: str, port: int) -> str:
         """Get base URL for service based on environment."""

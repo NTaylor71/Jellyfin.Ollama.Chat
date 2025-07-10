@@ -312,6 +312,21 @@ async def expand_concept(request: ProviderRequest):
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
+        # Handle case where provider returns None (no temporal concepts found or error)
+        if result is None:
+            return ProviderResponse(
+                success=False,
+                provider_name="spacy_temporal",
+                execution_time_ms=execution_time_ms,
+                result=None,
+                error_message="No temporal concepts found or provider returned no result",
+                metadata={
+                    "confidence_score": None,
+                    "cache_key": None,
+                    "temporal_analysis": None
+                }
+            )
+        
         return ProviderResponse(
             success=result.success,
             provider_name="spacy_temporal",

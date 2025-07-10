@@ -7,6 +7,7 @@ Tests the plugin via queue system for real-world validation.
 import argparse
 import sys
 from typing import Dict, Any
+import pprint
 
 # Add project root to path
 import os
@@ -253,56 +254,70 @@ Evaluate documented cultural impact:
     print("="*80)
     
     if result.get("success", False):
-        websearch_data = result.get("result", {})
-        
-        # Display search results summary
-        search_results = websearch_data.get("websearch_results", [])
-        print(f"\n📊 Search Results Summary:")
-        print(f"   Total results found: {len(search_results)}")
-        
-        if search_results:
-            print(f"   Sources found:")
-            sources = set()
-            for res in search_results:
-                if res.get("url"):
-                    domain = res["url"].split("//")[-1].split("/")[0]
-                    sources.add(domain)
-            for source in sorted(sources):
-                print(f"     - {source}")
-        
-        # Display LLM analysis
-        llm_analysis = websearch_data.get("llm_analysis", {})
-        if llm_analysis:
-            print(f"\n🤖 LLM Analysis:")
-            for field, content in llm_analysis.items():
-                if content:
-                    print(f"\n  {field.replace('_', ' ').title()}:")
-                    if isinstance(content, str):
-                        print(f"    {content[:300]}{'...' if len(content) > 300 else ''}")
-                    elif isinstance(content, list):
-                        for item in content[:3]:  # Show first 3 items
-                            print(f"    • {item}")
-                        if len(content) > 3:
-                            print(f"    ... and {len(content) - 3} more")
-                    else:
-                        print(f"    {str(content)[:200]}{'...' if len(str(content)) > 200 else ''}")
-        
-        # Display metadata
-        metadata = websearch_data.get("search_metadata", {})
-        if metadata:
-            print(f"\n📈 Execution Metadata:")
-            print(f"   Execution time: {metadata.get('execution_time_ms', 0):.1f}ms")
-            print(f"   Templates used: {len(metadata.get('templates_used', []))}")
-            print(f"   Queries executed: {len(metadata.get('queries_executed', []))}")
+        if args.verbose:
+            print("🔍 VERBOSE MODE: Full data stack with pprint")
+            print("="*80)
+            print("📊 COMPLETE RESULT STRUCTURE:")
+            pprint.pprint(result, width=120, depth=None)
+            print("="*80)
+        else:
+            print(f"🔍 DEBUG: Full result keys: {list(result.keys())}")
+            print(f"🔍 DEBUG: Result data keys: {list(result.get('data', {}).keys()) if isinstance(result.get('data'), dict) else 'not dict'}")
+            websearch_data = result.get("data", result.get("result", {}))
             
-            if hasattr(args, 'debug') and args.debug and metadata.get('queries_executed'):
-                print(f"\n🔍 Queries executed:")
-                for i, query in enumerate(metadata['queries_executed'], 1):
-                    print(f"     {i}. {query}")
+            # Display search results summary
+            search_results = websearch_data.get("websearch_results", [])
+            print(f"\n📊 Search Results Summary:")
+            print(f"   Total results found: {len(search_results)}")
+            
+            if search_results:
+                print(f"   Sources found:")
+                sources = set()
+                for res in search_results:
+                    if res.get("url"):
+                        domain = res["url"].split("//")[-1].split("/")[0]
+                        sources.add(domain)
+                for source in sorted(sources):
+                    print(f"     - {source}")
+            
+            # Display LLM analysis
+            llm_analysis = websearch_data.get("llm_analysis", {})
+            if llm_analysis:
+                print(f"\n🤖 LLM Analysis:")
+                for field, content in llm_analysis.items():
+                    if content:
+                        print(f"\n  {field.replace('_', ' ').title()}:")
+                        if isinstance(content, str):
+                            print(f"    {content[:300]}{'...' if len(content) > 300 else ''}")
+                        elif isinstance(content, list):
+                            for item in content[:3]:  # Show first 3 items
+                                print(f"    • {item}")
+                            if len(content) > 3:
+                                print(f"    ... and {len(content) - 3} more")
+                        else:
+                            print(f"    {str(content)[:200]}{'...' if len(str(content)) > 200 else ''}")
+            
+            # Display metadata
+            metadata = websearch_data.get("search_metadata", {})
+            if metadata:
+                print(f"\n📈 Execution Metadata:")
+                print(f"   Execution time: {metadata.get('execution_time_ms', 0):.1f}ms")
+                templates_used = metadata.get('templates_used', [])
+                if isinstance(templates_used, list):
+                    print(f"   Templates used: {len(templates_used)}")
+                else:
+                    print(f"   Templates used: {templates_used}")
+                print(f"   Queries executed: {len(metadata.get('queries_executed', []))}")
+                
+                if metadata.get('queries_executed'):
+                    print(f"\n🔍 Queries executed:")
+                    for i, query in enumerate(metadata['queries_executed'], 1):
+                        print(f"     {i}. {query}")
     else:
         print(f"❌ Test failed: {result.get('error', 'Unknown error')}")
-        if hasattr(args, 'debug') and args.debug:
-            print(f"\nDebug info: {format_result(result)}")
+        if args.verbose:
+            print(f"\n🔍 VERBOSE ERROR DEBUG INFO:")
+            pprint.pprint(result, width=120, depth=None)
 
     print("\n" + "="*80)
 

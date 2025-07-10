@@ -71,7 +71,7 @@ class SpacyTemporalPlugin(HTTPBasePlugin):
             
             # Call SpaCy temporal provider via dedicated SpaCy service
             # SpaCy temporal provider expects ProviderRequest format
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
                 "media_context": "movie",

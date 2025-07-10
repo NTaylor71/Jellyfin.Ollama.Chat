@@ -91,7 +91,7 @@ class LLMQuestionAnswerPlugin(HTTPBasePlugin):
             
             # Call LLM service (using general expand endpoint for Q&A)
             # LLM expand endpoint expects LLMRequest format
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             
             # Create a concept that includes context and questions for LLM processing
             concept_text = f"Context: {context}\n\nQuestions: {', '.join(questions)}"

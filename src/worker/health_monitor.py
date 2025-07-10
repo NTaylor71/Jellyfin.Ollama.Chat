@@ -130,7 +130,7 @@ class HealthMonitor:
         logger.debug("Performing health checks...")
         
         # Get list of available plugins
-        plugins_info = self.plugin_loader.list_available_plugins()
+        plugins_info = await self.plugin_loader.list_available_plugins()
         
         # Check local plugins
         for plugin_name in plugins_info.get("local_plugins", {}):
@@ -274,7 +274,7 @@ class HealthMonitor:
         
         try:
             # For local plugins, try reloading
-            plugins_info = self.plugin_loader.list_available_plugins()
+            plugins_info = await self.plugin_loader.list_available_plugins()
             
             if plugin_name in plugins_info.get("local_plugins", {}):
                 # Try reloading the plugin

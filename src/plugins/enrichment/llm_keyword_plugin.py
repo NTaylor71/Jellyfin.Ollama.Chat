@@ -94,7 +94,7 @@ class LLMKeywordPlugin(HTTPBasePlugin):
             
             # Call LLM service using general expand endpoint
             # LLM expand endpoint expects LLMRequest format
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             
             # Convert keywords list to a single concept string with context
             keywords_text = ", ".join(keywords)

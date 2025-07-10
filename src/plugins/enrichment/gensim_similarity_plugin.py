@@ -76,7 +76,7 @@ class GensimSimilarityPlugin(HTTPBasePlugin):
             
             # Call Gensim provider via dedicated Gensim service endpoint
             # Gensim provider expects ProviderRequest format
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             
             # Convert keywords list to a single concept string for provider request
             concept_text = ", ".join(keywords)

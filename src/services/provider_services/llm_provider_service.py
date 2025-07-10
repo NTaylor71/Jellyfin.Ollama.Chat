@@ -723,46 +723,34 @@ async def process_search_results(request: WebSearchProcessRequest):
             logger.warning(f"Template variable missing in prompt: {e}")
             prompt = request.processing_prompt.replace("{search_results}", results_text)
         
-        # Create expansion request for LLM
-        from src.providers.nlp.base_provider import ExpansionRequest
-        expansion_request = ExpansionRequest(
-            concept=prompt,
-            media_context="websearch",
-            max_concepts=20,
-            field_name="websearch_processing",
-            options={
-                "task_type": "content_analysis",
-                "expected_format": request.expected_format,
-                "fields": request.fields,
-                "max_length": request.max_length,
-                "temperature": 0.2  # Lower for more factual processing
-            }
+        # For content analysis, we'll call the LLM directly rather than using concept expansion
+        result = await _perform_content_analysis(
+            provider, 
+            prompt, 
+            request.expected_format, 
+            request.fields,
+            request.max_length
         )
-        
-        # Call LLM provider
-        result = await provider.expand_concept(expansion_request)
         
         execution_time_ms = (asyncio.get_event_loop().time() - start_time) * 1000
         
         # Extract processed content from result
-        if result.success:
-            processed_content = result.enhanced_data.get("expanded_concepts", {})
-            if isinstance(processed_content, list) and processed_content:
-                processed_content = processed_content[0] if len(processed_content) == 1 else {"items": processed_content}
+        if result and result.get("success", False):
+            processed_content = result.get("analysis", {})
         else:
-            processed_content = {"error": result.error_message}
+            processed_content = {"error": result.get("error", "Content analysis failed") if result else "No result returned"}
         
         return WebSearchResponse(
-            success=result.success,
+            success=result.get("success", False) if result else False,
             execution_time_ms=execution_time_ms,
             processed_content=processed_content,
             metadata={
                 "input_results_count": len(request.search_results),
                 "prompt_length": len(prompt),
-                "llm_confidence": result.confidence_score.overall if result.success else None,
+                "llm_confidence": result.get("confidence", 0.8) if result else None,
                 "expected_format": request.expected_format
             },
-            error_message=result.error_message if not result.success else None
+            error_message=result.get("error") if result and not result.get("success", False) else None
         )
         
     except Exception as e:
@@ -1069,6 +1057,144 @@ async def models_ready_check():
     except Exception as e:
         logger.error(f"Models ready check failed: {e}")
         return {"models_ready": False, "error": str(e)}, 503
+
+
+async def _perform_content_analysis(
+    provider,
+    analysis_prompt: str, 
+    expected_format: str = "dict",
+    fields: Optional[List[str]] = None,
+    max_length: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Perform content analysis using LLM without going through concept expansion.
+    
+    This keeps the LLM provider focused on concept expansion while handling
+    content analysis at the service level.
+    """
+    try:
+        # Build system prompt for content analysis
+        system_prompt = "You are an expert content analyzer. Your task is to analyze and synthesize information from web search results."
+        
+        if expected_format == "dict" and fields:
+            field_descriptions = ", ".join(fields)
+            system_prompt += f"\n\nYou must return your analysis as a JSON object with these exact fields: {field_descriptions}. Each field should contain relevant insights extracted from the provided content."
+            system_prompt += "\n\nExample format:\n{"
+            for i, field in enumerate(fields):
+                system_prompt += f'"{field}": "your analysis here"'
+                if i < len(fields) - 1:
+                    system_prompt += ", "
+            system_prompt += "}"
+        else:
+            system_prompt += "\n\nProvide a structured analysis of the content."
+        
+        system_prompt += "\n\nBe factual, concise, and focus on extracting meaningful insights from the provided search results."
+        
+        # Create LLM request for content analysis (bypassing concept expansion)
+        from src.providers.llm.base_llm_client import LLMRequest
+        
+        llm_request = LLMRequest(
+            prompt=analysis_prompt,
+            concept="content_analysis",
+            media_context="websearch",
+            max_tokens=max_length or 2000,
+            temperature=0.2,  # Lower for more factual processing
+            system_prompt=system_prompt
+        )
+        
+        # Call LLM backend directly
+        llm_response = await provider.client.generate_completion(llm_request)
+        
+        if not llm_response.success:
+            return {
+                "success": False,
+                "error": f"LLM completion failed: {llm_response.error_message}",
+                "confidence": 0.0
+            }
+        
+        # Parse structured response for content analysis
+        analysis_result = _parse_analysis_response(
+            llm_response.text,
+            expected_format,
+            fields
+        )
+        
+        if not analysis_result:
+            return {
+                "success": False,
+                "error": "No analysis result extracted from LLM response",
+                "confidence": 0.0
+            }
+        
+        return {
+            "success": True,
+            "analysis": analysis_result,
+            "confidence": 0.8,  # Default confidence for analysis
+            "model_used": llm_response.model
+        }
+        
+    except Exception as e:
+        logger.error(f"Content analysis failed: {e}")
+        return {
+            "success": False,
+            "error": f"Content analysis failed: {str(e)}",
+            "confidence": 0.0
+        }
+
+
+def _parse_analysis_response(
+    response_text: str,
+    expected_format: str,
+    fields: Optional[List[str]] = None
+) -> Optional[Dict[str, Any]]:
+    """Parse structured analysis response from LLM."""
+    try:
+        text = response_text.strip()
+        
+        if expected_format == "dict":
+            # Try to extract JSON from the response
+            import json
+            import re
+            
+            # Look for JSON-like structure
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group())
+                    
+                    # Validate that expected fields are present
+                    if fields:
+                        validated_result = {}
+                        for field in fields:
+                            validated_result[field] = result.get(field, f"No {field} analysis available")
+                        return validated_result
+                    else:
+                        return result
+                except json.JSONDecodeError:
+                    pass
+            
+            # Fallback: try to parse field-by-field from text
+            if fields:
+                result = {}
+                for field in fields:
+                    # Look for field patterns in text
+                    field_pattern = rf'{field}[:\-]\s*([^\n]+)'
+                    match = re.search(field_pattern, text, re.IGNORECASE)
+                    if match:
+                        result[field] = match.group(1).strip()
+                    else:
+                        result[field] = f"No {field} analysis found"
+                return result
+            else:
+                # Return the whole text as a single analysis
+                return {"analysis": text}
+        else:
+            # Return as plain text analysis
+            return {"analysis": text}
+        
+    except Exception as e:
+        logger.error(f"Failed to parse analysis response: {e}")
+        return {"error": f"Failed to parse analysis: {str(e)}", "raw_response": response_text}
 
 
 if __name__ == "__main__":

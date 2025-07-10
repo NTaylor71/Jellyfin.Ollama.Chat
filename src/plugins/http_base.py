@@ -157,11 +157,14 @@ class HTTPBasePlugin(BasePlugin):
         This is the standard plugin interface. For HTTP plugins, we delegate
         to the enrich_field method for each field in the data.
         """
+        logger.info(f"🔍 HTTP_BASE_PLUGIN.execute: Called on {self.__class__.__name__}")
+        logger.info(f"🔍 HTTP_BASE_PLUGIN.execute: data type={type(data)}, keys={list(data.keys()) if isinstance(data, dict) else 'not dict'}")
         start_time = time.time()
         
         try:
             # Handle different data types
             if isinstance(data, dict):
+                logger.info(f"🔍 HTTP_BASE_PLUGIN.execute: Processing dict data with {len(data)} keys")
                 # Process each field in the dictionary
                 enriched_data = data.copy()
                 
@@ -171,6 +174,7 @@ class HTTPBasePlugin(BasePlugin):
                 
                 # Process fields that need enrichment
                 fields_to_enrich = getattr(context, 'fields_to_enrich', ['name', 'overview', 'description'])
+                logger.info(f"🔍 HTTP_BASE_PLUGIN.execute: fields_to_enrich={fields_to_enrich}")
                 
                 for field_name in fields_to_enrich:
                     if field_name in data:
@@ -543,22 +547,32 @@ class HTTPBasePlugin(BasePlugin):
         Returns:
             Complete service URL
         """
-        # Use dynamic service discovery instead of hard-coded URLs
-        from src.shared.dynamic_service_discovery import get_service_discovery
+        # Use configuration-based URL generation as fallback
+        # since this is a synchronous method and dynamic discovery is async
+        from src.shared.config import get_settings
         
-        try:
-            discovery = await get_service_discovery()
-            service_url = await discovery.get_service_url(f"{service_name}-service", endpoint)
-            if service_url:
-                return service_url
-        except Exception as e:
-            self._logger.warning(f"Dynamic discovery failed for {service_name}: {e}")
+        settings = get_settings()
         
-        # No fallback - return None if dynamic discovery fails
-        self._logger.error(f"No service URL found for {service_name}")
-        return None
+        # Map service names to settings properties
+        service_url_mapping = {
+            "conceptnet": settings.conceptnet_service_url,
+            "gensim": settings.gensim_service_url,
+            "spacy": settings.spacy_service_url,
+            "heideltime": settings.heideltime_service_url,
+            "llm": settings.llm_service_url,
+        }
+        
+        base_url = service_url_mapping.get(service_name)
+        if not base_url:
+            self._logger.error(f"No service URL configured for {service_name}")
+            return None
+            
+        # Construct full URL with endpoint
+        if endpoint:
+            return f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+        return base_url
     
-    def get_plugin_service_url(self, plugin_name: Optional[str] = None) -> str:
+    async def get_plugin_service_url(self, plugin_name: Optional[str] = None) -> str:
         """
         Get service URL for this plugin using configuration-driven mapping.
         
@@ -571,6 +585,6 @@ class HTTPBasePlugin(BasePlugin):
         if plugin_name is None:
             plugin_name = self.metadata.name
             
-        # Use configuration to determine service and endpoint
-        service_name, endpoint_path = self.endpoint_mapper.get_service_and_endpoint(plugin_name)
+        # Use async configuration to determine service and endpoint
+        service_name, endpoint_path = await self.endpoint_mapper.get_service_and_endpoint(plugin_name)
         return self.get_service_url(service_name, endpoint_path)

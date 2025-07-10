@@ -69,7 +69,7 @@ class SUTimeTemporalPlugin(HTTPBasePlugin):
             
             # Call SUTime provider via dedicated SUTime service  
             # SUTime provider expects ProviderRequest format
-            service_url = self.get_plugin_service_url()
+            service_url = await self.get_plugin_service_url()
             request_data = {
                 "concept": text,
                 "media_context": "movie",

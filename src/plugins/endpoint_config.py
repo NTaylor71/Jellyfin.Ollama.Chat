@@ -244,6 +244,6 @@ def get_endpoint_mapper() -> ServiceEndpointMapper:
     return _endpoint_mapper
 
 
-def get_plugin_service_and_endpoint(plugin_name: str) -> Tuple[str, str]:
+async def get_plugin_service_and_endpoint(plugin_name: str) -> Tuple[str, str]:
     """Get service and endpoint for a plugin name."""
-    return get_endpoint_mapper().get_service_and_endpoint(plugin_name)
+    return await get_endpoint_mapper().get_service_and_endpoint(plugin_name)
