@@ -3,6 +3,8 @@ Merge Keywords Plugin
 HTTP-only plugin that merges keyword results from multiple provider plugins.
 """
 
+import asyncio
+import json
 import logging
 from typing import Dict, Any, List, Set
 from collections import Counter
@@ -22,7 +24,11 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
     - Multiple merge strategies (union, intersection, weighted)
     - Deduplication and ranking
     - No HTTP calls - just local processing
+    - Dependency waiting for parent plugin results
     """
+    
+    def __init__(self):
+        super().__init__()
     
     @property
     def metadata(self) -> PluginMetadata:
@@ -57,8 +63,21 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
             Dict containing merged keyword results
         """
         try:
+            # Check if we have dependency inputs that need to be waited for
+            inputs = config.get("inputs", [])
+            ingestion_id = config.get("ingestion_id")
             
-            input_enrichments = config.get("input_enrichments", [])
+            if inputs and ingestion_id:
+                # Wait for parent plugin results
+                parent_results = await self._wait_for_dependencies(inputs, ingestion_id)
+                if parent_results:
+                    # Use parent results as input enrichments
+                    input_enrichments = list(parent_results.values())
+                else:
+                    input_enrichments = config.get("input_enrichments", [])
+            else:
+                input_enrichments = config.get("input_enrichments", [])
+            
             if not input_enrichments:
                 self._logger.warning(f"No input enrichments provided for merging field {field_name}")
                 result = {"merged_keywords": []}
@@ -114,6 +133,10 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
                 }
             }
             
+            # Store result for children plugins if we have an ingestion_id
+            if ingestion_id:
+                plugin_id = config.get("id", "merged_keywords")
+                await self._store_result_for_children(ingestion_id, plugin_id, result)
             
             return self.normalize_text(result)
             
@@ -292,3 +315,4 @@ class MergeKeywordsPlugin(HTTPBasePlugin):
         base_health["merge_strategies"] = ["union", "intersection", "weighted", "ranked"]
         
         return base_health
+    

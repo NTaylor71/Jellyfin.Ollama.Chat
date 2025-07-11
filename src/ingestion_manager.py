@@ -7,6 +7,7 @@ Uses YAML-based configuration for enrichment processing - completely data-driven
 import asyncio
 import json
 import argparse
+import uuid
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Type
 from datetime import datetime
@@ -365,6 +366,10 @@ class IngestionManager:
 
         media_dict = media_item.model_dump()
         
+        # Generate unique ingestion_id for this media item
+        ingestion_id = str(uuid.uuid4())
+        self.logger.info(f"Starting enrichment for {media_item.Name} (ingestion_id: {ingestion_id})")
+        
         
         self._add_computed_fields(media_dict)
         
@@ -378,11 +383,15 @@ class IngestionManager:
                 if "enrichments" in field_config:
                     try:
                         enriched_value = await self._process_field_enrichments(
-                            field_name, field_config, media_dict
+                            field_name, field_config, media_dict, ingestion_id
                         )
                         enriched_data[field_name] = enriched_value
                     except Exception as e:
                         self.logger.error(f"Error enriching field {field_name} for {media_item.Name}: {e}")
+        
+        # TODO: Add dependency cleanup after enrichment completion
+        # This would require a plugin instance to call cleanup_dependency_results(ingestion_id)
+        # For now, Redis expiration handles cleanup automatically
                         
         return enriched_data
         
@@ -434,19 +443,78 @@ class IngestionManager:
                     self.logger.warning(f"Failed to compute field {field_name}: {e}")
                     
     async def _process_field_enrichments(self, field_name: str, field_config: Dict[str, Any], 
-                                       media_dict: Dict[str, Any]) -> Any:
-        """Process enrichments for a specific field."""
-
+                                       media_dict: Dict[str, Any], ingestion_id: str) -> Any:
+        """Process enrichments for a specific field with dependency support."""
 
         
         source_field = field_config.get("source_field")
         if source_field and source_field in media_dict:
             return media_dict[source_field]
         elif source_field is None:
-
-            return f"[Synthetic {field_name} - would be enriched by plugins]"
+            # Synthetic field - process enrichments
+            enrichments = field_config.get("enrichments", [])
+            if not enrichments:
+                return f"[Synthetic {field_name} - no enrichments configured]"
+            
+            enriched_value = await self._process_enrichment_pipeline(
+                field_name, enrichments, media_dict, ingestion_id
+            )
+            return enriched_value
         else:
             return None
+            
+    async def _process_enrichment_pipeline(self, field_name: str, enrichments: List[Dict[str, Any]],
+                                         media_dict: Dict[str, Any], ingestion_id: str) -> Any:
+        """Process the enrichment pipeline for a field."""
+        
+        # For now, return a placeholder that shows the pipeline structure
+        # In a real implementation, this would execute the actual plugins
+        pipeline_info = {
+            "field_name": field_name,
+            "ingestion_id": ingestion_id,
+            "enrichments_configured": len(enrichments),
+            "pipeline": []
+        }
+        
+        for enrichment in enrichments:
+            if isinstance(enrichment, dict):
+                if "plugin" in enrichment:
+                    # Single plugin enrichment
+                    plugin_config = enrichment.copy()
+                    plugin_config["ingestion_id"] = ingestion_id
+                    pipeline_info["pipeline"].append({
+                        "type": "plugin",
+                        "plugin": enrichment["plugin"],
+                        "id": enrichment.get("id", enrichment["plugin"]),
+                        "inputs": enrichment.get("inputs", [])
+                    })
+                elif "group" in enrichment:
+                    # Group enrichment
+                    group_config = enrichment["group"]
+                    group_plugins = group_config.get("plugins", [])
+                    group_info = {
+                        "type": "group",
+                        "plugins": []
+                    }
+                    
+                    for plugin in group_plugins:
+                        plugin_config = plugin.copy()
+                        plugin_config["ingestion_id"] = ingestion_id
+                        group_info["plugins"].append({
+                            "plugin": plugin["plugin"],
+                            "id": plugin.get("id", plugin["plugin"]),
+                            "inputs": plugin.get("inputs", [])
+                        })
+                    
+                    pipeline_info["pipeline"].append(group_info)
+        
+        self.logger.info(f"Processing enrichment pipeline for {field_name} with {len(enrichments)} enrichments")
+        
+        return {
+            "enriched_field": field_name,
+            "enrichment_metadata": pipeline_info,
+            "status": "pipeline_configured_for_dependency_chaining"
+        }
             
     @track_mongodb_metrics("upsert", "enriched")
     async def store_media_item(self, media_data: Dict[str, Any]):
