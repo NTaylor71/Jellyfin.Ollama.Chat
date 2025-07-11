@@ -1,0 +1,222 @@
+# Example: How to configure LLM Semantic Chunking in movie.yaml
+# This shows how the generic plugin would be configured for different use cases
+
+# Movie Review Analysis with Semantic Chunking
+ReviewAnalysis:
+  source_field: Reviews
+  type: dict
+  field_weight: 2.0
+  enrichments:
+    # First, generate synthetic reviews
+    - group:
+        group_weight: 1.5
+        plugins:
+          - plugin: llm_question_answer
+            id: critic_review
+            plugin_weight: 2.0
+            config:
+              prompt: |
+                Write a professional film critic's review of "{Name}" ({ProductionYear}).
+                Genres: {Genres}
+                Plot: {Overview}
+                Include analysis of cinematography, performances, direction, and themes.
+              expected_format: string
+              max_length: 1000
+    
+    # Then, chunk the reviews semantically
+    - plugin: llm_semantic_chunking
+      id: review_chunks
+      plugin_weight: 2.5
+      field_override: "@critic_review"
+      config:
+        structure_prompt: |
+          Analyze this movie review structure. Identify: 
+          1) Opening opinion 
+          2) Plot discussion 
+          3) Character analysis 
+          4) Technical aspects 
+          5) Final verdict. 
+          List the main topics in order:
+        boundary_prompt: |
+          Mark semantic boundaries with | where the review shifts from: 
+          criticism→plot→acting→technical→conclusion. 
+          Output format: 'Text before boundary | Text after boundary'
+        strategy: semantic_paragraphs
+        max_chunk_size: 200
+        overlap: 30
+        min_length: 500
+        optimize_chunks: true
+
+# Plot Summary with Semantic Chunking
+PlotAnalysis:
+  source_field: Overview
+  type: dict
+  field_weight: 1.8
+  enrichments:
+    - plugin: llm_semantic_chunking
+      config:
+        structure_prompt: |
+          Analyze this plot summary structure. Identify:
+          1) Setup and characters
+          2) Rising action and conflict
+          3) Climax and resolution
+          4) Themes and subplots
+          List the narrative flow:
+        boundary_prompt: |
+          Mark story boundaries with | where the plot shifts:
+          setup→conflict→climax→resolution.
+          Output format: 'Text before boundary | Text after boundary'
+        strategy: narrative_flow
+        max_chunk_size: 150
+        overlap: 20
+
+# Generic Long Text Chunking
+LongTextProcessing:
+  source_field: DetailedDescription
+  type: dict
+  field_weight: 1.5
+  enrichments:
+    - plugin: llm_semantic_chunking
+      config:
+        structure_prompt: |
+          Analyze this text structure. Identify the main topics and where they transition. 
+          List the key themes in order:
+        boundary_prompt: |
+          Mark semantic boundaries with | where topics change or new themes emerge. 
+          Output format: 'Text before boundary | Text after boundary'
+        strategy: topic_based
+        max_chunk_size: 300
+        overlap: 50
+        min_length: 800
+
+# Sentiment-Based Chunking for Analysis
+SentimentAnalysis:
+  source_field: UserReviews
+  type: dict
+  field_weight: 1.2
+  enrichments:
+    - plugin: llm_semantic_chunking
+      config:
+        structure_prompt: |
+          Analyze this text for sentiment changes. Identify where tone shifts 
+          from positive to negative or vice versa. List the emotional flow:
+        boundary_prompt: |
+          Mark sentiment boundaries with | where the emotional tone changes significantly. 
+          Output format: 'Text before boundary | Text after boundary'
+        strategy: sentiment_based
+        max_chunk_size: 100
+        overlap: 15
+        min_length: 300
+
+# Multi-Pass Analysis (Structure + Chunks + Analysis)
+ComprehensiveAnalysis:
+  source_field: null
+  type: dict
+  field_weight: 2.2
+  enrichments:
+    # Step 1: Chunk the overview
+    - plugin: llm_semantic_chunking
+      id: overview_chunks
+      field_override: Overview
+      config:
+        structure_prompt: |
+          Analyze this movie plot. Identify main story beats and character arcs. 
+          List the narrative progression:
+        boundary_prompt: |
+          Mark story boundaries with | at major plot points and character developments.
+          Output format: 'Text before boundary | Text after boundary'
+        strategy: narrative_flow
+        max_chunk_size: 200
+        overlap: 25
+    
+    # Step 2: Analyze each chunk
+    - plugin: llm_question_answer
+      config:
+        prompt: |
+          Analyze these semantically chunked plot segments:
+          {@overview_chunks.chunks}
+          
+          For each chunk, identify:
+          1. Main story elements
+          2. Character development
+          3. Thematic content
+          4. Narrative function
+          
+          How do these chunks work together to tell the story?
+        expected_format: dict
+        fields: ["chunk_analysis", "narrative_flow", "thematic_coherence", "story_structure"]
+
+# Technical: Similarity Analysis Using LLM
+SimilarityAnalysis:
+  source_field: null
+  type: dict
+  field_weight: 1.0
+  enrichments:
+    - plugin: llm_question_answer
+      config:
+        prompt: |
+          Compare these text segments for semantic similarity:
+          
+          Segment 1: {Overview}
+          Segment 2: {Taglines}
+          
+          Rate similarity 0-100 and explain:
+          1. Topic overlap
+          2. Thematic alignment
+          3. Semantic coherence
+          4. Conceptual relationship
+        expected_format: dict
+        fields: ["similarity_score", "topic_overlap", "thematic_alignment", "conceptual_relationship"]
+
+# Configuration Examples for Different Content Types
+ConfigExamples:
+  # News Article Chunking
+  news_chunking:
+    structure_prompt: |
+      Analyze this news article structure. Identify: 
+      1) Lead/headline info 
+      2) Background 
+      3) Quotes/sources 
+      4) Details. 
+      List the information flow:
+    boundary_prompt: |
+      Mark news boundaries with | where the article shifts from: 
+      lead→background→quotes→details.
+      Output format: 'Text before boundary | Text after boundary'
+  
+  # Technical Documentation
+  technical_chunking:
+    structure_prompt: |
+      Analyze this technical document structure. Identify: 
+      1) Concept introduction 
+      2) Implementation details 
+      3) Examples 
+      4) Specifications. 
+      List the main sections:
+    boundary_prompt: |
+      Mark technical boundaries with | where the document shifts from: 
+      concept→implementation→examples→specifications.
+      Output format: 'Text before boundary | Text after boundary'
+  
+  # Academic Paper
+  academic_chunking:
+    structure_prompt: |
+      Analyze this academic text structure. Identify: 
+      1) Introduction 
+      2) Main arguments 
+      3) Evidence 
+      4) Conclusion. 
+      List the logical flow:
+    boundary_prompt: |
+      Mark academic boundaries with | where the argument shifts from: 
+      introduction→main points→evidence→conclusion.
+      Output format: 'Text before boundary | Text after boundary'
+
+# Plugin Configuration Notes:
+# - All prompts are configurable via YAML
+# - No hardcoded content types in the plugin
+# - Same plugin works for any text type
+# - Strategies are configuration-driven
+# - Chunk sizes and overlap are adjustable
+# - Multi-pass workflows are supported
+# - Integration with other plugins via field references (@field_name)

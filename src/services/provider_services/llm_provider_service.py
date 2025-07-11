@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class LLMRequest(BaseModel):
     """Request to LLM provider."""
-    concept: str = Field(..., min_length=1, max_length=500)
+    concept: str = Field(..., min_length=1, max_length=3000)
     media_context: str = Field(default="movie")
     max_concepts: int = Field(default=10, ge=1, le=50)
     field_name: str = Field(default="concept")

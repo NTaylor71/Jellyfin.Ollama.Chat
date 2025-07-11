@@ -30,6 +30,7 @@ llm_endpoints:
   keywords: "providers/llm/keywords/expand"
   general: "providers/llm/expand"
   websearch: "providers/llm/websearch/full"
+  semantic_chunking: "providers/llm/semantic_chunking/expand"
 
 # Plugin to Service Mapping Rules (Microservices)
 plugin_routing:
@@ -68,6 +69,9 @@ plugin_routing:
     - pattern: "llm.*keyword"
       service: "llm"
       endpoint: "keywords"
+    - pattern: "semantic_chunking"
+      service: "llm"
+      endpoint: "semantic_chunking"
     - pattern: "llm"
       service: "llm"
       endpoint: "general"
