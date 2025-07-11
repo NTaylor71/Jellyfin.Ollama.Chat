@@ -4,12 +4,15 @@ Simplified base class for all HTTP-only plugins in the reorganized architecture.
 """
 
 import asyncio
+import json
 import logging
 import time
 import unicodedata
 from abc import abstractmethod
 from typing import Dict, Any, Optional, List, Union
 import aiohttp
+
+import redis.asyncio as redis
 
 from src.plugins.base import (
     BasePlugin, PluginMetadata, PluginResourceRequirements, 
@@ -48,6 +51,7 @@ class HTTPBasePlugin(BasePlugin):
         self._request_count = 0
         self._failed_requests = 0
         self._total_response_time = 0.0
+        self.redis_client = None
     
     def normalize_text(self, data: Any) -> Any:
         """
@@ -265,7 +269,8 @@ class HTTPBasePlugin(BasePlugin):
             "gensim_service",    
             "spacy_service",     
             "heideltime_service",
-            "llm_service",       
+            "sutime_service",
+            "llm_service",
         ]
         
         for service_name in services:
@@ -559,6 +564,7 @@ class HTTPBasePlugin(BasePlugin):
             "gensim": settings.gensim_service_url,
             "spacy": settings.spacy_service_url,
             "heideltime": settings.heideltime_service_url,
+            "sutime": settings.sutime_service_url,
             "llm": settings.llm_service_url,
         }
         
@@ -588,3 +594,167 @@ class HTTPBasePlugin(BasePlugin):
         
         service_name, endpoint_path = await self.endpoint_mapper.get_service_and_endpoint(plugin_name)
         return self.get_service_url(service_name, endpoint_path)
+    
+    async def _wait_for_dependencies(self, inputs: List[str], ingestion_id: str, timeout: int = None) -> Dict[str, Any]:
+        """
+        Wait for parent plugin results to be available in Redis.
+        
+        Args:
+            inputs: List of parent plugin IDs to wait for
+            ingestion_id: Unique ingestion identifier
+            timeout: Maximum time to wait in seconds (uses config default if None)
+            
+        Returns:
+            Dict of parent plugin results
+        """
+        await self._ensure_redis_client()
+        
+        # Use configured timeout or default
+        if timeout is None:
+            timeout = getattr(self.settings, 'DEPENDENCY_WAIT_TIMEOUT', 300)
+        
+        poll_interval = getattr(self.settings, 'DEPENDENCY_POLL_INTERVAL', 1.0)
+        
+        self._logger.info(f"Waiting for dependencies: {inputs} (ingestion_id: {ingestion_id})")
+        
+        end_time = asyncio.get_event_loop().time() + timeout
+        
+        while asyncio.get_event_loop().time() < end_time:
+            parent_results = await self._get_parent_results(inputs, ingestion_id)
+            
+            if len(parent_results) == len(inputs):
+                self._logger.info(f"All dependencies available: {list(parent_results.keys())}")
+                return parent_results
+            
+            missing = set(inputs) - set(parent_results.keys())
+            self._logger.debug(f"Still waiting for dependencies: {missing}")
+            
+            await asyncio.sleep(poll_interval)
+        
+        self._logger.warning(f"Timeout waiting for dependencies: {inputs}")
+        return {}
+    
+    async def _get_parent_results(self, inputs: List[str], ingestion_id: str) -> Dict[str, Any]:
+        """
+        Get parent plugin results from Redis using batch operations.
+        
+        Args:
+            inputs: List of parent plugin IDs
+            ingestion_id: Unique ingestion identifier
+            
+        Returns:
+            Dict of available parent results
+        """
+        await self._ensure_redis_client()
+        
+        if not inputs:
+            return {}
+        
+        # Build Redis keys for batch operation
+        redis_keys = [f"result:{ingestion_id}:{plugin_id}" for plugin_id in inputs]
+        
+        parent_results = {}
+        
+        try:
+            # Batch get all results at once for efficiency
+            result_jsons = await self.redis_client.mget(redis_keys)
+            
+            for plugin_id, result_json in zip(inputs, result_jsons):
+                if result_json:
+                    try:
+                        result = json.loads(result_json)
+                        parent_results[plugin_id] = result
+                        self._logger.debug(f"Found result for {plugin_id}")
+                    except json.JSONDecodeError as e:
+                        self._logger.error(f"Invalid JSON for {plugin_id}: {e}")
+                else:
+                    self._logger.debug(f"No result yet for {plugin_id}")
+                    
+        except Exception as e:
+            self._logger.error(f"Error batch getting parent results: {e}")
+            # Fallback to individual gets
+            for plugin_id in inputs:
+                redis_key = f"result:{ingestion_id}:{plugin_id}"
+                try:
+                    result_json = await self.redis_client.get(redis_key)
+                    if result_json:
+                        result = json.loads(result_json)
+                        parent_results[plugin_id] = result
+                except Exception as e:
+                    self._logger.error(f"Error getting result for {plugin_id}: {e}")
+        
+        return parent_results
+    
+    async def _store_result_for_children(self, ingestion_id: str, plugin_id: str, result: Any) -> None:
+        """
+        Store plugin result in Redis for children plugins.
+        
+        Args:
+            ingestion_id: Unique ingestion identifier
+            plugin_id: Plugin identifier
+            result: Result to store
+        """
+        await self._ensure_redis_client()
+        
+        redis_key = f"result:{ingestion_id}:{plugin_id}"
+        
+        try:
+            result_json = json.dumps(result)
+            
+            # Check result size to prevent memory issues
+            max_result_size = getattr(self.settings, 'MAX_DEPENDENCY_RESULT_SIZE', 1048576)  # 1MB default
+            if len(result_json) > max_result_size:
+                self._logger.warning(f"Result for {plugin_id} too large ({len(result_json)} bytes), truncating")
+                truncated_result = {"error": "Result too large", "size": len(result_json), "max_size": max_result_size}
+                result_json = json.dumps(truncated_result)
+            
+            # Use configured expiration
+            expiry_seconds = getattr(self.settings, 'DEPENDENCY_RESULT_EXPIRY', 3600)  # 1 hour default
+            await self.redis_client.setex(redis_key, expiry_seconds, result_json)
+            self._logger.debug(f"Stored result for {plugin_id} in Redis (expires in {expiry_seconds}s)")
+        except Exception as e:
+            self._logger.error(f"Error storing result for {plugin_id}: {e}")
+    
+    async def _ensure_redis_client(self) -> None:
+        """Ensure Redis client is initialized."""
+        if self.redis_client is None:
+            socket_timeout = getattr(self.settings, 'REDIS_SOCKET_TIMEOUT', 10)
+            self.redis_client = redis.Redis(
+                host=self.settings.redis_host,
+                port=self.settings.redis_port,
+                password=self.settings.REDIS_PASSWORD,
+                db=self.settings.REDIS_DB,
+                decode_responses=True,
+                socket_timeout=socket_timeout,
+                retry_on_timeout=True
+            )
+            self._logger.debug("Initialized Redis client for dependency management")
+    
+    async def cleanup_dependency_results(self, ingestion_id: str) -> int:
+        """
+        Clean up dependency results for a completed ingestion.
+        
+        Args:
+            ingestion_id: Ingestion identifier to clean up
+            
+        Returns:
+            Number of keys cleaned up
+        """
+        await self._ensure_redis_client()
+        
+        try:
+            # Find all result keys for this ingestion
+            pattern = f"result:{ingestion_id}:*"
+            keys = await self.redis_client.keys(pattern)
+            
+            if keys:
+                deleted = await self.redis_client.delete(*keys)
+                self._logger.info(f"Cleaned up {deleted} dependency result keys for ingestion {ingestion_id}")
+                return deleted
+            else:
+                self._logger.debug(f"No dependency results to clean up for ingestion {ingestion_id}")
+                return 0
+                
+        except Exception as e:
+            self._logger.error(f"Error cleaning up dependency results for {ingestion_id}: {e}")
+            return 0

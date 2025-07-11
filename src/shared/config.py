@@ -242,21 +242,21 @@ class Settings(BaseSettings):
     SPACY_SERVICE_PORT: int = Field(default=8007)
     HEIDELTIME_SERVICE_URL: str = Field(default="http://localhost:8008")
     HEIDELTIME_SERVICE_PORT: int = Field(default=8008)
-    
+    SUTIME_SERVICE_URL: str = Field(default="http://localhost:8009")
+    SUTIME_SERVICE_PORT: int = Field(default=8009)
 
     SERVICE_SCAN_START_PORT: int = Field(default=8001)
     SERVICE_SCAN_END_PORT: int = Field(default=8010)
-    
 
     SEARXNG_URL: str = Field(default="http://searxng:8080")
-    
 
     DOCKER_LLM_SERVICE_URL: str = Field(default="http://llm-service:8002")
     DOCKER_CONCEPTNET_SERVICE_URL: str = Field(default="http://conceptnet-service:8001")
     DOCKER_GENSIM_SERVICE_URL: str = Field(default="http://gensim-service:8006")
     DOCKER_SPACY_SERVICE_URL: str = Field(default="http://spacy-service:8007")
     DOCKER_HEIDELTIME_SERVICE_URL: str = Field(default="http://heideltime-service:8008")
-    
+    DOCKER_SUTIME_SERVICE_URL: str = Field(default="http://sutime-service:8009")
+
     @property
     def llm_service_url(self) -> str:
         """Get LLM service URL based on environment."""
@@ -291,6 +291,20 @@ class Settings(BaseSettings):
         if self.is_docker:
             return self.DOCKER_HEIDELTIME_SERVICE_URL
         return self.HEIDELTIME_SERVICE_URL
+    
+    @property
+    def sutime_service_url(self) -> str:
+        """Get SUTime service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_SUTIME_SERVICE_URL
+        return self.SUTIME_SERVICE_URL
+    
+    @property
+    def semantic_chunking_service_url(self) -> str:
+        """Get Semantic Chunking service URL based on environment."""
+        if self.is_docker:
+            return self.DOCKER_SEMANTIC_CHUNKING_SERVICE_URL
+        return self.SEMANTIC_CHUNKING_SERVICE_URL
     
     
 
@@ -553,6 +567,13 @@ class Settings(BaseSettings):
             "ollama_ingestion": self.OLLAMA_INGESTION_BASE_URL,
             "ollama_embed": self.OLLAMA_INGESTION_BASE_URL,
             "redis": self.redis_url,
+            "llm": self.llm_service_url,
+            "conceptnet": self.conceptnet_service_url,
+            "gensim": self.gensim_service_url,
+            "spacy": self.spacy_service_url,
+            "heideltime": self.heideltime_service_url,
+            "sutime": self.sutime_service_url,
+            "semantic_chunking": self.semantic_chunking_service_url,
             "prometheus": f"http://localhost:{self.PROMETHEUS_PORT}" if self.PROMETHEUS_ENABLED else None
         }
     
